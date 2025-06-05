@@ -43,8 +43,12 @@ const DEBUG_MODULES = {
 // ===================================================================
 
 const createSettingsManagerDebugModule = () => {
+  console.log("🔧 Creating Settings Manager Debug Module...");
+
   const container = document.createElement("div");
   container.className = "debug-module settings-manager-debug";
+
+  console.log("📝 Adding HTML content to module...");
 
   container.innerHTML = `
     <div class="debug-section">
@@ -97,8 +101,13 @@ const createSettingsManagerDebugModule = () => {
     </div>
   `;
 
+  console.log("🎯 Setting up event handlers...");
+
   // Set up event handlers
-  setupSettingsDebugHandlers(container);
+  setTimeout(() => {
+    setupSettingsDebugHandlers(container);
+    console.log("✅ Settings Manager Debug Module created and configured");
+  }, 50);
 
   return container;
 };
@@ -543,51 +552,86 @@ const createDebugWindow = () => {
   window.appendChild(header);
   window.appendChild(content);
 
-  // Load initial module
-  loadDebugModule("settings-manager");
+  // Add to page first
+  document.body.appendChild(window);
 
   // Event handlers
   setupDebugWindowHandlers(window);
 
-  // Add to page
-  document.body.appendChild(window);
+  // Load initial module (after adding to DOM)
+  setTimeout(() => {
+    console.log("🔄 Loading initial debug module...");
+    loadDebugModule("settings-manager");
+  }, 100);
 
   return window;
 };
 
 const loadDebugModule = (moduleId) => {
+  console.log(`🔄 Loading debug module: ${moduleId}`);
   const content = document.getElementById("debug-window-content");
-  if (!content) return;
+  if (!content) {
+    console.error("❌ Debug window content area not found!");
+    return;
+  }
 
   // Clear content
-  content.innerHTML = "";
+  content.innerHTML =
+    '<div style="padding: 12px; color: #666;">Loading module...</div>';
 
   // Load module
   const module = DEBUG_MODULES[moduleId];
-  if (!module) return;
+  if (!module) {
+    console.error(`❌ Debug module not found: ${moduleId}`);
+    content.innerHTML =
+      '<div style="padding: 12px; color: #dc2626;">Error: Module not found</div>';
+    return;
+  }
+
+  console.log(`📦 Creating module component for: ${module.name}`);
 
   // Create module component
   let moduleComponent;
-  switch (moduleId) {
-    case "settings-manager":
-      moduleComponent = createSettingsManagerDebugModule();
-      break;
-    default:
-      moduleComponent = document.createElement("div");
-      moduleComponent.innerHTML = `
-        <div class="debug-section">
-          <h4>${module.name}</h4>
-          <p>${module.description}</p>
-          <p><em>This debug module is coming soon...</em></p>
-        </div>
-      `;
-  }
+  try {
+    switch (moduleId) {
+      case "settings-manager":
+        moduleComponent = createSettingsManagerDebugModule();
+        console.log("✅ Settings manager module created");
+        break;
+      default:
+        moduleComponent = document.createElement("div");
+        moduleComponent.innerHTML = `
+          <div class="debug-section">
+            <h4>${module.name}</h4>
+            <p>${module.description}</p>
+            <p><em>This debug module is coming soon...</em></p>
+          </div>
+        `;
+        console.log(`📋 Placeholder module created for: ${moduleId}`);
+    }
 
-  content.appendChild(moduleComponent);
+    if (moduleComponent) {
+      content.innerHTML = ""; // Clear loading message
+      content.appendChild(moduleComponent);
+      console.log("✅ Module component added to content area");
+    } else {
+      throw new Error("Module component was not created");
+    }
+  } catch (error) {
+    console.error("❌ Error creating module component:", error);
+    content.innerHTML = `
+      <div style="padding: 12px; color: #dc2626;">
+        <strong>Error loading module:</strong><br>
+        ${error.message}
+      </div>
+    `;
+  }
 
   // Update active state
   Object.values(DEBUG_MODULES).forEach((m) => (m.active = false));
   module.active = true;
+
+  console.log(`🎯 Module ${moduleId} is now active`);
 };
 
 const setupDebugWindowHandlers = (window) => {
@@ -684,7 +728,39 @@ export default {
 
     // Auto-open debug window for development
     setTimeout(() => {
-      createDebugWindow();
+      console.log("🔄 Auto-opening debug window...");
+      const debugWindow = createDebugWindow();
+      console.log(
+        "✅ Debug window created:",
+        debugWindow ? "Success" : "Failed"
+      );
+
+      // Add fallback content if module loading fails
+      setTimeout(() => {
+        const content = document.getElementById("debug-window-content");
+        if (
+          content &&
+          (!content.innerHTML || content.innerHTML.includes("Loading module"))
+        ) {
+          console.log("⚠️ Module loading failed, adding fallback content...");
+          content.innerHTML = `
+            <div style="padding: 20px; text-align: center; color: #666;">
+              <h3>🛠️ Debug Tools</h3>
+              <p>Module loading issue detected. Using fallback interface.</p>
+              <button onclick="console.log('Debug test clicked')" style="
+                padding: 8px 16px; 
+                background: #137cbd; 
+                color: white; 
+                border: none; 
+                border-radius: 4px; 
+                cursor: pointer;
+              ">Test Debug Button</button>
+              <br><br>
+              <p><em>Check console for detailed loading logs.</em></p>
+            </div>
+          `;
+        }
+      }, 2000);
     }, 1000);
   },
 
