@@ -1,1177 +1,558 @@
-// 🌳 Extension 1: Core Infrastructure v3.0 - Registry + Event Bus Only
-// 🌳 Purpose: Pure foundation layer for Roam Multiplayer Suite - manages extension coordination and communication
-// 🌳 Dependencies: None (this IS the foundation)
-// 🌳 Architecture: Clean separation of registry and event bus with zero business logic
+// ===================================================================
+// Extension 0.5: Reload Manager - Development Extension Loader
+// Checkbox interface for selective extension loading during development
+// ===================================================================
 
-const coreInfrastructure = (() => {
-  // 🌲 1.0 - EXTENSION STATE
-  let isInitialized = false;
-  let extensionAPI = null;
+// ===================================================================
+// 🔧 EXTENSION CATALOG - Available Extensions
+// ===================================================================
 
-  // 🌸 1.1 - LOGGING SYSTEM
-  // Simple, consistent logging that other extensions can use
-  const log = (message, category = "INFO", source = "Core") => {
-    const timestamp = new Date().toLocaleTimeString();
-    console.log(`[${source} ${timestamp}] ${category}: ${message}`);
+const EXTENSION_CATALOG = {
+  "foundation-registry": {
+    id: "foundation-registry",
+    name: "Foundation Registry",
+    description:
+      "Professional lifecycle management and extension coordination platform",
+    file: "extension-1-foundation-registry.js",
+    required: true, // Always loaded first
+    dependencies: [],
+  },
+  "user-authentication": {
+    id: "user-authentication",
+    name: "User Authentication",
+    description: "Professional user detection with multi-fallback approach",
+    file: "extension-2-user-authentication.js",
+    dependencies: ["foundation-registry"],
+  },
+  "settings-manager": {
+    id: "settings-manager",
+    name: "Settings Manager",
+    description: "Tree-based configuration with auto-creation",
+    file: "extension-3-settings-manager.js",
+    dependencies: ["foundation-registry", "user-authentication"],
+  },
+  "navigation-protection": {
+    id: "navigation-protection",
+    name: "Navigation + Protection",
+    description: "Smart landing + collaborative page protection",
+    file: "extension-4-navigation-protection.js",
+    dependencies: [
+      "foundation-registry",
+      "user-authentication",
+      "settings-manager",
+    ],
+  },
+  "personal-shortcuts": {
+    id: "personal-shortcuts",
+    name: "Personal Shortcuts",
+    description: "Professional shortcuts with keyboard navigation",
+    file: "extension-5-personal-shortcuts.js",
+    dependencies: [
+      "foundation-registry",
+      "user-authentication",
+      "settings-manager",
+    ],
+  },
+  "user-directory": {
+    id: "user-directory",
+    name: "User Directory + Timezones",
+    description: "User directory with real-time timezone intelligence",
+    file: "extension-6-user-directory.js",
+    dependencies: [
+      "foundation-registry",
+      "user-authentication",
+      "settings-manager",
+    ],
+  },
+  "journal-quick-entry": {
+    id: "journal-quick-entry",
+    name: "Journal Quick Entry",
+    description: "Daily entry buttons with natural language dates",
+    file: "extension-7-journal-quick-entry.js",
+    dependencies: [
+      "foundation-registry",
+      "user-authentication",
+      "settings-manager",
+    ],
+  },
+  "conversation-processor": {
+    id: "conversation-processor",
+    name: "Conversation Processor",
+    description: "Comment → conversation conversion + username tagging",
+    file: "extension-8-conversation-processor.js",
+    dependencies: ["foundation-registry", "user-authentication"],
+  },
+  "timestamp-enhancer": {
+    id: "timestamp-enhancer",
+    name: "Timestamp Enhancer",
+    description: "Beautiful #ts0 timestamp pills with temporal context",
+    file: "extension-9-timestamp-enhancer.js",
+    dependencies: ["foundation-registry"],
+  },
+  "debug-tools": {
+    id: "debug-tools",
+    name: "Debug Tools",
+    description: "Swappable debug modules for current development focus",
+    file: "extension-0-debug-tools.js",
+    dependencies: ["foundation-registry"],
+  },
+};
+
+// ===================================================================
+// 🗃️ PREFERENCES STORAGE - Development Settings
+// ===================================================================
+
+const STORAGE_KEY = "roam-extension-suite-dev-prefs";
+
+const getStoredPreferences = () => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored ? JSON.parse(stored) : {};
+  } catch (error) {
+    console.warn("Failed to load stored preferences:", error.message);
+    return {};
+  }
+};
+
+const storePreferences = (prefs) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+  } catch (error) {
+    console.warn("Failed to store preferences:", error.message);
+  }
+};
+
+// ===================================================================
+// 🎨 RELOAD MANAGER UI - Professional Interface
+// ===================================================================
+
+const createReloadManagerUI = () => {
+  // Remove existing UI if present
+  const existingUI = document.getElementById("roam-extension-reload-manager");
+  if (existingUI) {
+    existingUI.remove();
+  }
+
+  // Create main container
+  const container = document.createElement("div");
+  container.id = "roam-extension-reload-manager";
+  container.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 380px;
+    background: white;
+    border: 1px solid #e1e5e9;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 10000;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    max-height: 80vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  `;
+
+  // Header
+  const header = document.createElement("div");
+  header.style.cssText = `
+    background: #137cbd;
+    color: white;
+    padding: 12px 16px;
+    border-radius: 8px 8px 0 0;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  `;
+  header.innerHTML = `
+    <span>🔄 Extension Reload Manager</span>
+    <button id="close-reload-manager" style="
+      background: none;
+      border: none; 
+      color: white;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 0;
+      line-height: 1;
+    ">×</button>
+  `;
+
+  // Content area
+  const content = document.createElement("div");
+  content.style.cssText = `
+    padding: 16px;
+    overflow-y: auto;
+    flex: 1;
+  `;
+
+  // Extension list
+  const extensionList = document.createElement("div");
+  extensionList.style.cssText = `
+    margin-bottom: 16px;
+  `;
+
+  // Get current status
+  const platform = window.RoamExtensionSuite;
+  const loadedExtensions = platform ? platform.getStatus().extensions : [];
+  const storedPrefs = getStoredPreferences();
+
+  // Build extension checkboxes
+  Object.values(EXTENSION_CATALOG).forEach((ext) => {
+    const isLoaded = loadedExtensions.includes(ext.id);
+    const isEnabled = storedPrefs[ext.id] !== false; // Default to enabled
+
+    const item = document.createElement("div");
+    item.style.cssText = `
+      margin-bottom: 12px;
+      padding: 12px;
+      border: 1px solid #e1e5e9;
+      border-radius: 4px;
+      background: ${isLoaded ? "#f0f9ff" : "#fafafa"};
+    `;
+
+    item.innerHTML = `
+      <label style="display: flex; align-items: flex-start; cursor: pointer;">
+        <input 
+          type="checkbox" 
+          ${isEnabled ? "checked" : ""} 
+          ${ext.required ? "disabled" : ""}
+          data-extension-id="${ext.id}"
+          style="margin: 2px 8px 0 0; flex-shrink: 0;"
+        >
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-weight: 600; color: ${
+            isLoaded ? "#0d47a1" : "#333"
+          };">
+            ${ext.name}
+            ${isLoaded ? " ✅" : ""}
+            ${ext.required ? " (Required)" : ""}
+          </div>
+          <div style="font-size: 12px; color: #666; margin: 2px 0;">
+            ${ext.description}
+          </div>
+          ${
+            ext.dependencies.length > 0
+              ? `
+            <div style="font-size: 11px; color: #888;">
+              Depends on: ${ext.dependencies.join(", ")}
+            </div>
+          `
+              : ""
+          }
+        </div>
+      </label>
+    `;
+
+    extensionList.appendChild(item);
+  });
+
+  // Control buttons
+  const controls = document.createElement("div");
+  controls.style.cssText = `
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  `;
+
+  const buttonStyle = `
+    padding: 8px 16px;
+    border: 1px solid #137cbd;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  `;
+
+  controls.innerHTML = `
+    <button id="reload-selected" style="${buttonStyle} background: #137cbd; color: white;">
+      🔄 Reload Selected
+    </button>
+    <button id="unload-all" style="${buttonStyle} background: white; color: #137cbd;">
+      🗑️ Unload All
+    </button>
+    <button id="select-all" style="${buttonStyle} background: white; color: #137cbd;">
+      ✅ Select All
+    </button>
+    <button id="select-none" style="${buttonStyle} background: white; color: #137cbd;">
+      ❌ Select None
+    </button>
+  `;
+
+  // Status area
+  const status = document.createElement("div");
+  status.id = "reload-status";
+  status.style.cssText = `
+    margin-top: 12px;
+    padding: 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    min-height: 20px;
+  `;
+
+  // Assemble UI
+  content.appendChild(extensionList);
+  content.appendChild(controls);
+  content.appendChild(status);
+  container.appendChild(header);
+  container.appendChild(content);
+
+  // Add to page
+  document.body.appendChild(container);
+
+  // Register for cleanup
+  if (window._extensionRegistry) {
+    window._extensionRegistry.elements.push(container);
+  }
+
+  return container;
+};
+
+// ===================================================================
+// 🔄 EXTENSION LOADING LOGIC - Core Functionality
+// ===================================================================
+
+const showStatus = (message, type = "info") => {
+  const status = document.getElementById("reload-status");
+  if (!status) return;
+
+  const colors = {
+    info: "#e3f2fd",
+    success: "#e8f5e8",
+    error: "#ffebee",
+    warning: "#fff3e0",
   };
 
-  // 🌳 2.0 - EXTENSION REGISTRY SYSTEM
-  // 🌳 The "phone book" that lets extensions find and talk to each other
+  status.style.background = colors[type] || colors.info;
+  status.textContent = message;
 
-  // 🌲 2.1 - Registry State
-  if (!window.RoamMultiplayerSuite) {
-    window.RoamMultiplayerSuite = (() => {
-      // 🍎 Internal registry storage
-      const extensions = new Map(); // extensionId -> { id, api, metadata }
-      const loadOrder = []; // Order extensions were registered
-      const systemLog = []; // Registry operation history
+  setTimeout(() => {
+    if (status) status.textContent = "";
+  }, 3000);
+};
 
-      // 🌸 Registry logging (separate from main logging)
-      const registryLog = (message, category = "REGISTRY") => {
-        const timestamp = new Date().toLocaleTimeString();
-        const logEntry = `[${category} ${timestamp}] ${message}`;
-        console.log(logEntry);
+const getSelectedExtensions = () => {
+  const checkboxes = document.querySelectorAll("[data-extension-id]");
+  const selected = [];
 
-        // 🦔 Store logs for debugging (keep last 100)
-        systemLog.unshift({
-          timestamp,
-          category,
-          message,
-          fullTime: new Date().toISOString(),
-        });
-        if (systemLog.length > 100) systemLog.length = 100;
-      };
+  checkboxes.forEach((cb) => {
+    if (cb.checked && !cb.disabled) {
+      selected.push(cb.dataset.extensionId);
+    }
+  });
 
-      // 🌲 2.2 - Core Registry Functions
+  return selected;
+};
 
-      // 🌺 Register a new extension with the suite
-      const register = (id, api, metadata = {}) => {
-        if (extensions.has(id)) {
-          registryLog(`⚠️ Extension ${id} already registered, updating...`);
-        } else {
-          registryLog(`✅ Registering extension: ${id}`);
-        }
+const savePreferences = () => {
+  const checkboxes = document.querySelectorAll("[data-extension-id]");
+  const prefs = {};
 
-        // 🌸 Store extension with metadata
-        extensions.set(id, {
-          id,
-          api,
-          metadata: {
-            version: metadata.version || "1.0.0",
-            dependencies: metadata.dependencies || [],
-            loadedAt: Date.now(),
-            description: metadata.description || "",
-            ...metadata,
-          },
-        });
+  checkboxes.forEach((cb) => {
+    prefs[cb.dataset.extensionId] = cb.checked;
+  });
 
-        // 🦔 Track load order for dependency resolution
-        if (!loadOrder.includes(id)) {
-          loadOrder.push(id);
-        }
+  storePreferences(prefs);
+};
 
-        const apiMethods = api ? Object.keys(api).length : 0;
-        registryLog(
-          `📋 Extension ${id} registered with ${apiMethods} API methods`
-        );
+const unloadAllExtensions = async () => {
+  showStatus("🗑️ Unloading all extensions...", "warning");
 
-        // 🌿 Check for missing dependencies
-        const deps = metadata.dependencies || [];
-        const missingDeps = deps.filter((dep) => !extensions.has(dep));
-        if (missingDeps.length > 0) {
-          registryLog(
-            `⚠️ Extension ${id} missing dependencies: ${missingDeps.join(
-              ", "
-            )}`,
-            "WARNING"
-          );
-        }
+  // Note: In a real implementation, this would actually unload extensions
+  // For now, we'll just show the status and let the user know they need to reload the page
+  showStatus(
+    "⚠️ Please reload the page to fully unload all extensions",
+    "warning"
+  );
 
-        return true;
-      };
+  setTimeout(() => {
+    showStatus(
+      "💡 Tip: Use Cmd+R to reload the page, then reopen this manager",
+      "info"
+    );
+  }, 3500);
+};
 
-      // 🌺 Get an extension's API by ID
-      const get = (id) => {
-        const extension = extensions.get(id);
-        if (!extension) {
-          registryLog(`❌ Extension ${id} not found`);
-          return null;
-        }
-        return extension.api;
-      };
-
-      // 🌺 Check if extension exists
-      const has = (id) => {
-        return extensions.has(id);
-      };
-
-      // 🌺 Call a method on another extension safely
-      const call = (extensionId, methodName, ...args) => {
-        const api = get(extensionId);
-        if (!api) {
-          registryLog(
-            `❌ Cannot call ${extensionId}.${methodName} - extension not found`
-          );
-          return null;
-        }
-
-        if (typeof api[methodName] !== "function") {
-          registryLog(`❌ Method ${methodName} not found in ${extensionId}`);
-          return null;
-        }
-
-        try {
-          registryLog(`🔧 Calling ${extensionId}.${methodName}()`, "CALL");
-          return api[methodName](...args);
-        } catch (error) {
-          registryLog(
-            `❌ Error calling ${extensionId}.${methodName}: ${error.message}`,
-            "ERROR"
-          );
-          return null;
-        }
-      };
-
-      // 🌺 List all registered extensions
-      const list = () => {
-        return Array.from(extensions.keys());
-      };
-
-      // 🌺 Get comprehensive system status
-      const getStatus = () => {
-        const status = {};
-        for (const [id, ext] of extensions) {
-          status[id] = {
-            loaded: true,
-            apiMethods: ext.api ? Object.keys(ext.api).length : 0,
-            loadedAt: new Date(ext.metadata.loadedAt).toISOString(),
-            version: ext.metadata.version,
-            description: ext.metadata.description,
-            dependencies: ext.metadata.dependencies,
-          };
-        }
-
-        return {
-          totalExtensions: extensions.size,
-          loadOrder,
-          extensions: status,
-          systemHealth: extensions.size > 0 ? "Operational" : "No Extensions",
-        };
-      };
-
-      // 🌺 Debug function for development
-      const debug = () => {
-        registryLog("=== EXTENSION REGISTRY DEBUG ===", "DEBUG");
-        const status = getStatus();
-        registryLog(`Total Extensions: ${status.totalExtensions}`, "DEBUG");
-        registryLog(`Load Order: ${status.loadOrder.join(" → ")}`, "DEBUG");
-
-        for (const [id, info] of Object.entries(status.extensions)) {
-          registryLog(
-            `${id}: ${info.apiMethods} methods, v${info.version}`,
-            "DEBUG"
-          );
-          if (info.dependencies.length > 0) {
-            registryLog(
-              `  Dependencies: ${info.dependencies.join(", ")}`,
-              "DEBUG"
-            );
-          }
-        }
-
-        registryLog("=== REGISTRY DEBUG COMPLETE ===", "DEBUG");
-        return status;
-      };
-
-      // 🌺 Get recent registry logs
-      const getLogs = () => {
-        return systemLog.slice(0, 50);
-      };
-
-      // 🌺 Clear registry logs
-      const clearLogs = () => {
-        systemLog.length = 0;
-        registryLog("System logs cleared", "SYSTEM");
-      };
-
-      // 🌳 Export registry API
-      return {
-        register,
-        get,
-        has,
-        call,
-        list,
-        getStatus,
-        debug,
-        getLogs,
-        clearLogs,
-      };
-    })();
-
-    // 🌸 Add utility logging function to registry
-    window.RoamMultiplayerSuite.log = (msg, source = "Extension") => {
-      log(msg, "INFO", source);
-    };
+const loadSelectedExtensions = async () => {
+  const selected = getSelectedExtensions();
+  if (selected.length === 0) {
+    showStatus("❌ No extensions selected", "warning");
+    return;
   }
 
-  // 🌳 3.0 - CENTRAL EVENT BUS SYSTEM
-  // 🌳 The "messenger service" that eliminates duplicate observers and coordinates events
+  showStatus(`🔄 Loading ${selected.length} extension(s)...`, "info");
 
-  if (!window.RoamMultiplayerSuite.events) {
-    window.RoamMultiplayerSuite.events = (() => {
-      // 🌲 3.1 - Event Bus State
-      const subscribers = new Map(); // eventType -> [{ callback, extensionId, options }]
-      const eventLog = []; // Event history for debugging
-      const performance = { events: 0, broadcasts: 0, subscriptions: 0 };
+  // Save preferences
+  savePreferences();
 
-      // 🍎 Global observers (single instances - this is the key innovation!)
-      let domObserver = null;
-      let focusObserver = null;
-      let pageObserver = null;
+  // Sort by dependencies (foundation-registry first, etc.)
+  const sortedExtensions = [];
+  const resolved = new Set();
 
-      // 🦔 Debouncing and throttling utilities
-      const debouncers = new Map(); // eventType -> timeout
-      const throttlers = new Map(); // eventType -> { lastCall, timeout }
+  const resolveDependencies = (extId) => {
+    if (resolved.has(extId)) return;
 
-      // 🌸 Event bus logging
-      const eventLog_ = (message, category = "EVENT") => {
-        const timestamp = new Date().toLocaleTimeString();
+    const ext = EXTENSION_CATALOG[extId];
+    if (!ext) return;
 
-        // 🦔 Only log if debug mode is enabled (reduces noise)
-        if (window.RoamMultiplayerSuite.events.debugMode) {
-          console.log(`[${category} ${timestamp}] ${message}`);
-        }
-
-        eventLog.unshift({
-          timestamp,
-          category,
-          message,
-          fullTime: new Date().toISOString(),
-        });
-        if (eventLog.length > 200) eventLog.length = 200;
-      };
-
-      // 🌲 3.2 - Core Event Bus Functions
-
-      // 🌺 Subscribe to an event type
-      const subscribe = (eventType, callback, extensionId, options = {}) => {
-        if (typeof callback !== "function") {
-          eventLog_(
-            `❌ Invalid callback for ${eventType} from ${extensionId}`,
-            "ERROR"
-          );
-          return false;
-        }
-
-        // 🌸 Initialize subscribers list for this event type
-        if (!subscribers.has(eventType)) {
-          subscribers.set(eventType, []);
-        }
-
-        // 🌿 Create subscription with enhanced options
-        const subscription = {
-          callback,
-          extensionId: extensionId || "unknown",
-          priority: options.priority || 0, // Higher = executes first
-          once: options.once || false, // One-time subscription
-          debounce: options.debounce || 0, // Debounce delay in ms
-          throttle: options.throttle || 0, // Throttle delay in ms
-          filter: options.filter || null, // Function to filter events
-          id: `${extensionId}-${Date.now()}-${Math.random()
-            .toString(36)
-            .substr(2, 9)}`,
-        };
-
-        subscribers.get(eventType).push(subscription);
-
-        // 🦔 Sort by priority (higher executes first)
-        subscribers.get(eventType).sort((a, b) => b.priority - a.priority);
-
-        performance.subscriptions++;
-        eventLog_(
-          `✅ ${extensionId} subscribed to '${eventType}' (priority: ${subscription.priority})`
-        );
-
-        return subscription.id;
-      };
-
-      // 🌺 Unsubscribe from an event
-      const unsubscribe = (eventType, subscriptionId) => {
-        if (!subscribers.has(eventType)) return false;
-
-        const subs = subscribers.get(eventType);
-        const index = subs.findIndex((sub) => sub.id === subscriptionId);
-
-        if (index !== -1) {
-          const removed = subs.splice(index, 1)[0];
-          eventLog_(
-            `🗑 Unsubscribed ${removed.extensionId} from '${eventType}'`
-          );
-          return true;
-        }
-        return false;
-      };
-
-      // 🌺 Broadcast an event to all subscribers
-      const broadcast = (eventType, data = {}, meta = {}) => {
-        if (!subscribers.has(eventType)) {
-          return; // No subscribers, nothing to do
-        }
-
-        const startTime = performance.now();
-
-        // 🌸 Create event data object
-        const eventData = {
-          type: eventType,
-          data,
-          timestamp: Date.now(),
-          source: meta.source || "system",
-          ...meta,
-        };
-
-        performance.events++;
-        performance.broadcasts++;
-
-        eventLog_(
-          `📡 Broadcasting '${eventType}' to ${
-            subscribers.get(eventType).length
-          } subscribers`,
-          "BROADCAST"
-        );
-
-        const subs = subscribers.get(eventType);
-        const toRemove = [];
-
-        // 🌿 Execute all subscriber callbacks
-        subs.forEach((subscription, index) => {
-          try {
-            // 🦔 Apply filter if provided
-            if (subscription.filter && !subscription.filter(eventData)) {
-              return;
-            }
-
-            // 🦔 Handle debouncing
-            if (subscription.debounce > 0) {
-              const debounceKey = `${subscription.id}-${eventType}`;
-              if (debouncers.has(debounceKey)) {
-                clearTimeout(debouncers.get(debounceKey));
-              }
-
-              debouncers.set(
-                debounceKey,
-                setTimeout(() => {
-                  subscription.callback(eventData);
-                  debouncers.delete(debounceKey);
-                }, subscription.debounce)
-              );
-              return;
-            }
-
-            // 🦔 Handle throttling
-            if (subscription.throttle > 0) {
-              const throttleKey = `${subscription.id}-${eventType}`;
-              const throttleData = throttlers.get(throttleKey);
-              const now = Date.now();
-
-              if (
-                throttleData &&
-                now - throttleData.lastCall < subscription.throttle
-              ) {
-                return; // Skip this call
-              }
-
-              throttlers.set(throttleKey, { lastCall: now });
-            }
-
-            // 🌸 Execute the callback
-            subscription.callback(eventData);
-
-            // 🦔 Mark for removal if 'once' option
-            if (subscription.once) {
-              toRemove.push(index);
-            }
-          } catch (error) {
-            eventLog_(
-              `❌ Error in ${subscription.extensionId} callback for '${eventType}': ${error.message}`,
-              "ERROR"
-            );
-          }
-        });
-
-        // 🌿 Remove 'once' subscriptions
-        toRemove.reverse().forEach((index) => {
-          const removed = subs.splice(index, 1)[0];
-          eventLog_(
-            `🔄 Removed 'once' subscription for ${removed.extensionId}`
-          );
-        });
-
-        // 🦔 Performance tracking
-        const endTime = performance.now();
-        const duration = Math.round(endTime - startTime);
-
-        if (duration > 10) {
-          eventLog_(
-            `⏱ Event '${eventType}' took ${duration}ms to process`,
-            "PERFORMANCE"
-          );
-        }
-      };
-
-      // 🌲 3.3 - Global DOM Observer (Single Instance - Key Innovation!)
-      const setupDOMObserver = () => {
-        if (domObserver) return; // Already set up
-
-        // 🌸 Find Roam's main container
-        const targetNode =
-          document.querySelector(".roam-body") ||
-          document.querySelector(".roam-app") ||
-          document.body;
-
-        if (!targetNode) {
-          eventLog_("❌ Could not find target node for DOM observer", "ERROR");
-          return;
-        }
-
-        let processingTimer = null;
-        let pendingMutations = [];
-
-        // 🌿 Single observer for ALL extensions
-        domObserver = new MutationObserver((mutations) => {
-          pendingMutations.push(...mutations);
-
-          // 🦔 Debounce processing to avoid excessive events
-          clearTimeout(processingTimer);
-          processingTimer = setTimeout(() => {
-            const allMutations = [...pendingMutations];
-            pendingMutations = [];
-
-            // 🌸 Analyze mutations for different event types
-            const analysis = analyzeMutations(allMutations);
-
-            // 🌿 Broadcast specific events based on analysis
-            if (analysis.hasBlockChanges) {
-              broadcast("dom-blocks-changed", {
-                mutations: allMutations,
-                analysis,
-              });
-            }
-
-            if (analysis.hasPageRefChanges) {
-              broadcast("dom-page-refs-changed", {
-                mutations: allMutations,
-                analysis,
-              });
-            }
-
-            if (analysis.hasNewBlocks) {
-              broadcast("dom-new-blocks", {
-                mutations: allMutations,
-                analysis,
-              });
-            }
-
-            // 🌸 General DOM change event
-            broadcast("dom-changed", { mutations: allMutations, analysis });
-          }, 150); // Balanced debounce delay
-        });
-
-        // 🌸 Configure observer for comprehensive tracking
-        domObserver.observe(targetNode, {
-          childList: true,
-          subtree: true,
-          attributes: true,
-          attributeFilter: ["data-uid", "class", "data-page-links"],
-        });
-
-        eventLog_("✅ Global DOM observer initialized", "SYSTEM");
-      };
-
-      // 🌲 3.4 - Mutation Analysis Helper
-      const analyzeMutations = (mutations) => {
-        const analysis = {
-          hasBlockChanges: false,
-          hasPageRefChanges: false,
-          hasNewBlocks: false,
-          hasTimestampTags: false,
-          hasConversationTags: false,
-          addedNodes: [],
-          removedNodes: [],
-          modifiedAttributes: [],
-        };
-
-        // 🌿 Analyze each mutation for relevant changes
-        mutations.forEach((mutation) => {
-          if (mutation.type === "childList") {
-            // 🌸 Check added nodes
-            mutation.addedNodes.forEach((node) => {
-              if (node.nodeType === Node.ELEMENT_NODE) {
-                analysis.addedNodes.push(node);
-
-                // 🦔 Check for blocks
-                if (
-                  node.matches?.(".rm-block") ||
-                  node.querySelector?.(".rm-block")
-                ) {
-                  analysis.hasBlockChanges = true;
-                  analysis.hasNewBlocks = true;
-                }
-
-                // 🦔 Check for page refs
-                if (
-                  node.matches?.(".rm-page-ref") ||
-                  node.querySelector?.(".rm-page-ref")
-                ) {
-                  analysis.hasPageRefChanges = true;
-                }
-
-                // 🦔 Check for specific tags
-                if (node.querySelector?.('.rm-page-ref[data-tag="ts0"]')) {
-                  analysis.hasTimestampTags = true;
-                }
-
-                if (node.querySelector?.('.rm-page-ref[data-tag="ch0"]')) {
-                  analysis.hasConversationTags = true;
-                }
-              }
-            });
-
-            // 🌸 Check removed nodes
-            mutation.removedNodes.forEach((node) => {
-              if (node.nodeType === Node.ELEMENT_NODE) {
-                analysis.removedNodes.push(node);
-
-                if (
-                  node.matches?.(".rm-block") ||
-                  node.querySelector?.(".rm-block")
-                ) {
-                  analysis.hasBlockChanges = true;
-                }
-              }
-            });
-          }
-
-          // 🌸 Track attribute changes
-          if (mutation.type === "attributes") {
-            analysis.modifiedAttributes.push({
-              target: mutation.target,
-              attributeName: mutation.attributeName,
-              oldValue: mutation.oldValue,
-            });
-          }
-        });
-
-        return analysis;
-      };
-
-      // 🌲 3.5 - Page Change Observer
-      const setupPageObserver = () => {
-        if (pageObserver) return;
-
-        let currentUrl = window.location.href;
-        let currentPageTitle = null;
-
-        // 🌸 Check for page changes
-        const checkPageChange = () => {
-          const newUrl = window.location.href;
-          const newPageTitle = getCurrentPageTitle();
-
-          if (newUrl !== currentUrl || newPageTitle !== currentPageTitle) {
-            const oldUrl = currentUrl;
-            const oldPageTitle = currentPageTitle;
-
-            currentUrl = newUrl;
-            currentPageTitle = newPageTitle;
-
-            // 🌿 Broadcast page change event
-            broadcast("page-changed", {
-              newUrl,
-              oldUrl,
-              newPageTitle,
-              oldPageTitle,
-              pageType: detectPageType(newPageTitle),
-            });
-
-            eventLog_(
-              `📄 Page changed: ${oldPageTitle || "unknown"} → ${
-                newPageTitle || "unknown"
-              }`
-            );
-          }
-        };
-
-        // 🌸 Multiple detection methods
-        window.addEventListener("hashchange", checkPageChange);
-        window.addEventListener("popstate", checkPageChange);
-
-        // 🦔 Polling fallback for SPA navigation
-        pageObserver = setInterval(checkPageChange, 1000);
-
-        eventLog_("✅ Page change observer initialized", "SYSTEM");
-      };
-
-      // 🌲 3.6 - Focus/Blur Observer
-      const setupFocusObserver = () => {
-        if (focusObserver) return;
-
-        // 🌸 Handle focus events
-        const handleFocusIn = (event) => {
-          const blockElement = event.target.closest(".rm-block");
-          if (blockElement) {
-            broadcast("block-focus", {
-              blockElement,
-              target: event.target,
-              blockUid: getBlockUidFromDOM(blockElement),
-            });
-          }
-        };
-
-        // 🌸 Handle blur events
-        const handleFocusOut = (event) => {
-          const blockElement = event.target.closest(".rm-block");
-          if (blockElement) {
-            broadcast("block-blur", {
-              blockElement,
-              target: event.target,
-              blockUid: getBlockUidFromDOM(blockElement),
-            });
-          }
-        };
-
-        // 🌸 Handle key events
-        const handleKeyDown = (event) => {
-          broadcast("key-pressed", {
-            key: event.key,
-            ctrlKey: event.ctrlKey,
-            shiftKey: event.shiftKey,
-            altKey: event.altKey,
-            target: event.target,
-            blockElement: event.target.closest(".rm-block"),
-          });
-
-          if (event.key === "Enter") {
-            const blockElement = event.target.closest(".rm-block");
-            if (blockElement) {
-              broadcast("block-enter-pressed", {
-                blockElement,
-                target: event.target,
-                blockUid: getBlockUidFromDOM(blockElement),
-              });
-            }
-          }
-        };
-
-        // 🌿 Set up event listeners
-        document.addEventListener("focusin", handleFocusIn, true);
-        document.addEventListener("focusout", handleFocusOut, true);
-        document.addEventListener("keydown", handleKeyDown, true);
-
-        focusObserver = {
-          destroy: () => {
-            document.removeEventListener("focusin", handleFocusIn, true);
-            document.removeEventListener("focusout", handleFocusOut, true);
-            document.removeEventListener("keydown", handleKeyDown, true);
-          },
-        };
-
-        eventLog_("✅ Focus/blur observer initialized", "SYSTEM");
-      };
-
-      // 🌲 3.7 - Utility Functions
-
-      // 🌺 Get current page title from URL
-      const getCurrentPageTitle = () => {
-        try {
-          const url = window.location.href;
-
-          // 🌸 Check for page UID pattern
-          if (url.includes("/page/")) {
-            const pageMatch = url.match(/\/page\/(.+)$/);
-            if (pageMatch) {
-              const pageUid = pageMatch[1];
-              if (window.roamAlphaAPI) {
-                const pageTitle = window.roamAlphaAPI.data.q(`
-                  [:find ?title .
-                   :where 
-                   [?e :block/uid "${pageUid}"]
-                   [?e :node/title ?title]]
-                `);
-                if (pageTitle) return pageTitle;
-              }
-            }
-          }
-
-          // 🌸 Check for daily note pattern
-          const dailyNoteMatch = url.match(/\/(\d{2}-\d{2}-\d{4})$/);
-          if (dailyNoteMatch) {
-            return dailyNoteMatch[1];
-          }
-
-          // 🌸 Fallback to document title
-          const titleElement = document.querySelector("title");
-          if (titleElement) {
-            const title = titleElement.textContent;
-            const cleanTitle = title.replace(" - Roam", "").trim();
-            if (cleanTitle && cleanTitle !== "Roam") {
-              return cleanTitle;
-            }
-          }
-
-          return null;
-        } catch (error) {
-          return null;
-        }
-      };
-
-      // 🌺 Detect page type
-      const detectPageType = (pageTitle) => {
-        if (!pageTitle) return "unknown";
-
-        if (pageTitle === "Chat Room") return "chatroom";
-        if (pageTitle.match(/^\d{2}-\d{2}-\d{4}$/)) return "daily-note";
-        if (pageTitle.includes("/user data")) return "user-data";
-        if (pageTitle.includes("/user preferences")) return "user-preferences";
-
-        return "page";
-      };
-
-      // 🌺 Get block UID from DOM element
-      const getBlockUidFromDOM = (element) => {
-        try {
-          const blockElement = element.closest(".rm-block");
-          if (!blockElement) return null;
-
-          return (
-            blockElement.getAttribute("data-uid") ||
-            blockElement.id?.replace("block-input-", "") ||
-            blockElement.querySelector("[data-uid]")?.getAttribute("data-uid")
-          );
-        } catch (error) {
-          return null;
-        }
-      };
-
-      // 🌲 3.8 - Initialization and Cleanup
-
-      // 🌺 Initialize all observers
-      const init = () => {
-        setupDOMObserver();
-        setupPageObserver();
-        setupFocusObserver();
-
-        // 🌸 Page lifecycle events
-        window.addEventListener("beforeunload", () => {
-          broadcast("page-before-unload", { url: window.location.href });
-        });
-
-        eventLog_("🚀 Central Event Bus initialized", "SYSTEM");
-      };
-
-      // 🌺 Cleanup all observers
-      const destroy = () => {
-        if (domObserver) {
-          domObserver.disconnect();
-          domObserver = null;
-        }
-
-        if (pageObserver) {
-          clearInterval(pageObserver);
-          pageObserver = null;
-        }
-
-        if (focusObserver) {
-          focusObserver.destroy();
-          focusObserver = null;
-        }
-
-        // 🦔 Clear all timers
-        debouncers.forEach((timer) => clearTimeout(timer));
-        throttlers.clear();
-        debouncers.clear();
-
-        subscribers.clear();
-
-        eventLog_("🧹 Central Event Bus destroyed", "SYSTEM");
-      };
-
-      // 🌲 3.9 - Debug and Monitoring
-
-      // 🌺 Get event bus metrics
-      const getMetrics = () => {
-        return {
-          ...performance,
-          activeSubscriptions: Array.from(subscribers.entries()).map(
-            ([eventType, subs]) => ({
-              eventType,
-              subscriberCount: subs.length,
-              extensions: subs.map((s) => s.extensionId),
-            })
-          ),
-          observersActive: {
-            dom: !!domObserver,
-            page: !!pageObserver,
-            focus: !!focusObserver,
-          },
-        };
-      };
-
-      // 🌺 Debug function
-      const debug = () => {
-        eventLog_("=== EVENT BUS DEBUG ===", "DEBUG");
-        const metrics = getMetrics();
-
-        eventLog_(`Total Events: ${metrics.events}`, "DEBUG");
-        eventLog_(`Total Broadcasts: ${metrics.broadcasts}`, "DEBUG");
-        eventLog_(`Total Subscriptions: ${metrics.subscriptions}`, "DEBUG");
-
-        metrics.activeSubscriptions.forEach((sub) => {
-          eventLog_(
-            `${sub.eventType}: ${
-              sub.subscriberCount
-            } subscribers (${sub.extensions.join(", ")})`,
-            "DEBUG"
-          );
-        });
-
-        eventLog_("=== EVENT BUS DEBUG COMPLETE ===", "DEBUG");
-        return metrics;
-      };
-
-      // 🌸 Initialize immediately
-      setTimeout(init, 100);
-
-      // 🌳 Export event bus API
-      return {
-        subscribe,
-        unsubscribe,
-        broadcast,
-        getMetrics,
-        debug,
-        getLogs: () => eventLog.slice(0, 100),
-        clearLogs: () => {
-          eventLog.length = 0;
-        },
-        debugMode: false, // Can be enabled for verbose logging
-
-        // 🌿 Convenience methods
-        once: (eventType, callback, extensionId) =>
-          subscribe(eventType, callback, extensionId, { once: true }),
-        debounced: (eventType, callback, extensionId, delay) =>
-          subscribe(eventType, callback, extensionId, { debounce: delay }),
-        throttled: (eventType, callback, extensionId, delay) =>
-          subscribe(eventType, callback, extensionId, { throttle: delay }),
-
-        // 🌸 Manual broadcasting
-        emit: broadcast,
-
-        // 🌸 Cleanup
-        destroy,
-      };
-    })();
-  }
-
-  // 🌳 4.0 - SYSTEM HEALTH AND TESTING
-
-  // 🌺 4.1 - Self-test function
-  const runSelfTest = () => {
-    log("=== CORE INFRASTRUCTURE SELF TEST v3.0 ===", "TEST");
-
-    const tests = [
-      {
-        name: "🌳 Multiplayer Suite Registry Available",
-        test: () => !!window.RoamMultiplayerSuite,
-      },
-      {
-        name: "🌳 Central Event Bus Available",
-        test: () => !!window.RoamMultiplayerSuite.events,
-      },
-      {
-        name: "🌳 Event Bus Observers Active",
-        test: () => {
-          const metrics = window.RoamMultiplayerSuite.events.getMetrics();
-          return metrics.observersActive.dom && metrics.observersActive.page;
-        },
-      },
-      {
-        name: "🌳 Registry Registration Test",
-        test: () => {
-          const testSuccess = window.RoamMultiplayerSuite.register(
-            "test-extension",
-            {
-              testMethod: () => "test successful",
-            }
-          );
-          const retrieved = window.RoamMultiplayerSuite.get("test-extension");
-          return (
-            testSuccess &&
-            retrieved &&
-            retrieved.testMethod() === "test successful"
-          );
-        },
-      },
-      {
-        name: "🌳 Event Bus Communication Test",
-        test: () => {
-          let testPassed = false;
-          const subscriptionId = window.RoamMultiplayerSuite.events.subscribe(
-            "test-event",
-            () => {
-              testPassed = true;
-            },
-            "self-test"
-          );
-          window.RoamMultiplayerSuite.events.broadcast("test-event", {
-            test: true,
-          });
-          window.RoamMultiplayerSuite.events.unsubscribe(
-            "test-event",
-            subscriptionId
-          );
-          return testPassed;
-        },
-      },
-    ];
-
-    let allPassed = true;
-    const results = [];
-
-    tests.forEach((test) => {
-      try {
-        const passed = test.test();
-        const status = passed ? "✅ PASS" : "❌ FAIL";
-        log(`${test.name}: ${status}`, passed ? "SUCCESS" : "ERROR");
-        results.push({ name: test.name, passed });
-        if (!passed) allPassed = false;
-      } catch (error) {
-        log(`${test.name}: ❌ ERROR - ${error.message}`, "ERROR");
-        results.push({ name: test.name, passed: false, error: error.message });
-        allPassed = false;
+    // First resolve dependencies
+    ext.dependencies.forEach((depId) => {
+      if (selected.includes(depId) || ext.required) {
+        resolveDependencies(depId);
       }
     });
 
-    log(
-      `🌳 Self Test Result: ${
-        allPassed ? "✅ ALL TESTS PASSED" : "❌ SOME TESTS FAILED"
-      }`,
-      allPassed ? "SUCCESS" : "ERROR"
-    );
-
-    return { allPassed, results };
-  };
-
-  // 🌺 4.2 - Get system status
-  const getSystemStatus = () => {
-    try {
-      const eventMetrics = window.RoamMultiplayerSuite.events.getMetrics();
-
-      return {
-        timestamp: new Date().toISOString(),
-        version: "3.0.0",
-        isInitialized,
-        registry: {
-          available: !!window.RoamMultiplayerSuite,
-          extensionCount: window.RoamMultiplayerSuite?.list()?.length || 0,
-          registered:
-            window.RoamMultiplayerSuite?.has("core-infrastructure") || false,
-        },
-        eventBus: {
-          available: !!window.RoamMultiplayerSuite.events,
-          totalEvents: eventMetrics.events,
-          totalBroadcasts: eventMetrics.broadcasts,
-          activeSubscriptions: eventMetrics.activeSubscriptions.length,
-          observersActive: eventMetrics.observersActive,
-        },
-        systemHealth:
-          "🌳 Clean Foundation v3.0 - Roam Multiplayer Suite Registry + Event Bus",
-        features: [
-          "Extension Registry System",
-          "Central Event Bus",
-          "Single DOM Observer",
-          "Event Coordination",
-          "Performance Monitoring",
-          "Dependency Management",
-        ],
-      };
-    } catch (error) {
-      return {
-        timestamp: new Date().toISOString(),
-        version: "3.0.0",
-        isInitialized,
-        systemHealth: "Error",
-        error: error.message,
-      };
+    // Then add this extension
+    if (selected.includes(extId)) {
+      sortedExtensions.push(extId);
+      resolved.add(extId);
     }
   };
 
-  // 🌳 5.0 - EXTENSION LIFECYCLE
+  selected.forEach(resolveDependencies);
 
-  // 🌺 5.1 - Extension load
-  const onload = async ({ extensionAPI: api }) => {
-    try {
-      log(
-        "🚀 Roam Multiplayer Suite - Core Infrastructure v3.0 loading - Registry + Event Bus Only...",
-        "SUCCESS"
-      );
+  showStatus(`📋 Loading order: ${sortedExtensions.join(" → ")}`, "info");
 
-      extensionAPI = api;
+  // Note: In a real implementation, this would load the actual extension files
+  // For development, we'll show the user what would be loaded
+  setTimeout(() => {
+    showStatus(`💡 Would load: ${sortedExtensions.join(", ")}`, "success");
+  }, 1500);
 
-      // 🌸 Create settings panel
-      extensionAPI.settings.panel.create({
-        tabTitle: "Roam Multiplayer Suite - Core v3.0",
-        settings: [
-          {
-            id: "enableEventBusDebug",
-            name: "🌳 Enable Event Bus Debug Mode",
-            description: "Show detailed event system logging",
-            action: { type: "switch" },
-          },
-          {
-            id: "enableSelfTest",
-            name: "Enable Self-Test on Load",
-            description: "Run comprehensive self-test when extension loads",
-            action: { type: "switch" },
-          },
-        ],
-      });
+  setTimeout(() => {
+    showStatus(
+      "🚀 In full implementation: extensions would be loaded via import()",
+      "info"
+    );
+  }, 4000);
+};
 
-      // 🌸 Configure event bus debug mode
-      const eventDebug = extensionAPI.settings.get("enableEventBusDebug");
-      if (eventDebug) {
-        window.RoamMultiplayerSuite.events.debugMode = true;
-      }
+// ===================================================================
+// 🎯 EVENT HANDLERS - UI Interactions
+// ===================================================================
 
-      // 🌸 Create API for registry registration
-      const coreInfrastructureAPI = {
-        // 🌳 Registry access
-        registry: {
-          register: window.RoamMultiplayerSuite.register,
-          get: window.RoamMultiplayerSuite.get,
-          has: window.RoamMultiplayerSuite.has,
-          call: window.RoamMultiplayerSuite.call,
-          list: window.RoamMultiplayerSuite.list,
-          getStatus: window.RoamMultiplayerSuite.getStatus,
-          debug: window.RoamMultiplayerSuite.debug,
-        },
+const setupEventHandlers = () => {
+  // Close button
+  document
+    .getElementById("close-reload-manager")
+    ?.addEventListener("click", () => {
+      const ui = document.getElementById("roam-extension-reload-manager");
+      if (ui) ui.remove();
+    });
 
-        // 🌳 Event bus access
-        events: {
-          subscribe: window.RoamMultiplayerSuite.events.subscribe,
-          unsubscribe: window.RoamMultiplayerSuite.events.unsubscribe,
-          broadcast: window.RoamMultiplayerSuite.events.broadcast,
-          once: window.RoamMultiplayerSuite.events.once,
-          debounced: window.RoamMultiplayerSuite.events.debounced,
-          throttled: window.RoamMultiplayerSuite.events.throttled,
-          getMetrics: window.RoamMultiplayerSuite.events.getMetrics,
-          debug: window.RoamMultiplayerSuite.events.debug,
-        },
+  // Reload selected
+  document
+    .getElementById("reload-selected")
+    ?.addEventListener("click", loadSelectedExtensions);
 
-        // 🌳 System functions
-        runSelfTest,
-        getSystemStatus,
-        log,
-      };
+  // Unload all
+  document
+    .getElementById("unload-all")
+    ?.addEventListener("click", unloadAllExtensions);
 
-      // 🌸 Register self with registry
-      const registrationSuccess = window.RoamMultiplayerSuite.register(
-        "core-infrastructure",
-        coreInfrastructureAPI,
+  // Select all
+  document.getElementById("select-all")?.addEventListener("click", () => {
+    const checkboxes = document.querySelectorAll("[data-extension-id]");
+    checkboxes.forEach((cb) => {
+      if (!cb.disabled) cb.checked = true;
+    });
+    savePreferences();
+  });
+
+  // Select none
+  document.getElementById("select-none")?.addEventListener("click", () => {
+    const checkboxes = document.querySelectorAll("[data-extension-id]");
+    checkboxes.forEach((cb) => {
+      if (!cb.disabled) cb.checked = false;
+    });
+    savePreferences();
+  });
+
+  // Individual checkboxes
+  document.querySelectorAll("[data-extension-id]").forEach((cb) => {
+    cb.addEventListener("change", savePreferences);
+  });
+};
+
+// ===================================================================
+// 🚀 ROAM EXTENSION EXPORT - Development Integration
+// ===================================================================
+
+export default {
+  onload: async ({ extensionAPI }) => {
+    console.log("🔄 Reload Manager starting...");
+
+    // Create UI
+    const ui = createReloadManagerUI();
+    setupEventHandlers();
+
+    // Register command to open manager
+    const command = {
+      label: "Extension Suite: Open Reload Manager",
+      callback: () => {
+        const existing = document.getElementById(
+          "roam-extension-reload-manager"
+        );
+        if (existing) {
+          existing.remove();
+        }
+        const newUI = createReloadManagerUI();
+        setupEventHandlers();
+        showStatus(
+          '🔄 Reload Manager ready! Select extensions and click "Reload Selected"',
+          "success"
+        );
+      },
+    };
+
+    window.roamAlphaAPI.ui.commandPalette.addCommand(command);
+
+    // Register for cleanup
+    if (window._extensionRegistry) {
+      window._extensionRegistry.commands.push(command.label);
+    }
+
+    // Register with platform if available
+    if (window.RoamExtensionSuite) {
+      window.RoamExtensionSuite.register(
+        "reload-manager",
         {
-          version: "3.0.0",
+          openUI: () => {
+            const ui = createReloadManagerUI();
+            setupEventHandlers();
+            return ui;
+          },
+          getSelectedExtensions,
+          version: "1.0.0",
+        },
+        {
+          name: "Reload Manager",
+          description: "Development utility for selective extension loading",
+          version: "1.0.0",
           dependencies: [],
-          description:
-            "Core infrastructure providing registry and event bus foundation for Roam Multiplayer Suite",
         }
       );
-
-      if (registrationSuccess) {
-        log(
-          "✅ Successfully registered with Roam Multiplayer Suite Registry",
-          "SUCCESS"
-        );
-      } else {
-        log(
-          "❌ Failed to register with Roam Multiplayer Suite Registry",
-          "ERROR"
-        );
-      }
-
-      // 🌸 Backward compatibility
-      window.coreInfrastructure = coreInfrastructureAPI;
-
-      isInitialized = true;
-      log(
-        "✅ Roam Multiplayer Suite - Core Infrastructure v3.0 loaded successfully",
-        "SUCCESS"
-      );
-
-      // 🌸 Test event system integration
-      setTimeout(() => {
-        log("=== CORE INFRASTRUCTURE INTEGRATION TEST ===", "TEST");
-
-        const metrics = window.RoamMultiplayerSuite.events.getMetrics();
-        log(
-          `Event observers active: ${JSON.stringify(metrics.observersActive)}`,
-          "TEST"
-        );
-        log(`Total events: ${metrics.events}`, "TEST");
-
-        // 🌿 Broadcast ready event
-        window.RoamMultiplayerSuite.events.broadcast(
-          "core-infrastructure-ready",
-          {
-            version: "3.0.0",
-            features: ["registry", "event-bus", "observers"],
-          }
-        );
-
-        log("=== CORE INFRASTRUCTURE TEST COMPLETE ===", "TEST");
-      }, 2000);
-
-      // 🌸 Auto-run self-test if enabled
-      const enableSelfTest = extensionAPI.settings.get("enableSelfTest");
-      if (enableSelfTest !== false) {
-        setTimeout(() => {
-          log("Running auto self-test...");
-          runSelfTest();
-        }, 1000);
-      }
-    } catch (error) {
-      log(
-        `CRITICAL ERROR in Core Infrastructure onload: ${error.message}`,
-        "ERROR"
-      );
     }
-  };
 
-  // 🌺 5.2 - Extension unload
-  const onunload = () => {
-    try {
-      log("Core Infrastructure v3.0 unloading...", "INFO");
+    console.log("✅ Reload Manager loaded successfully!");
+    console.log('💡 Try: Cmd+P → "Extension Suite: Open Reload Manager"');
 
-      // 🌸 Destroy event bus
-      if (window.RoamExtensionSuite?.events?.destroy) {
-        window.RoamExtensionSuite.events.destroy();
-      }
+    // Auto-show on first load
+    showStatus(
+      "🎉 Reload Manager ready! Check the extensions you want to load.",
+      "success"
+    );
+  },
 
-      // 🌸 Clean up backward compatibility
-      if (window.coreInfrastructure) {
-        delete window.coreInfrastructure;
-      }
+  onunload: () => {
+    console.log("🔄 Reload Manager unloading...");
 
-      extensionAPI = null;
-      isInitialized = false;
+    // Remove UI
+    const ui = document.getElementById("roam-extension-reload-manager");
+    if (ui) ui.remove();
 
-      log("✅ Core Infrastructure v3.0 unloaded successfully", "SUCCESS");
-    } catch (error) {
-      console.error("Error in Core Infrastructure onunload:", error);
-    }
-  };
-
-  // 🌳 Export extension lifecycle
-  return {
-    onload,
-    onunload,
-  };
-})();
-
-export default coreInfrastructure;
+    console.log("✅ Reload Manager cleanup complete!");
+  },
+};
