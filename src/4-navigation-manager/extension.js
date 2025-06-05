@@ -461,7 +461,7 @@ export default {
     const requiredDependencies = [
       "utility-library",
       "user-authentication",
-      "settings-manager",
+      "configuration-manager",
     ];
 
     for (const dep of requiredDependencies) {
@@ -606,7 +606,7 @@ export default {
           "foundation-registry",
           "utility-library",
           "user-authentication",
-          "settings-manager",
+          "configuration-manager",
         ],
       }
     );
