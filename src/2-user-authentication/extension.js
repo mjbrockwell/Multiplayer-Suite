@@ -1,216 +1,411 @@
 // ===================================================================
-// Extension 2: User Authentication - Professional User Detection
-// Based on David Vargas's enterprise-grade patterns from Roam University
-// Using Josh Brown's official API + David's localStorage + our proven fallbacks
+// Extension 2: User Authentication - Professional User Management
+// Rewritten to leverage Extension 1.5 Utility Library
+// Focus: Authentication workflows, user sessions, and high-level user services
 // ===================================================================
 
 // ===================================================================
-// 🔧 CORE USER DETECTION UTILITIES - Professional Business Logic
+// 🎯 AUTHENTICATION WORKFLOW MANAGEMENT - Higher-Level Services
 // ===================================================================
 
-// Josh Brown's Official API (June 2025) - PRIMARY METHOD
-const getCurrentUserViaOfficialAPI = () => {
-  try {
-    const userUid = window.roamAlphaAPI?.user?.uid?.();
-    if (userUid) {
-      const userData = window.roamAlphaAPI.pull(
-        `
-        [:user/display-name :user/photo-url :user/uid :user/email]
-      `,
-        [":user/uid", userUid]
-      );
+/**
+ * Enhanced user session management with authentication state
+ */
+class UserSession {
+  constructor() {
+    this.sessionId = null;
+    this.user = null;
+    this.authState = "unknown"; // unknown, authenticated, guest, error
+    this.lastActivity = 0;
+    this.sessionStartTime = 0;
+  }
 
-      if (userData) {
-        return {
-          uid: userUid,
-          displayName: userData[":user/display-name"] || "Unknown User",
-          photoUrl: userData[":user/photo-url"] || null,
-          email: userData[":user/email"] || null,
-          method: "official-api",
-        };
-      }
+  async initialize() {
+    try {
+      // Get utilities from platform
+      const platform = window.RoamExtensionSuite;
+      const getCurrentUser = platform.getUtility("getCurrentUser");
+      const isMultiUserGraph = platform.getUtility("isMultiUserGraph");
+
+      // Detect current user
+      this.user = getCurrentUser();
+      this.authState =
+        this.user.method === "fallback" ? "guest" : "authenticated";
+      this.sessionId = this.generateSessionId();
+      this.sessionStartTime = Date.now();
+      this.lastActivity = Date.now();
+
+      // Check if we're in a multi-user environment
+      const isMultiUser = isMultiUserGraph();
+
+      console.log(`🔐 User session initialized:`);
+      console.log(`   User: ${this.user.displayName} (${this.user.method})`);
+      console.log(`   State: ${this.authState}`);
+      console.log(`   Multi-user graph: ${isMultiUser}`);
+      console.log(`   Session ID: ${this.sessionId}`);
+
+      return this;
+    } catch (error) {
+      console.error("Failed to initialize user session:", error);
+      this.authState = "error";
+      throw error;
     }
-  } catch (error) {
-    console.warn("Official user API not available:", error.message);
-  }
-  return null;
-};
-
-// David's localStorage Method - PROVEN FALLBACK
-const getCurrentUserViaLocalStorage = () => {
-  try {
-    const globalAppState = JSON.parse(
-      localStorage.getItem("globalAppState") || '["","",[]]'
-    );
-    const userIndex = globalAppState.findIndex((s) => s === "~:user");
-
-    if (userIndex > 0 && globalAppState[userIndex + 1]) {
-      const userArray = globalAppState[userIndex + 1];
-
-      // Extract key user data from localStorage structure
-      const uidIndex = userArray.findIndex((s) => s === "~:uid");
-      const nameIndex = userArray.findIndex((s) => s === "~:display-name");
-      const emailIndex = userArray.findIndex((s) => s === "~:email");
-
-      const uid = uidIndex > 0 ? userArray[uidIndex + 1] : null;
-      const displayName = nameIndex > 0 ? userArray[nameIndex + 1] : null;
-      const email = emailIndex > 0 ? userArray[emailIndex + 1] : null;
-
-      if (uid || displayName) {
-        return {
-          uid: uid || generateUID(),
-          displayName: displayName || "Current User",
-          photoUrl: null, // localStorage doesn't store photo URLs
-          email: email || null,
-          method: "localStorage",
-        };
-      }
-    }
-  } catch (error) {
-    console.warn("localStorage user detection failed:", error.message);
-  }
-  return null;
-};
-
-// Our Proven Recent Block Method - FINAL FALLBACK
-const getCurrentUserViaRecentBlocks = () => {
-  try {
-    // Get recent blocks created in last hour
-    const oneHourAgo = Date.now() - 60 * 60 * 1000;
-    const recentBlocks = window.roamAlphaAPI.data.q(`
-      [:find ?uid ?user-id ?create-time
-       :where 
-       [?b :block/uid ?uid]
-       [?b :create/user ?user-id]  
-       [?b :create/time ?create-time]
-       [(> ?create-time ${oneHourAgo})]]
-    `);
-
-    if (recentBlocks.length > 0) {
-      // Get most recent block's creator
-      const mostRecentBlock = recentBlocks.sort((a, b) => b[2] - a[2])[0];
-      const userDbId = mostRecentBlock[1];
-
-      // Get user details
-      const userData = window.roamAlphaAPI.pull(
-        `
-        [:user/display-name :user/photo-url :user/uid :user/email]
-      `,
-        userDbId
-      );
-
-      if (userData) {
-        return {
-          uid: userData[":user/uid"] || generateUID(),
-          displayName: userData[":user/display-name"] || "Current User",
-          photoUrl: userData[":user/photo-url"] || null,
-          email: userData[":user/email"] || null,
-          method: "recent-blocks",
-        };
-      }
-    }
-  } catch (error) {
-    console.warn("Recent blocks user detection failed:", error.message);
-  }
-  return null;
-};
-
-// ===================================================================
-// 🧠 SMART USER DETECTION WITH CACHING - David's Optimization Pattern
-// ===================================================================
-
-let userCache = null;
-let cacheTimestamp = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes like David's patterns
-
-const getCurrentUser = () => {
-  // Smart caching - only refresh every 5 minutes
-  if (userCache && Date.now() - cacheTimestamp < CACHE_DURATION) {
-    return userCache;
   }
 
-  // Try detection methods in order of reliability
-  let user =
-    getCurrentUserViaOfficialAPI() ||
-    getCurrentUserViaLocalStorage() ||
-    getCurrentUserViaRecentBlocks();
+  generateSessionId() {
+    const platform = window.RoamExtensionSuite;
+    const generateUID = platform.getUtility("generateUID");
+    return `session-${generateUID()}-${Date.now()}`;
+  }
 
-  // Fallback to basic user if all methods fail
-  if (!user) {
-    user = {
-      uid: generateUID(),
-      displayName: "Unknown User",
-      photoUrl: null,
-      email: null,
-      method: "fallback",
+  updateActivity() {
+    this.lastActivity = Date.now();
+  }
+
+  getSessionDuration() {
+    return Date.now() - this.sessionStartTime;
+  }
+
+  isActive() {
+    const fiveMinutes = 5 * 60 * 1000;
+    return Date.now() - this.lastActivity < fiveMinutes;
+  }
+
+  getSessionInfo() {
+    return {
+      sessionId: this.sessionId,
+      user: this.user,
+      authState: this.authState,
+      duration: this.getSessionDuration(),
+      isActive: this.isActive(),
+      lastActivity: new Date(this.lastActivity).toISOString(),
     };
   }
 
-  // Cache successful result
-  userCache = user;
-  cacheTimestamp = Date.now();
+  async refreshUser() {
+    const platform = window.RoamExtensionSuite;
+    const clearUserCache = platform.getUtility("clearUserCache");
+    const getCurrentUser = platform.getUtility("getCurrentUser");
 
-  console.log(`👤 User detected via ${user.method}:`, user.displayName);
-  return user;
-};
+    // Clear cache and get fresh user data
+    clearUserCache();
+    this.user = getCurrentUser();
+    this.authState =
+      this.user.method === "fallback" ? "guest" : "authenticated";
+    this.updateActivity();
 
-// ===================================================================
-// 🔧 UTILITY FUNCTIONS - Clean API for Other Extensions
-// ===================================================================
-
-const getCurrentUserUid = () => getCurrentUser().uid;
-const getCurrentUserDisplayName = () => getCurrentUser().displayName;
-const getCurrentUserPhotoUrl = () => getCurrentUser().photoUrl;
-const getCurrentUserEmail = () => getCurrentUser().email;
-
-const getUserById = (uidOrDbId) => {
-  try {
-    const userData = window.roamAlphaAPI.pull(
-      `
-      [:user/display-name :user/photo-url :user/uid :user/email]
-    `,
-      typeof uidOrDbId === "string" ? [":user/uid", uidOrDbId] : uidOrDbId
+    console.log(
+      `🔄 User session refreshed: ${this.user.displayName} (${this.user.method})`
     );
-
-    if (userData) {
-      return {
-        uid: userData[":user/uid"],
-        displayName: userData[":user/display-name"],
-        photoUrl: userData[":user/photo-url"],
-        email: userData[":user/email"],
-      };
-    }
-  } catch (error) {
-    console.warn("Failed to get user by ID:", error.message);
+    return this.user;
   }
-  return null;
+}
+
+// Global session instance
+let userSession = null;
+
+// ===================================================================
+// 🛡️ AUTHENTICATION SERVICES - High-Level User Operations
+// ===================================================================
+
+/**
+ * Get current authenticated user with session tracking
+ */
+const getAuthenticatedUser = () => {
+  if (!userSession) {
+    console.warn(
+      "User session not initialized - call initializeAuthentication first"
+    );
+    return null;
+  }
+
+  userSession.updateActivity();
+  return userSession.user;
 };
 
-const isMultiUserGraph = () => {
+/**
+ * Check if user is authenticated (not a fallback user)
+ */
+const isUserAuthenticated = () => {
+  if (!userSession) return false;
+  return userSession.authState === "authenticated";
+};
+
+/**
+ * Get user preferences page UID with auto-creation
+ */
+const getUserPreferencesPageUid = async (username) => {
+  const platform = window.RoamExtensionSuite;
+  const createPageIfNotExists = platform.getUtility("createPageIfNotExists");
+
+  const pageTitle = `${username}/user preferences`;
+  const pageUid = await createPageIfNotExists(pageTitle);
+
+  if (pageUid) {
+    console.log(`📄 User preferences page ready: ${pageTitle}`);
+  } else {
+    console.error(`Failed to create preferences page for ${username}`);
+  }
+
+  return pageUid;
+};
+
+/**
+ * Get user preference with intelligent defaults
+ */
+const getUserPreference = async (username, key, defaultValue = null) => {
   try {
-    const allUsers = window.roamAlphaAPI.data.q(`
-      [:find (distinct ?user-id)
-       :where [?b :create/user ?user-id]]
-    `);
-    return allUsers.length > 1;
+    const platform = window.RoamExtensionSuite;
+    const findDataValue = platform.getUtility("findDataValue");
+
+    const pageUid = await getUserPreferencesPageUid(username);
+    if (!pageUid) return defaultValue;
+
+    const value = findDataValue(pageUid, key);
+    const result = value !== null ? value : defaultValue;
+
+    console.log(`⚙️ Preference "${key}" for ${username}: ${result}`);
+    return result;
   } catch (error) {
-    console.warn("Failed to detect multi-user graph:", error.message);
+    console.error(`Failed to get preference "${key}" for ${username}:`, error);
+    return defaultValue;
+  }
+};
+
+/**
+ * Set user preference with proper structure
+ */
+const setUserPreference = async (
+  username,
+  key,
+  value,
+  useAttributeFormat = false
+) => {
+  try {
+    const platform = window.RoamExtensionSuite;
+    const setDataValue = platform.getUtility("setDataValue");
+
+    const pageUid = await getUserPreferencesPageUid(username);
+    if (!pageUid) return false;
+
+    const success = await setDataValue(pageUid, key, value, useAttributeFormat);
+
+    if (success) {
+      console.log(`✅ Set preference "${key}" for ${username}: ${value}`);
+    } else {
+      console.error(`❌ Failed to set preference "${key}" for ${username}`);
+    }
+
+    return success;
+  } catch (error) {
+    console.error(`Error setting preference "${key}" for ${username}:`, error);
     return false;
   }
 };
 
-const generateUID = () => {
-  return (
-    window.roamAlphaAPI?.util?.generateUID?.() ||
-    "user-" + Math.random().toString(36).substr(2, 9)
-  );
+/**
+ * Get all user preferences as object
+ */
+const getAllUserPreferences = async (username) => {
+  try {
+    const platform = window.RoamExtensionSuite;
+    const findDataValue = platform.getUtility("findDataValue");
+    const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
+
+    const pageTitle = `${username}/user preferences`;
+    const pageUid = getPageUidByTitle(pageTitle);
+
+    if (!pageUid) {
+      console.log(`📄 No preferences page found for ${username}`);
+      return {};
+    }
+
+    // Common preference keys to check
+    const preferenceKeys = [
+      "Loading Page Preference",
+      "Immutable Home Page",
+      "Weekly Bundle",
+      "Journal Header Color",
+      "Personal Shortcuts",
+    ];
+
+    const preferences = {};
+
+    for (const key of preferenceKeys) {
+      const value = findDataValue(pageUid, key);
+      if (value !== null) {
+        preferences[key] = value;
+      }
+    }
+
+    console.log(
+      `📊 Loaded ${Object.keys(preferences).length} preferences for ${username}`
+    );
+    return preferences;
+  } catch (error) {
+    console.error(`Failed to get all preferences for ${username}:`, error);
+    return {};
+  }
 };
 
-// Clear cache function for testing/debugging
-const clearUserCache = () => {
-  userCache = null;
-  cacheTimestamp = 0;
-  console.log("🔄 User cache cleared");
+/**
+ * Initialize default preferences for new users
+ */
+const initializeUserPreferences = async (username) => {
+  try {
+    console.log(`🎯 Initializing default preferences for ${username}...`);
+
+    const defaults = {
+      "Loading Page Preference": "Daily Page",
+      "Immutable Home Page": "yes",
+      "Weekly Bundle": "no",
+      "Journal Header Color": "blue",
+      "Personal Shortcuts": ["Daily Notes", "Chat Room"],
+    };
+
+    let successCount = 0;
+
+    for (const [key, value] of Object.entries(defaults)) {
+      const success = await setUserPreference(username, key, value);
+      if (success) successCount++;
+    }
+
+    console.log(
+      `✅ Initialized ${successCount}/${
+        Object.keys(defaults).length
+      } default preferences`
+    );
+    return successCount === Object.keys(defaults).length;
+  } catch (error) {
+    console.error(`Failed to initialize preferences for ${username}:`, error);
+    return false;
+  }
+};
+
+// ===================================================================
+// 🔄 SESSION MONITORING - Activity Tracking
+// ===================================================================
+
+/**
+ * Start session monitoring with activity tracking
+ */
+const startSessionMonitoring = () => {
+  if (!userSession) return;
+
+  // Track user activity with various DOM events
+  const activityEvents = ["click", "keydown", "scroll", "mousemove"];
+
+  activityEvents.forEach((eventType) => {
+    const listener = () => userSession.updateActivity();
+    document.addEventListener(eventType, listener, true);
+
+    // Register for cleanup
+    window._extensionRegistry.domListeners.push({
+      el: document,
+      type: eventType,
+      listener: listener,
+    });
+  });
+
+  // Periodic session health check (every 30 seconds)
+  const healthCheck = () => {
+    if (userSession && userSession.isActive()) {
+      console.log(
+        `💓 Session active: ${userSession.user.displayName} (${Math.round(
+          userSession.getSessionDuration() / 1000
+        )}s)`
+      );
+      setTimeout(healthCheck, 30000);
+    } else {
+      console.log("💤 Session inactive - stopping health checks");
+    }
+  };
+
+  // Start health checks after 30 seconds
+  const healthCheckTimeout = setTimeout(healthCheck, 30000);
+  window._extensionRegistry.timeouts.push({ timeout: healthCheckTimeout });
+
+  console.log("📊 Session monitoring started");
+};
+
+// ===================================================================
+// 🧪 TESTING AND VALIDATION UTILITIES
+// ===================================================================
+
+/**
+ * Run comprehensive authentication tests
+ */
+const runAuthenticationTests = async () => {
+  console.group("🧪 Authentication System Tests");
+
+  try {
+    // Test 1: User Detection
+    console.log("Test 1: User Detection");
+    const user = getAuthenticatedUser();
+    console.log(`  Current user: ${user?.displayName} (${user?.method})`);
+    console.log(`  Authenticated: ${isUserAuthenticated()}`);
+
+    // Test 2: Session Information
+    console.log("Test 2: Session Information");
+    const sessionInfo = userSession?.getSessionInfo();
+    console.log("  Session info:", sessionInfo);
+
+    // Test 3: Preferences
+    console.log("Test 3: User Preferences");
+    if (user) {
+      const preferences = await getAllUserPreferences(user.displayName);
+      console.log(
+        `  Found ${Object.keys(preferences).length} preferences:`,
+        preferences
+      );
+
+      // Test setting a preference
+      const testResult = await setUserPreference(
+        user.displayName,
+        "Test Setting",
+        `Test ${Date.now()}`
+      );
+      console.log(`  Set test preference: ${testResult}`);
+    }
+
+    // Test 4: Multi-user Detection
+    console.log("Test 4: Multi-user Graph Detection");
+    const platform = window.RoamExtensionSuite;
+    const isMultiUserGraph = platform.getUtility("isMultiUserGraph");
+    console.log(`  Multi-user graph: ${isMultiUserGraph()}`);
+
+    console.log("✅ All tests completed successfully");
+  } catch (error) {
+    console.error("❌ Test failed:", error);
+  }
+
+  console.groupEnd();
+};
+
+/**
+ * Display authentication status dashboard
+ */
+const showAuthenticationDashboard = () => {
+  if (!userSession) {
+    console.log("❌ Authentication not initialized");
+    return;
+  }
+
+  const sessionInfo = userSession.getSessionInfo();
+  const durationMinutes = Math.round(sessionInfo.duration / (1000 * 60));
+
+  console.group("🔐 Authentication Dashboard");
+  console.log(`👤 User: ${sessionInfo.user.displayName}`);
+  console.log(`🔍 Detection Method: ${sessionInfo.user.method}`);
+  console.log(`🎯 Authentication State: ${sessionInfo.authState}`);
+  console.log(`⏱️ Session Duration: ${durationMinutes} minutes`);
+  console.log(`💓 Active: ${sessionInfo.isActive ? "Yes" : "No"}`);
+  console.log(`🆔 Session ID: ${sessionInfo.sessionId}`);
+  console.log(`📧 Email: ${sessionInfo.user.email || "Not available"}`);
+  console.log(
+    `🖼️ Photo: ${sessionInfo.user.photoUrl ? "Available" : "Not available"}`
+  );
+  console.groupEnd();
 };
 
 // ===================================================================
@@ -219,9 +414,9 @@ const clearUserCache = () => {
 
 export default {
   onload: async ({ extensionAPI }) => {
-    console.log("👤 User Authentication starting...");
+    console.log("🔐 User Authentication starting...");
 
-    // ✅ VERIFY FOUNDATION DEPENDENCY
+    // ✅ VERIFY DEPENDENCIES
     if (!window.RoamExtensionSuite) {
       console.error(
         "❌ Foundation Registry not found! Please load Extension 1 first."
@@ -229,49 +424,96 @@ export default {
       return;
     }
 
-    // 🎯 REGISTER UTILITIES WITH PLATFORM
+    if (!window.RoamExtensionSuite.getUtility("getCurrentUser")) {
+      console.error(
+        "❌ Utility Library not found! Please load Extension 1.5 first."
+      );
+      return;
+    }
+
+    // 🎯 INITIALIZE USER SESSION
+    try {
+      userSession = new UserSession();
+      await userSession.initialize();
+
+      // Start monitoring user activity
+      startSessionMonitoring();
+    } catch (error) {
+      console.error("❌ Failed to initialize user session:", error);
+      return;
+    }
+
+    // 🔧 REGISTER HIGH-LEVEL AUTHENTICATION SERVICES
     const platform = window.RoamExtensionSuite;
 
-    platform.registerUtility("getCurrentUser", getCurrentUser);
-    platform.registerUtility("getCurrentUserUid", getCurrentUserUid);
-    platform.registerUtility(
-      "getCurrentUserDisplayName",
-      getCurrentUserDisplayName
-    );
-    platform.registerUtility("getCurrentUserPhotoUrl", getCurrentUserPhotoUrl);
-    platform.registerUtility("getCurrentUserEmail", getCurrentUserEmail);
-    platform.registerUtility("getUserById", getUserById);
-    platform.registerUtility("isMultiUserGraph", isMultiUserGraph);
-    platform.registerUtility("clearUserCache", clearUserCache);
+    const authenticationServices = {
+      // Core authentication
+      getAuthenticatedUser: getAuthenticatedUser,
+      isUserAuthenticated: isUserAuthenticated,
+      refreshUserSession: () => userSession?.refreshUser(),
+      getSessionInfo: () => userSession?.getSessionInfo(),
 
-    // 📝 REGISTER COMMANDS FOR TESTING/DEBUG
+      // User preferences
+      getUserPreference: getUserPreference,
+      setUserPreference: setUserPreference,
+      getAllUserPreferences: getAllUserPreferences,
+      initializeUserPreferences: initializeUserPreferences,
+      getUserPreferencesPageUid: getUserPreferencesPageUid,
+
+      // Testing utilities
+      runAuthenticationTests: runAuthenticationTests,
+      showAuthenticationDashboard: showAuthenticationDashboard,
+    };
+
+    Object.entries(authenticationServices).forEach(([name, service]) => {
+      platform.registerUtility(name, service);
+    });
+
+    // 📝 REGISTER COMMANDS
     const commands = [
       {
-        label: "User Auth: Show Current User",
-        callback: () => {
-          const user = getCurrentUser();
-          console.log("👤 Current User:", user);
-          const multiUser = isMultiUserGraph();
-          console.log("📊 Multi-user graph:", multiUser);
+        label: "Auth: Show User Dashboard",
+        callback: showAuthenticationDashboard,
+      },
+      {
+        label: "Auth: Run Authentication Tests",
+        callback: runAuthenticationTests,
+      },
+      {
+        label: "Auth: Refresh User Session",
+        callback: async () => {
+          if (userSession) {
+            const user = await userSession.refreshUser();
+            console.log(`🔄 User session refreshed: ${user.displayName}`);
+          }
         },
       },
       {
-        label: "User Auth: Clear Cache & Refresh",
-        callback: () => {
-          clearUserCache();
-          const user = getCurrentUser();
-          console.log("🔄 User refreshed:", user);
+        label: "Auth: Initialize My Preferences",
+        callback: async () => {
+          const user = getAuthenticatedUser();
+          if (user) {
+            const success = await initializeUserPreferences(user.displayName);
+            console.log(
+              `🎯 Preference initialization ${
+                success ? "successful" : "failed"
+              }`
+            );
+          }
         },
       },
       {
-        label: "User Auth: Test All Detection Methods",
-        callback: () => {
-          console.group("🧪 Testing User Detection Methods");
-          console.log("Official API:", getCurrentUserViaOfficialAPI());
-          console.log("localStorage:", getCurrentUserViaLocalStorage());
-          console.log("Recent blocks:", getCurrentUserViaRecentBlocks());
-          console.log("Final result:", getCurrentUser());
-          console.groupEnd();
+        label: "Auth: Show My Preferences",
+        callback: async () => {
+          const user = getAuthenticatedUser();
+          if (user) {
+            const preferences = await getAllUserPreferences(user.displayName);
+            console.group(`⚙️ Preferences for ${user.displayName}`);
+            Object.entries(preferences).forEach(([key, value]) => {
+              console.log(`${key}: ${JSON.stringify(value)}`);
+            });
+            console.groupEnd();
+          }
         },
       },
     ];
@@ -286,41 +528,40 @@ export default {
     platform.register(
       "user-authentication",
       {
-        getCurrentUser,
-        getCurrentUserUid,
-        getCurrentUserDisplayName,
-        getCurrentUserPhotoUrl,
-        getUserById,
-        isMultiUserGraph,
-        clearUserCache,
-        version: "1.0.0",
+        session: userSession,
+        services: authenticationServices,
+        version: "2.0.0",
       },
       {
         name: "User Authentication",
         description:
-          "Professional user detection with Josh Brown API + David Vargas localStorage + proven fallbacks",
-        version: "1.0.0",
-        dependencies: ["foundation-registry"],
+          "Professional user session management and authentication workflows",
+        version: "2.0.0",
+        dependencies: ["foundation-registry", "utility-library"],
       }
     );
 
-    // 🎉 STARTUP TEST
-    const currentUser = getCurrentUser();
-    const multiUserStatus = isMultiUserGraph();
-
+    // 🎉 STARTUP COMPLETE
+    const user = getAuthenticatedUser();
     console.log("✅ User Authentication loaded successfully!");
     console.log(
-      `👤 Detected user: ${currentUser.displayName} (${currentUser.method})`
+      `👤 Welcome ${user.displayName}! Authentication state: ${userSession.authState}`
     );
-    console.log(`📊 Multi-user graph: ${multiUserStatus}`);
-    console.log('💡 Try: Cmd+P → "User Auth: Show Current User"');
+    console.log('💡 Try: Cmd+P → "Auth: Show User Dashboard"');
+
+    // Auto-initialize preferences for new users
+    const preferences = await getAllUserPreferences(user.displayName);
+    if (Object.keys(preferences).length === 0) {
+      console.log("🎯 No preferences found - initializing defaults...");
+      await initializeUserPreferences(user.displayName);
+    }
   },
 
   onunload: () => {
-    console.log("👤 User Authentication unloading...");
+    console.log("🔐 User Authentication unloading...");
 
-    // Clear cache
-    clearUserCache();
+    // Clear session
+    userSession = null;
 
     console.log("✅ User Authentication cleanup complete!");
   },
