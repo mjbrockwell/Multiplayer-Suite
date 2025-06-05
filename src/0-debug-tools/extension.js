@@ -194,14 +194,50 @@ const setupSettingsDebugHandlers = (container) => {
       try {
         log("🌳 Scanning tree structure...", "info");
         const user = getCurrentUser();
+
+        // First check what's actually in the page
+        const pageTitle = `${user.displayName}/user preferences`;
+        const pageUid = window.roamAlphaAPI.data.q(`
+        [:find ?uid .
+         :where [?page :node/title "${pageTitle}"] [?page :block/uid ?uid]]
+      `);
+
+        if (pageUid) {
+          // Get raw tree structure
+          const rawTree = window.roamAlphaAPI.data.q(`
+          [:find ?uid ?string ?order
+           :where 
+           [?parent :block/uid "${pageUid}"]
+           [?parent :block/children ?child]
+           [?child :block/uid ?uid]
+           [?child :block/string ?string]
+           [?child :block/order ?order]]
+        `);
+
+          log(`📊 Raw blocks in page: ${rawTree.length}`, "info");
+          rawTree.forEach(([uid, text, order]) => {
+            log(`  Block ${order}: "${text}" (${uid})`, "info");
+          });
+        }
+
+        // Now get processed preferences
         const prefs = await getAllUserPreferences(user.displayName);
-
         const count = Object.keys(prefs).length;
-        log(`📊 Found ${count} preferences:`, "info");
+        log(
+          `📊 Processed preferences: ${count}`,
+          count > 0 ? "success" : "warning"
+        );
 
-        Object.entries(prefs).forEach(([key, value]) => {
-          log(`  • ${key}: "${value}"`, "info");
-        });
+        if (count > 0) {
+          Object.entries(prefs).forEach(([key, value]) => {
+            log(`  • ${key}: "${value}"`, "info");
+          });
+        } else {
+          log(
+            "❌ No processed preferences found - page may have blocks but wrong structure",
+            "warning"
+          );
+        }
 
         updateStatus(
           "settings-count",
