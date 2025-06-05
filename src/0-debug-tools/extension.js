@@ -250,30 +250,231 @@ const setupSettingsDebugHandlers = (container) => {
       }
     });
 
-  // Force Create
+  // Enhanced Force Create with detailed block creation tracing
   container
     .querySelector("#debug-force-create")
     ?.addEventListener("click", async () => {
       try {
-        log("🔧 Force creating preferences...", "info");
+        log("🔧 Starting detailed force create analysis...", "info");
         const user = getCurrentUser();
+        const pageTitle = `${user.displayName}/user preferences`;
 
-        // This will trigger the auto-creation logic
-        const testPref = await getUserPreference(
+        // STEP 1: Check initial state
+        log("📊 STEP 1: Checking initial state...", "info");
+        const initialPageUid = window.roamAlphaAPI.data.q(`
+      [:find ?uid . :where [?page :node/title "${pageTitle}"] [?page :block/uid ?uid]]
+    `);
+        log(
+          `Initial page UID: ${initialPageUid || "NONE"}`,
+          initialPageUid ? "success" : "warning"
+        );
+
+        if (initialPageUid) {
+          const initialBlocks = window.roamAlphaAPI.data.q(`
+        [:find ?uid ?string ?order
+         :where 
+         [?parent :block/uid "${initialPageUid}"]
+         [?parent :block/children ?child]
+         [?child :block/uid ?uid]
+         [?child :block/string ?string]
+         [?child :block/order ?order]]
+      `);
+          log(`Initial blocks: ${initialBlocks.length}`, "info");
+        }
+
+        // STEP 2: Trigger getUserPreference (which should create the setting)
+        log(
+          "🎯 STEP 2: Calling getUserPreference (should trigger creation)...",
+          "info"
+        );
+        const startTime = Date.now();
+        const result = await getUserPreference(
           user.displayName,
           "Loading Page Preference",
           "Daily Page"
         );
-        log(`✅ Auto-creation triggered, got: "${testPref}"`, "success");
+        const endTime = Date.now();
+        log(
+          `getUserPreference result: "${result}" (took ${
+            endTime - startTime
+          }ms)`,
+          "success"
+        );
 
-        // Scan results
-        const prefs = await getAllUserPreferences(user.displayName);
-        const count = Object.keys(prefs).length;
-        log(`📊 Created ${count} preferences total`, "success");
-        updateStatus("settings-count", count, "success");
-        updateStatus("page-exists", "Yes", "success");
+        // STEP 3: Immediate check - what was actually created?
+        log("🔍 STEP 3: Immediate post-creation check...", "info");
+        const postCreatePageUid = window.roamAlphaAPI.data.q(`
+      [:find ?uid . :where [?page :node/title "${pageTitle}"] [?page :block/uid ?uid]]
+    `);
+        log(
+          `Post-create page UID: ${postCreatePageUid || "NONE"}`,
+          postCreatePageUid ? "success" : "error"
+        );
+
+        if (postCreatePageUid) {
+          const postCreateBlocks = window.roamAlphaAPI.data.q(`
+        [:find ?uid ?string ?order
+         :where 
+         [?parent :block/uid "${postCreatePageUid}"]
+         [?parent :block/children ?child]
+         [?child :block/uid ?uid]
+         [?child :block/string ?string]
+         [?child :block/order ?order]]
+      `);
+
+          log(`Post-create blocks: ${postCreateBlocks.length}`, "info");
+          postCreateBlocks.forEach(([uid, text, order], index) => {
+            log(`  Block ${order}: "${text}" (${uid})`, "info");
+
+            // Check for children immediately
+            const immediateChildren = window.roamAlphaAPI.data.q(`
+          [:find ?childUid ?childString ?childOrder
+           :where 
+           [?parent :block/uid "${uid}"]
+           [?parent :block/children ?child]
+           [?child :block/uid ?childUid]
+           [?child :block/string ?childString]
+           [?child :block/order ?childOrder]]
+        `);
+
+            if (immediateChildren.length > 0) {
+              immediateChildren.forEach(([childUid, childText, childOrder]) => {
+                log(
+                  `    Child ${childOrder}: "${childText}" (${childUid})`,
+                  "success"
+                );
+              });
+            } else {
+              log(`    No immediate children found`, "warning");
+            }
+          });
+        }
+
+        // STEP 4: Wait for potential async operations
+        log("⏳ STEP 4: Waiting 1 second for async operations...", "info");
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        // STEP 5: Check again after delay
+        log("🔍 STEP 5: Post-delay check...", "info");
+        const delayedPageUid = window.roamAlphaAPI.data.q(`
+      [:find ?uid . :where [?page :node/title "${pageTitle}"] [?page :block/uid ?uid]]
+    `);
+
+        if (delayedPageUid) {
+          const delayedBlocks = window.roamAlphaAPI.data.q(`
+        [:find ?uid ?string ?order
+         :where 
+         [?parent :block/uid "${delayedPageUid}"]
+         [?parent :block/children ?child]
+         [?child :block/uid ?uid]
+         [?child :block/string ?string]
+         [?child :block/order ?order]]
+      `);
+
+          log(`Post-delay blocks: ${delayedBlocks.length}`, "info");
+          delayedBlocks.forEach(([uid, text, order]) => {
+            log(`  Block ${order}: "${text}" (${uid})`, "info");
+
+            // Check for children after delay
+            const delayedChildren = window.roamAlphaAPI.data.q(`
+          [:find ?childUid ?childString ?childOrder
+           :where 
+           [?parent :block/uid "${uid}"]
+           [?parent :block/children ?child]
+           [?child :block/uid ?childUid]
+           [?child :block/string ?childString]
+           [?child :block/order ?childOrder]]
+        `);
+
+            if (delayedChildren.length > 0) {
+              delayedChildren.forEach(([childUid, childText, childOrder]) => {
+                log(
+                  `    Child ${childOrder}: "${childText}" (${childUid})`,
+                  "success"
+                );
+              });
+            } else {
+              log(`    Still no children found`, "error");
+            }
+          });
+        }
+
+        // STEP 6: Test getAllUserPreferences reading
+        log("📖 STEP 6: Testing getAllUserPreferences reading...", "info");
+        const readStartTime = Date.now();
+        const allPrefs = await getAllUserPreferences(user.displayName);
+        const readEndTime = Date.now();
+        const prefCount = Object.keys(allPrefs).length;
+        log(
+          `getAllUserPreferences found: ${prefCount} preferences (took ${
+            readEndTime - readStartTime
+          }ms)`,
+          prefCount > 0 ? "success" : "error"
+        );
+
+        if (prefCount > 0) {
+          Object.entries(allPrefs).forEach(([key, value]) => {
+            log(`  📝 Found: "${key}" = "${value}"`, "success");
+          });
+        } else {
+          log(
+            "❌ getAllUserPreferences found nothing - this is the bug!",
+            "error"
+          );
+        }
+
+        // STEP 7: Test the regex matching directly
+        log("🧪 STEP 7: Testing regex matching on raw blocks...", "info");
+        if (delayedPageUid) {
+          const allBlocks = window.roamAlphaAPI.data.q(`
+        [:find ?uid ?string
+         :where 
+         [?parent :block/uid "${delayedPageUid}"]
+         [?parent :block/children ?child]
+         [?child :block/uid ?uid]
+         [?child :block/string ?string]]
+      `);
+
+          // Test the toFlexRegex function
+          const testKey = "Loading Page Preference";
+          const flexRegex = new RegExp(
+            `^\\s*${testKey.replace(
+              /([()])/g,
+              "\\$1"
+            )}\\s*(#\\.[\\w\\d-]*\\s*)?$`,
+            "i"
+          );
+
+          log(`Testing regex: ${flexRegex.toString()}`, "info");
+
+          allBlocks.forEach(([uid, text]) => {
+            const matches = flexRegex.test(text.trim());
+            log(
+              `  Block "${text}" matches: ${matches}`,
+              matches ? "success" : "warning"
+            );
+          });
+        }
+
+        // STEP 8: Summary
+        log("📊 STEP 8: Summary of findings...", "info");
+        log(`✅ getUserPreference returned: "${result}"`, "success");
+        log(
+          `❌ getAllUserPreferences found: ${prefCount} preferences`,
+          prefCount > 0 ? "success" : "error"
+        );
+        if (postCreatePageUid) {
+          log(`✅ Page exists with UID: ${postCreatePageUid}`, "success");
+        }
+
+        updateStatus(
+          "settings-count",
+          prefCount,
+          prefCount > 0 ? "success" : "error"
+        );
       } catch (error) {
-        log(`❌ Force create failed: ${error.message}`, "error");
+        log(`❌ Enhanced debug failed: ${error.message}`, "error");
+        console.error("Enhanced debug error details:", error);
       }
     });
 
