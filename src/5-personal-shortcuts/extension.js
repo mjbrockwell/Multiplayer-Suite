@@ -583,9 +583,9 @@ export default {
       return;
     }
 
-    if (!platform.has("settings-manager")) {
+    if (!platform.has("configuration-manager")) {
       console.error(
-        "❌ Settings Manager not found! Please load Extension 3 first."
+        "❌ Configuration Manager not found! Please load Extension 3 first."
       );
       return;
     }
@@ -696,7 +696,7 @@ export default {
         dependencies: [
           "foundation-registry",
           "user-authentication",
-          "settings-manager",
+          "configuration-manager",
         ],
       }
     );
