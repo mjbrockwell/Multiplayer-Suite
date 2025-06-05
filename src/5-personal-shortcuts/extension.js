@@ -111,41 +111,110 @@ const injectWithAllFallbacks = (shortcutsElement) => {
 };
 
 // ===================================================================
-// 🎨 UI CREATION - Simple, Professional Design
+// 🎨 UI CREATION - Enhanced Professional Design
 // ===================================================================
 
+// State for collapse/expand
+let isCollapsed = false;
+
 /**
- * Create the shortcuts section element
+ * Create the shortcuts section element with management features
  */
 const createShortcutsElement = (shortcuts) => {
   const element = document.createElement("div");
   element.className = "roam-extension-personal-shortcuts";
   element.id = "roam-extension-personal-shortcuts";
 
-  // Professional styling from findings document
+  // Enhanced styling - crisp border, better visibility, proper alignment
   element.style.cssText = `
-    margin: 12px 0;
-    padding: 8px 16px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 6px;
-    border-left: 3px solid #667eea;
+    margin: 8px 0 12px 0;
+    padding: 0;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(102, 126, 234, 0.2);
+    border-radius: 8px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   `;
 
-  // Header
+  // Header with collapse button
   const header = document.createElement("div");
   header.style.cssText = `
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: rgba(102, 126, 234, 0.05);
+    border-radius: 8px 8px 0 0;
+    border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+    cursor: pointer;
+  `;
+
+  const headerText = document.createElement("div");
+  headerText.style.cssText = `
     font-weight: 600;
-    color: #666;
-    margin-bottom: 8px;
-    font-size: 12px;
+    color: #5c7080;
+    font-size: 13px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
   `;
-  header.textContent = "★ Personal Shortcuts";
+  headerText.textContent = "★ PERSONAL SHORTCUTS";
+
+  const collapseButton = document.createElement("button");
+  collapseButton.style.cssText = `
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    color: #667eea;
+    padding: 2px 4px;
+    border-radius: 3px;
+    transition: background-color 0.15s ease;
+  `;
+  collapseButton.innerHTML = isCollapsed ? "🔽" : "🔼";
+
+  header.appendChild(headerText);
+  header.appendChild(collapseButton);
+
+  // Content container (shortcuts list + controls)
+  const content = document.createElement("div");
+  content.className = "shortcuts-content";
+  content.style.cssText = `
+    padding: 8px;
+    display: ${isCollapsed ? "none" : "block"};
+  `;
+
+  // Add current page button
+  const addCurrentButton = document.createElement("button");
+  addCurrentButton.style.cssText = `
+    width: 100%;
+    padding: 6px 8px;
+    margin-bottom: 8px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+  `;
+  addCurrentButton.textContent = "+ Add Current Page";
+
+  addCurrentButton.addEventListener("mouseenter", () => {
+    addCurrentButton.style.background = "#5a6fd8";
+  });
+
+  addCurrentButton.addEventListener("mouseleave", () => {
+    addCurrentButton.style.background = "#667eea";
+  });
+
+  addCurrentButton.addEventListener("click", async () => {
+    await addCurrentPageToShortcuts();
+  });
 
   // Shortcuts list
   const list = document.createElement("div");
+  list.className = "shortcuts-list";
   list.style.cssText = `
     display: flex;
     flex-direction: column;
@@ -156,9 +225,10 @@ const createShortcutsElement = (shortcuts) => {
     const emptyMessage = document.createElement("div");
     emptyMessage.style.cssText = `
       color: #8a9ba8;
-      font-size: 11px;
+      font-size: 12px;
       font-style: italic;
-      padding: 4px 0;
+      padding: 8px;
+      text-align: center;
     `;
     emptyMessage.textContent = "No shortcuts configured";
     list.appendChild(emptyMessage);
@@ -166,17 +236,56 @@ const createShortcutsElement = (shortcuts) => {
     shortcuts.forEach((shortcut) => {
       const item = document.createElement("div");
       item.style.cssText = `
-        padding: 4px 8px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 8px;
         margin: 1px 0;
         border-radius: 4px;
         cursor: pointer;
-        font-size: 12px;
+        font-size: 13px;
         transition: background-color 0.15s ease;
         color: #333;
       `;
-      item.textContent = shortcut;
 
-      // Hover effect
+      const shortcutText = document.createElement("span");
+      shortcutText.textContent = shortcut;
+      shortcutText.style.cssText = `
+        flex: 1;
+        cursor: pointer;
+      `;
+
+      const removeButton = document.createElement("button");
+      removeButton.innerHTML = "×";
+      removeButton.style.cssText = `
+        background: none;
+        border: none;
+        color: #dc3545;
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: bold;
+        padding: 0 4px;
+        border-radius: 2px;
+        opacity: 0.6;
+        transition: opacity 0.15s ease;
+      `;
+
+      removeButton.addEventListener("mouseenter", () => {
+        removeButton.style.opacity = "1";
+        removeButton.style.background = "rgba(220, 53, 69, 0.1)";
+      });
+
+      removeButton.addEventListener("mouseleave", () => {
+        removeButton.style.opacity = "0.6";
+        removeButton.style.background = "none";
+      });
+
+      removeButton.addEventListener("click", async (e) => {
+        e.stopPropagation(); // Prevent navigation
+        await removeFromShortcuts(shortcut);
+      });
+
+      // Hover effect for the whole item
       item.addEventListener("mouseenter", () => {
         item.style.background = "rgba(102, 126, 234, 0.1)";
       });
@@ -185,17 +294,35 @@ const createShortcutsElement = (shortcuts) => {
         item.style.background = "";
       });
 
-      // Click to navigate
-      item.addEventListener("click", () => {
+      // Click to navigate (only on the text, not the remove button)
+      shortcutText.addEventListener("click", () => {
         navigateToPage(shortcut);
       });
 
+      item.appendChild(shortcutText);
+      item.appendChild(removeButton);
       list.appendChild(item);
     });
   }
 
+  // Collapse/expand functionality
+  const toggleCollapse = () => {
+    isCollapsed = !isCollapsed;
+    content.style.display = isCollapsed ? "none" : "block";
+    collapseButton.innerHTML = isCollapsed ? "🔽" : "🔼";
+  };
+
+  header.addEventListener("click", toggleCollapse);
+  collapseButton.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleCollapse();
+  });
+
+  content.appendChild(addCurrentButton);
+  content.appendChild(list);
+
   element.appendChild(header);
-  element.appendChild(list);
+  element.appendChild(content);
 
   return element;
 };
@@ -458,6 +585,46 @@ export default {
           await injectPersonalShortcuts();
         },
       },
+      {
+        label: "Shortcuts: Add Current Page",
+        callback: async () => {
+          const success = await addCurrentPageToShortcuts();
+          if (success) {
+            console.log("✅ Current page added to shortcuts");
+          } else {
+            console.log("❌ Failed to add current page or already exists");
+          }
+        },
+      },
+      {
+        label: "Shortcuts: Refresh UI",
+        callback: async () => {
+          await refreshShortcutsUI();
+          console.log("🔄 Shortcuts UI refreshed");
+        },
+      },
+      {
+        label: "Shortcuts: Show All Data",
+        callback: async () => {
+          console.group("📊 Complete Shortcuts Data");
+          const shortcuts = await getUserShortcuts();
+          console.log("Current shortcuts:", shortcuts);
+
+          const platform = window.RoamExtensionSuite;
+          const getCurrentUser = platform.getUtility("getCurrentUser");
+          const getCurrentPageTitle = platform.getUtility(
+            "getCurrentPageTitle"
+          );
+
+          if (getCurrentUser && getCurrentPageTitle) {
+            const user = getCurrentUser();
+            const currentPage = getCurrentPageTitle();
+            console.log("Current user:", user.displayName);
+            console.log("Current page:", currentPage);
+          }
+          console.groupEnd();
+        },
+      },
     ];
 
     // Add commands and register for cleanup
@@ -472,11 +639,16 @@ export default {
       {
         inject: injectPersonalShortcuts,
         debug: debugSidebarStructure,
+        getUserShortcuts: getUserShortcuts,
+        addCurrentPageToShortcuts: addCurrentPageToShortcuts,
+        removeFromShortcuts: removeFromShortcuts,
+        refreshUI: refreshShortcutsUI,
         version: "1.0.0",
       },
       {
-        name: "Personal Shortcuts (Simplified)",
-        description: "Basic sidebar shortcuts injection with robust fallbacks",
+        name: "Personal Shortcuts (Enhanced)",
+        description:
+          "Sidebar shortcuts with management features: add, remove, collapse",
         version: "1.0.0",
         dependencies: ["foundation-registry"],
       }
