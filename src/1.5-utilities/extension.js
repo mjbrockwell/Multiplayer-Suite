@@ -1,10 +1,11 @@
 // ===================================================================
 // Extension 1.5: Utility Library - Professional Cross-Cutting Utilities
+// ENHANCED: Now includes nested data value parsing for complex structures
 // Following David Vargas's proven utility library patterns
 // ===================================================================
 
 // ===================================================================
-// 📊 UNIVERSAL DATA PARSING - New Protocol Implementation
+// 📊 UNIVERSAL DATA PARSING - Enhanced Protocol Implementation
 // ===================================================================
 
 /**
@@ -73,6 +74,162 @@ const findDataValue = (pageUid, key) => {
     }
   } catch (error) {
     console.error(`Error in findDataValue for "${key}":`, error);
+    return null;
+  }
+};
+
+/**
+ * 🆕 ENHANCED: Find nested data values under a parent key (e.g., all profile data under "About Me::")
+ * Perfect for complex user profiles with multiple nested attributes
+ *
+ * @param {string} pageUid - UID of the page containing the data
+ * @param {string} parentKey - Parent key to search for (e.g., "About Me", "Contact Info")
+ * @returns {Object|null} - Object with key-value pairs from children, or null if parent not found
+ */
+const findNestedDataValues = (pageUid, parentKey) => {
+  if (!pageUid || !parentKey) return null;
+
+  try {
+    // First, find the parent block using existing logic
+    const allBlocks = window.roamAlphaAPI.data.q(`
+      [:find ?uid ?string ?order
+       :where 
+       [?parent :block/uid "${pageUid}"]
+       [?parent :block/children ?child]
+       [?child :block/uid ?uid]
+       [?child :block/string ?string]
+       [?child :block/order ?order]]
+    `);
+
+    let parentBlock = null;
+
+    // Method 1: Look for attribute format "ParentKey::"
+    parentBlock = allBlocks.find(([uid, text]) => {
+      return text.trim() === `${parentKey}::`;
+    });
+
+    // Method 2: Look for text that contains the parent key (handles bold/plain)
+    if (!parentBlock) {
+      parentBlock = allBlocks.find(([uid, text]) => {
+        const cleanText = text.replace(/\*\*/g, "").replace(/:/g, "").trim();
+        return cleanText.toLowerCase().includes(parentKey.toLowerCase());
+      });
+    }
+
+    if (!parentBlock) {
+      console.log(`Parent key "${parentKey}" not found on page`);
+      return null;
+    }
+
+    const [parentBlockUid, parentBlockText] = parentBlock;
+
+    // Get all children blocks of the parent
+    const childrenBlocks = window.roamAlphaAPI.data
+      .q(
+        `
+      [:find ?childUid ?childString ?childOrder
+       :where 
+       [?parent :block/uid "${parentBlockUid}"]
+       [?parent :block/children ?child]
+       [?child :block/uid ?childUid]
+       [?child :block/string ?childString]
+       [?child :block/order ?childOrder]]
+    `
+      )
+      .sort((a, b) => a[2] - b[2]); // Sort by order
+
+    if (childrenBlocks.length === 0) {
+      console.log(`No children found under "${parentKey}"`);
+      return {};
+    }
+
+    // Parse each child as a key-value pair
+    const nestedData = {};
+
+    for (const [childUid, childString] of childrenBlocks) {
+      // Look for attribute format "Key::" in child text
+      const attributeMatch = childString.match(/^(.+?)::(.*)$/);
+      if (attributeMatch) {
+        const key = attributeMatch[1].trim();
+        let value = attributeMatch[2].trim();
+
+        // If no value after ::, look for child blocks
+        if (!value) {
+          const grandchildren = window.roamAlphaAPI.data
+            .q(
+              `
+            [:find ?grandchildString ?grandchildOrder
+             :where 
+             [?parent :block/uid "${childUid}"]
+             [?parent :block/children ?grandchild]
+             [?grandchild :block/string ?grandchildString]
+             [?grandchild :block/order ?grandchildOrder]]
+          `
+            )
+            .sort((a, b) => a[1] - b[1]);
+
+          if (grandchildren.length === 1) {
+            value = grandchildren[0][0];
+          } else if (grandchildren.length > 1) {
+            value = grandchildren.map(([text]) => text);
+          }
+        }
+
+        if (value) {
+          nestedData[key] = value;
+        }
+      } else {
+        // Look for other formats like "**Key:**" or "Key:"
+        const boldMatch = childString.match(/^\*\*(.+?)\*\*:?\s*(.*)$/);
+        const plainMatch = childString.match(/^(.+?):\s*(.*)$/);
+
+        let key, value;
+
+        if (boldMatch) {
+          key = boldMatch[1].trim();
+          value = boldMatch[2].trim();
+        } else if (plainMatch) {
+          key = plainMatch[1].trim();
+          value = plainMatch[2].trim();
+        }
+
+        // If we found a key but no value, look for child blocks
+        if (key && !value) {
+          const grandchildren = window.roamAlphaAPI.data
+            .q(
+              `
+            [:find ?grandchildString ?grandchildOrder
+             :where 
+             [?parent :block/uid "${childUid}"]
+             [?parent :block/children ?grandchild]
+             [?grandchild :block/string ?grandchildString]
+             [?grandchild :block/order ?grandchildOrder]]
+          `
+            )
+            .sort((a, b) => a[1] - b[1]);
+
+          if (grandchildren.length === 1) {
+            value = grandchildren[0][0];
+          } else if (grandchildren.length > 1) {
+            value = grandchildren.map(([text]) => text);
+          }
+        }
+
+        if (key && value) {
+          nestedData[key] = value;
+        }
+      }
+    }
+
+    console.log(
+      `📊 Found ${
+        Object.keys(nestedData).length
+      } nested values under "${parentKey}":`,
+      nestedData
+    );
+    return nestedData;
+  } catch (error) {
+    console.error(`Error in findNestedDataValues for "${parentKey}":`, error);
     return null;
   }
 };
@@ -151,6 +308,111 @@ const setDataValue = async (
     return true;
   } catch (error) {
     console.error(`Error in setDataValue for "${key}":`, error);
+    return false;
+  }
+};
+
+/**
+ * 🆕 ENHANCED: Set nested data values under a parent key
+ * Perfect for complex user profiles with multiple attributes
+ *
+ * @param {string} pageUid - UID of the page containing the data
+ * @param {string} parentKey - Parent key to create/update (e.g., "Contact Info")
+ * @param {Object} nestedData - Object with key-value pairs to set as children
+ * @param {boolean} useAttributeFormat - Whether to use attribute format (Key::)
+ * @returns {boolean} - Success status
+ */
+const setNestedDataValues = async (
+  pageUid,
+  parentKey,
+  nestedData,
+  useAttributeFormat = false
+) => {
+  if (!pageUid || !parentKey || !nestedData || typeof nestedData !== "object") {
+    return false;
+  }
+
+  try {
+    // First ensure the parent block exists
+    const parentKeyText = useAttributeFormat
+      ? `${parentKey}::`
+      : `**${parentKey}:**`;
+
+    // Check if parent block already exists
+    const allBlocks = window.roamAlphaAPI.data.q(`
+      [:find ?uid ?string
+       :where 
+       [?parent :block/uid "${pageUid}"]
+       [?parent :block/children ?child]
+       [?child :block/uid ?uid]
+       [?child :block/string ?string]]
+    `);
+
+    let parentBlock = allBlocks.find(([uid, text]) => {
+      if (useAttributeFormat) {
+        return text.trim() === parentKeyText;
+      } else {
+        const cleanText = text.replace(/\*\*/g, "").replace(/:/g, "").trim();
+        return cleanText.toLowerCase().includes(parentKey.toLowerCase());
+      }
+    });
+
+    let parentBlockUid;
+
+    if (!parentBlock) {
+      // Create new parent block
+      parentBlockUid = await window.roamAlphaAPI.data.block.create({
+        location: { "parent-uid": pageUid, order: "last" },
+        block: { string: parentKeyText },
+      });
+    } else {
+      parentBlockUid = parentBlock[0];
+
+      // Clear existing children
+      const existingChildren = window.roamAlphaAPI.data.q(`
+        [:find ?childUid
+         :where 
+         [?parent :block/uid "${parentBlockUid}"]
+         [?parent :block/children ?child]
+         [?child :block/uid ?childUid]]
+      `);
+
+      for (const [childUid] of existingChildren) {
+        await window.roamAlphaAPI.data.block.delete({
+          block: { uid: childUid },
+        });
+      }
+    }
+
+    // Add each nested key-value pair as children
+    let order = 0;
+    for (const [key, value] of Object.entries(nestedData)) {
+      const childKeyText = useAttributeFormat ? `${key}::` : `**${key}:**`;
+
+      // Create child key block
+      const childKeyUid = await window.roamAlphaAPI.data.block.create({
+        location: { "parent-uid": parentBlockUid, order: order++ },
+        block: { string: childKeyText },
+      });
+
+      // Add value(s) as grandchildren
+      const values = Array.isArray(value) ? value : [value];
+      for (let i = 0; i < values.length; i++) {
+        await window.roamAlphaAPI.data.block.create({
+          location: { "parent-uid": childKeyUid, order: i },
+          block: { string: values[i] },
+        });
+      }
+    }
+
+    console.log(
+      `✅ Set ${
+        Object.keys(nestedData).length
+      } nested values under "${parentKey}"`
+    );
+    return true;
+  } catch (error) {
+    console.error(`Error in setNestedDataValues for "${parentKey}":`, error);
     return false;
   }
 };
@@ -484,13 +746,15 @@ const parsePersonalShortcuts = (shortcutsString) => {
 };
 
 // ===================================================================
-// 🎯 UTILITY REGISTRY - Central Registration System
+// 🎯 ENHANCED UTILITY REGISTRY - Central Registration System
 // ===================================================================
 
 const UTILITIES = {
-  // Data parsing
+  // Enhanced data parsing
   findDataValue: findDataValue,
   setDataValue: setDataValue,
+  findNestedDataValues: findNestedDataValues, // 🆕 NEW NESTED PARSER
+  setNestedDataValues: setNestedDataValues, // 🆕 NEW NESTED SETTER
 
   // User detection
   getCurrentUser: getCurrentUser,
@@ -520,7 +784,7 @@ const UTILITIES = {
 
 export default {
   onload: async ({ extensionAPI }) => {
-    console.log("🔧 Utility Library starting...");
+    console.log("🔧 Enhanced Utility Library starting...");
 
     // ✅ VERIFY FOUNDATION DEPENDENCY
     if (!window.RoamExtensionSuite) {
@@ -538,7 +802,7 @@ export default {
       console.log(`🔧 Registered utility: ${name}`);
     });
 
-    // 📝 REGISTER DEBUG COMMANDS
+    // 📝 REGISTER ENHANCED DEBUG COMMANDS
     const commands = [
       {
         label: "Utils: Test Universal Data Parser",
@@ -570,6 +834,74 @@ export default {
         },
       },
       {
+        label: "Utils: Test Nested Data Parser", // 🆕 NEW COMMAND
+        callback: async () => {
+          const user = getCurrentUser();
+          const userPageUid = getPageUidByTitle(user.displayName);
+
+          if (userPageUid) {
+            console.group("🧪 Testing Nested Data Parser");
+            console.log("User Page UID:", userPageUid);
+
+            // Test nested data structures
+            const testParentKeys = [
+              "Contact Info",
+              "About Me",
+              "Profile Data",
+              "Social Links",
+            ];
+
+            testParentKeys.forEach((parentKey) => {
+              const nestedData = findNestedDataValues(userPageUid, parentKey);
+              if (nestedData && Object.keys(nestedData).length > 0) {
+                console.log(`📊 ${parentKey}:`, nestedData);
+              } else {
+                console.log(`📊 ${parentKey}: No nested data found`);
+              }
+            });
+
+            console.groupEnd();
+          } else {
+            console.log("❌ User page not found");
+          }
+        },
+      },
+      {
+        label: "Utils: Create Sample Nested Data", // 🆕 NEW COMMAND
+        callback: async () => {
+          const user = getCurrentUser();
+          const userPageUid = await createPageIfNotExists(user.displayName);
+
+          if (userPageUid) {
+            console.log("🧪 Creating sample nested data structure...");
+
+            // Create sample nested contact info
+            const contactInfo = {
+              Email: user.email || "user@example.com",
+              Phone: "+1 (555) 123-4567",
+              LinkedIn: "linkedin.com/in/username",
+              Twitter: "@username",
+            };
+
+            const success = await setNestedDataValues(
+              userPageUid,
+              "Contact Info",
+              contactInfo,
+              true
+            );
+
+            if (success) {
+              console.log("✅ Sample nested data created successfully!");
+              console.log(
+                "💡 Check your user page and try 'Utils: Test Nested Data Parser'"
+              );
+            } else {
+              console.log("❌ Failed to create sample nested data");
+            }
+          }
+        },
+      },
+      {
         label: "Utils: Test User Detection",
         callback: () => {
           console.group("🧪 Testing User Detection Methods");
@@ -586,7 +918,11 @@ export default {
         callback: () => {
           console.group("🔧 Available Utilities");
           Object.keys(UTILITIES).forEach((name) => {
-            console.log(`• ${name}`);
+            const isNew = [
+              "findNestedDataValues",
+              "setNestedDataValues",
+            ].includes(name);
+            console.log(`${isNew ? "🆕" : "•"} ${name}`);
           });
           console.groupEnd();
         },
@@ -605,25 +941,27 @@ export default {
       {
         utilities: UTILITIES,
         findDataValue,
+        findNestedDataValues, // 🆕 NEW
         getCurrentUser,
-        version: "1.0.0",
+        version: "1.5.1", // Incremented for new features
       },
       {
-        name: "Utility Library",
+        name: "Enhanced Utility Library",
         description:
-          "Professional cross-cutting utilities following David Vargas patterns",
-        version: "1.0.0",
+          "Professional cross-cutting utilities with nested data parsing capabilities",
+        version: "1.5.1",
         dependencies: ["foundation-registry"],
       }
     );
 
     // 🎉 STARTUP COMPLETE
     console.log(
-      `✅ Utility Library loaded with ${
+      `✅ Enhanced Utility Library loaded with ${
         Object.keys(UTILITIES).length
       } utilities!`
     );
-    console.log('💡 Try: Cmd+P → "Utils: Test Universal Data Parser"');
+    console.log("🆕 NEW: Nested data parsing capabilities added");
+    console.log('💡 Try: Cmd+P → "Utils: Test Nested Data Parser"');
 
     // Test user detection on startup
     const currentUser = getCurrentUser();
@@ -633,11 +971,11 @@ export default {
   },
 
   onunload: () => {
-    console.log("🔧 Utility Library unloading...");
+    console.log("🔧 Enhanced Utility Library unloading...");
 
     // Clear caches
     clearUserCache();
 
-    console.log("✅ Utility Library cleanup complete!");
+    console.log("✅ Enhanced Utility Library cleanup complete!");
   },
 };
