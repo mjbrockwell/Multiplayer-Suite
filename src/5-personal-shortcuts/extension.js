@@ -1,7 +1,6 @@
 // ===================================================================
-// Extension 5: Personal Shortcuts - Enhanced & Fixed Version
-// Focus: Fixed positioning, improved styling, working functionality
-// Based on user feedback and Roam University utilities
+// Extension 5: Personal Shortcuts - Complete Fixed Version
+// FIXES: Container sizing, overflow handling, proper scrolling
 // ===================================================================
 
 // ===================================================================
@@ -121,8 +120,84 @@ const injectWithAllFallbacks = (shortcutsElement) => {
 };
 
 // ===================================================================
-// 📊 SHORTCUTS DATA MANAGEMENT - Working Implementation
+// 📊 SHORTCUTS DATA MANAGEMENT - Enhanced with Retry Logic
 // ===================================================================
+
+/**
+ * Enhanced data reading with retry logic to handle timing issues
+ */
+const getUserShortcutsWithRetry = async (retries = 3, delay = 500) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const platform = window.RoamExtensionSuite;
+      if (!platform) {
+        console.warn("Platform not available, using fallback shortcuts");
+        return ["Daily Notes", "Chat Room"];
+      }
+
+      const getCurrentUser = platform.getUtility("getCurrentUser");
+      const findDataValue = platform.getUtility("findDataValue");
+      const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
+
+      if (!getCurrentUser || !findDataValue || !getPageUidByTitle) {
+        console.warn(
+          "Required utilities not available, using fallback shortcuts"
+        );
+        return ["Daily Notes", "Chat Room"];
+      }
+
+      const user = getCurrentUser();
+      const preferencesPageTitle = `${user.displayName}/user preferences`;
+      const preferencesPageUid = getPageUidByTitle(preferencesPageTitle);
+
+      if (!preferencesPageUid) {
+        console.log(
+          `No preferences page found for ${user.displayName}, using defaults`
+        );
+        return ["Daily Notes", "Chat Room"];
+      }
+
+      // Try to get shortcuts using universal parser
+      const shortcutsData = findDataValue(
+        preferencesPageUid,
+        "Personal Shortcuts"
+      );
+
+      console.log(`🔍 Attempt ${i + 1}: Raw shortcuts data:`, shortcutsData);
+
+      if (Array.isArray(shortcutsData)) {
+        console.log(
+          `📊 Loaded ${
+            shortcutsData.length
+          } shortcuts from preferences (attempt ${i + 1})`
+        );
+        return shortcutsData.filter(Boolean); // Remove any empty strings
+      } else if (typeof shortcutsData === "string" && shortcutsData.trim()) {
+        // Single shortcut
+        return [shortcutsData.trim()];
+      } else if (i < retries - 1) {
+        // If no data found and we have more retries, wait and try again
+        console.log(
+          `No shortcuts found on attempt ${i + 1}, retrying in ${delay}ms...`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        continue;
+      } else {
+        console.log(
+          "No shortcuts found in preferences after all retries, using defaults"
+        );
+        return ["Daily Notes", "Chat Room"];
+      }
+    } catch (error) {
+      console.error(`Error loading user shortcuts (attempt ${i + 1}):`, error);
+      if (i < retries - 1) {
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  return ["Daily Notes", "Chat Room"];
+};
 
 /**
  * Add current page to shortcuts using utility library
@@ -181,6 +256,8 @@ const addCurrentPageToShortcuts = async () => {
       ? existingShortcuts
       : [existingShortcuts].filter(Boolean);
 
+    console.log("📊 Existing shortcuts before adding:", shortcutsArray);
+
     // Check if already exists
     if (shortcutsArray.includes(currentPage)) {
       console.log(`"${currentPage}" already in shortcuts`);
@@ -189,6 +266,7 @@ const addCurrentPageToShortcuts = async () => {
 
     // Add new shortcut
     const updatedShortcuts = [...shortcutsArray, currentPage];
+    console.log("📊 Updated shortcuts to save:", updatedShortcuts);
 
     // Save updated shortcuts
     const success = await setDataValue(
@@ -199,8 +277,12 @@ const addCurrentPageToShortcuts = async () => {
 
     if (success) {
       console.log(`✅ Added "${currentPage}" to shortcuts`);
-      // Refresh the UI
-      await refreshShortcutsUI();
+
+      // Wait a bit longer before refreshing to ensure data is committed
+      setTimeout(async () => {
+        await refreshShortcutsUI();
+      }, 1000); // Increased delay
+
       return true;
     } else {
       console.error("Failed to save shortcuts");
@@ -244,10 +326,14 @@ const removeFromShortcuts = async (shortcutToRemove) => {
       ? existingShortcuts
       : [existingShortcuts].filter(Boolean);
 
+    console.log("📊 Existing shortcuts before removal:", shortcutsArray);
+
     // Remove the shortcut
     const updatedShortcuts = shortcutsArray.filter(
       (shortcut) => shortcut !== shortcutToRemove
     );
+
+    console.log("📊 Updated shortcuts after removal:", updatedShortcuts);
 
     // Save updated shortcuts
     const success = await setDataValue(
@@ -258,8 +344,12 @@ const removeFromShortcuts = async (shortcutToRemove) => {
 
     if (success) {
       console.log(`✅ Removed "${shortcutToRemove}" from shortcuts`);
-      // Refresh the UI
-      await refreshShortcutsUI();
+
+      // Wait before refreshing to ensure data is committed
+      setTimeout(async () => {
+        await refreshShortcutsUI();
+      }, 1000);
+
       return true;
     } else {
       console.error("Failed to save updated shortcuts");
@@ -272,7 +362,7 @@ const removeFromShortcuts = async (shortcutToRemove) => {
 };
 
 /**
- * Refresh the shortcuts UI
+ * Refresh the shortcuts UI with enhanced data fetching
  */
 const refreshShortcutsUI = async () => {
   console.log("🔄 Refreshing shortcuts UI...");
@@ -283,28 +373,83 @@ const refreshShortcutsUI = async () => {
     existing.remove();
   }
 
-  // Re-inject with updated data
+  // Re-inject with updated data (using retry logic)
   await injectPersonalShortcuts();
 };
 
+/**
+ * Get user shortcuts using the utility library with retry logic
+ */
+const getUserShortcuts = async () => {
+  return await getUserShortcutsWithRetry(3, 500);
+};
+
 // ===================================================================
-// 🎨 UI CREATION - Enhanced Styling with Fixes
+// 🎨 UI CREATION - FIXED CONTAINER SIZING AND OVERFLOW
 // ===================================================================
 
 // State for collapse/expand
 let isCollapsed = false;
 
 /**
- * Create the shortcuts section element with enhanced styling
+ * Add custom scrollbar styles for better visual integration
+ */
+const addScrollbarStyles = () => {
+  const styleId = "personal-shortcuts-scrollbar-styles";
+  if (document.getElementById(styleId)) return;
+
+  const style = document.createElement("style");
+  style.id = styleId;
+  style.textContent = `
+    .roam-extension-personal-shortcuts .shortcuts-content > div::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    .roam-extension-personal-shortcuts .shortcuts-content > div::-webkit-scrollbar-track {
+      background: rgba(102, 126, 234, 0.05);
+      border-radius: 3px;
+    }
+    
+    .roam-extension-personal-shortcuts .shortcuts-content > div::-webkit-scrollbar-thumb {
+      background: rgba(102, 126, 234, 0.3);
+      border-radius: 3px;
+      transition: background 0.2s ease;
+    }
+    
+    .roam-extension-personal-shortcuts .shortcuts-content > div::-webkit-scrollbar-thumb:hover {
+      background: rgba(102, 126, 234, 0.5);
+    }
+    
+    /* Ensure proper sizing for all children */
+    .roam-extension-personal-shortcuts * {
+      box-sizing: border-box;
+    }
+    
+    /* Prevent any text overflow issues */
+    .roam-extension-personal-shortcuts .shortcuts-list > div {
+      overflow: hidden;
+    }
+  `;
+
+  document.head.appendChild(style);
+
+  // Register for cleanup
+  if (window._extensionRegistry) {
+    window._extensionRegistry.elements.push(style);
+  }
+};
+
+/**
+ * Create the shortcuts section element with FIXED container sizing
  */
 const createShortcutsElement = (shortcuts) => {
   const element = document.createElement("div");
   element.className = "roam-extension-personal-shortcuts";
   element.id = "roam-extension-personal-shortcuts";
 
-  // ENHANCED STYLING - Bold border, curved corners, subtle shadow, better positioning
+  // FIXED: Better container sizing with proper overflow handling
   element.style.cssText = `
-    margin: 6px 8px 8px 8px;
+    margin: 6px 0px 8px 0px;
     padding: 0;
     background: rgba(255, 255, 255, 0.95);
     border: 1.5px solid #667eea;
@@ -313,6 +458,15 @@ const createShortcutsElement = (shortcuts) => {
     box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15), 0 1px 3px rgba(0, 0, 0, 0.1);
     position: relative;
     z-index: 10;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    max-height: 400px;
+    min-height: fit-content;
+    overflow: hidden;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
   `;
 
   // Header with collapse button
@@ -326,6 +480,7 @@ const createShortcutsElement = (shortcuts) => {
     border-radius: 10px 10px 0 0;
     border-bottom: 1px solid rgba(102, 126, 234, 0.2);
     cursor: pointer;
+    flex-shrink: 0;
   `;
 
   const headerText = document.createElement("div");
@@ -354,15 +509,30 @@ const createShortcutsElement = (shortcuts) => {
   header.appendChild(headerText);
   header.appendChild(collapseButton);
 
-  // Content container (shortcuts list + controls)
+  // FIXED: Content container with proper flex sizing and overflow
   const content = document.createElement("div");
   content.className = "shortcuts-content";
   content.style.cssText = `
-    padding: 10px;
-    display: ${isCollapsed ? "none" : "block"};
+    display: ${isCollapsed ? "none" : "flex"};
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    max-height: 340px;
+    overflow: hidden;
+    box-sizing: border-box;
   `;
 
-  // DEMURE Add Current Page Button - Pastel with Bold Border
+  // FIXED: Scrollable container for the actual content
+  const scrollContainer = document.createElement("div");
+  scrollContainer.style.cssText = `
+    padding: 10px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: 320px;
+    box-sizing: border-box;
+  `;
+
+  // Add Current Page Button
   const addCurrentButton = document.createElement("button");
   addCurrentButton.style.cssText = `
     width: 100%;
@@ -377,6 +547,7 @@ const createShortcutsElement = (shortcuts) => {
     cursor: pointer;
     transition: all 0.2s ease;
     text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+    flex-shrink: 0;
   `;
   addCurrentButton.textContent = "+ Add Current Page";
 
@@ -419,13 +590,17 @@ const createShortcutsElement = (shortcuts) => {
     }
   });
 
-  // Shortcuts list
+  // FIXED: Shortcuts list with proper sizing
   const list = document.createElement("div");
   list.className = "shortcuts-list";
   list.style.cssText = `
     display: flex;
     flex-direction: column;
     gap: 3px;
+    width: 100%;
+    box-sizing: border-box;
+    flex: 1;
+    min-height: fit-content;
   `;
 
   if (shortcuts.length === 0) {
@@ -438,11 +613,16 @@ const createShortcutsElement = (shortcuts) => {
       text-align: center;
       background: rgba(102, 126, 234, 0.03);
       border-radius: 6px;
+      flex-shrink: 0;
     `;
     emptyMessage.textContent = "No shortcuts configured";
     list.appendChild(emptyMessage);
   } else {
-    shortcuts.forEach((shortcut) => {
+    console.log(`🎨 Creating UI for ${shortcuts.length} shortcuts:`, shortcuts);
+
+    shortcuts.forEach((shortcut, index) => {
+      console.log(`🎨 Creating item ${index + 1}: "${shortcut}"`);
+
       const item = document.createElement("div");
       item.style.cssText = `
         display: flex;
@@ -458,6 +638,9 @@ const createShortcutsElement = (shortcuts) => {
         color: #2d3748;
         background: rgba(102, 126, 234, 0.02);
         border: 1px solid rgba(102, 126, 234, 0.1);
+        flex-shrink: 0;
+        min-height: 36px;
+        box-sizing: border-box;
       `;
 
       const shortcutText = document.createElement("span");
@@ -465,6 +648,8 @@ const createShortcutsElement = (shortcuts) => {
       shortcutText.style.cssText = `
         flex: 1;
         cursor: pointer;
+        word-break: break-word;
+        line-height: 1.2;
       `;
 
       const removeButton = document.createElement("button");
@@ -480,6 +665,12 @@ const createShortcutsElement = (shortcuts) => {
         border-radius: 4px;
         opacity: 0.6;
         transition: all 0.15s ease;
+        flex-shrink: 0;
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       `;
 
       removeButton.addEventListener("mouseenter", () => {
@@ -525,11 +716,18 @@ const createShortcutsElement = (shortcuts) => {
     });
   }
 
-  // Collapse/expand functionality
+  // FIXED: Better collapse/expand functionality
   const toggleCollapse = () => {
     isCollapsed = !isCollapsed;
-    content.style.display = isCollapsed ? "none" : "block";
-    collapseButton.innerHTML = isCollapsed ? "🔽" : "🔼";
+    if (isCollapsed) {
+      content.style.display = "none";
+      collapseButton.innerHTML = "🔽";
+      element.style.maxHeight = "auto";
+    } else {
+      content.style.display = "flex";
+      collapseButton.innerHTML = "🔼";
+      element.style.maxHeight = "400px";
+    }
   };
 
   header.addEventListener("click", toggleCollapse);
@@ -538,8 +736,10 @@ const createShortcutsElement = (shortcuts) => {
     toggleCollapse();
   });
 
-  content.appendChild(addCurrentButton);
-  content.appendChild(list);
+  // Build the structure properly
+  scrollContainer.appendChild(addCurrentButton);
+  scrollContainer.appendChild(list);
+  content.appendChild(scrollContainer);
 
   element.appendChild(header);
   element.appendChild(content);
@@ -587,75 +787,17 @@ const navigateToPage = async (pageName) => {
 };
 
 // ===================================================================
-// 📊 DATA MANAGEMENT - Simple Shortcuts Loading
-// ===================================================================
-
-/**
- * Get user shortcuts using the utility library
- */
-const getUserShortcuts = async () => {
-  try {
-    const platform = window.RoamExtensionSuite;
-    if (!platform) {
-      console.warn("Platform not available, using fallback shortcuts");
-      return ["Daily Notes", "Chat Room"];
-    }
-
-    const getCurrentUser = platform.getUtility("getCurrentUser");
-    const findDataValue = platform.getUtility("findDataValue");
-    const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
-
-    if (!getCurrentUser || !findDataValue || !getPageUidByTitle) {
-      console.warn(
-        "Required utilities not available, using fallback shortcuts"
-      );
-      return ["Daily Notes", "Chat Room"];
-    }
-
-    const user = getCurrentUser();
-    const preferencesPageTitle = `${user.displayName}/user preferences`;
-    const preferencesPageUid = getPageUidByTitle(preferencesPageTitle);
-
-    if (!preferencesPageUid) {
-      console.log(
-        `No preferences page found for ${user.displayName}, using defaults`
-      );
-      return ["Daily Notes", "Chat Room"];
-    }
-
-    // Try to get shortcuts using universal parser
-    const shortcutsData = findDataValue(
-      preferencesPageUid,
-      "Personal Shortcuts"
-    );
-
-    if (Array.isArray(shortcutsData)) {
-      console.log(
-        `📊 Loaded ${shortcutsData.length} shortcuts from preferences`
-      );
-      return shortcutsData;
-    } else if (typeof shortcutsData === "string") {
-      // Single shortcut
-      return [shortcutsData];
-    } else {
-      console.log("No shortcuts found in preferences, using defaults");
-      return ["Daily Notes", "Chat Room"];
-    }
-  } catch (error) {
-    console.error("Error loading user shortcuts:", error);
-    return ["Daily Notes", "Chat Room"];
-  }
-};
-
-// ===================================================================
 // 🔧 MAIN INJECTION FUNCTION
 // ===================================================================
 
 /**
- * Main function to inject shortcuts into sidebar
+ * Main function to inject shortcuts into sidebar with proper styling
  */
 const injectPersonalShortcuts = async () => {
   console.log("🔗 Starting Personal Shortcuts injection...");
+
+  // Add scrollbar styles first
+  addScrollbarStyles();
 
   // Remove any existing shortcuts
   const existing = document.getElementById("roam-extension-personal-shortcuts");
@@ -664,11 +806,11 @@ const injectPersonalShortcuts = async () => {
     console.log("🧹 Removed existing shortcuts element");
   }
 
-  // Get user shortcuts
+  // Get user shortcuts with retry logic
   const shortcuts = await getUserShortcuts();
   console.log(`📊 Found ${shortcuts.length} shortcuts:`, shortcuts);
 
-  // Create shortcuts element
+  // Create shortcuts element with fixed sizing
   const shortcutsElement = createShortcutsElement(shortcuts);
 
   // Inject with fallbacks
@@ -684,6 +826,17 @@ const injectPersonalShortcuts = async () => {
       window._extensionRegistry.elements.push(shortcutsElement);
     }
 
+    // Add a small delay to ensure sizing is properly applied
+    setTimeout(() => {
+      console.log("🔍 Final container check:");
+      const rect = shortcutsElement.getBoundingClientRect();
+      console.log("Container dimensions:", {
+        width: rect.width,
+        height: rect.height,
+        maxHeight: shortcutsElement.style.maxHeight,
+      });
+    }, 100);
+
     return shortcutsElement;
   } else {
     console.error("❌ Failed to inject Personal Shortcuts with all methods");
@@ -696,7 +849,7 @@ const injectPersonalShortcuts = async () => {
 // ===================================================================
 
 /**
- * Debug function to analyze sidebar structure
+ * Debug sidebar structure
  */
 const debugSidebarStructure = () => {
   console.group("🔍 Sidebar Structure Analysis");
@@ -735,13 +888,133 @@ const debugSidebarStructure = () => {
   console.groupEnd();
 };
 
+/**
+ * Enhanced debug function to analyze container sizing issues
+ */
+const debugContainerSizing = () => {
+  console.group("🔍 Container Sizing Analysis");
+
+  const shortcutsElement = document.getElementById(
+    "roam-extension-personal-shortcuts"
+  );
+  if (shortcutsElement) {
+    const rect = shortcutsElement.getBoundingClientRect();
+    const computedStyle = window.getComputedStyle(shortcutsElement);
+
+    console.log("Shortcuts element:", shortcutsElement);
+    console.log("Bounding rect:", rect);
+    console.log("Computed styles:", {
+      width: computedStyle.width,
+      height: computedStyle.height,
+      minHeight: computedStyle.minHeight,
+      maxHeight: computedStyle.maxHeight,
+      overflow: computedStyle.overflow,
+      overflowY: computedStyle.overflowY,
+      position: computedStyle.position,
+      display: computedStyle.display,
+    });
+
+    // Check content and list sizing
+    const content = shortcutsElement.querySelector(".shortcuts-content");
+    const list = shortcutsElement.querySelector(".shortcuts-list");
+
+    if (content) {
+      const contentRect = content.getBoundingClientRect();
+      console.log("Content container:", {
+        rect: contentRect,
+        scrollHeight: content.scrollHeight,
+        clientHeight: content.clientHeight,
+        offsetHeight: content.offsetHeight,
+      });
+    }
+
+    if (list) {
+      const listRect = list.getBoundingClientRect();
+      console.log("List container:", {
+        rect: listRect,
+        scrollHeight: list.scrollHeight,
+        clientHeight: list.clientHeight,
+        offsetHeight: list.offsetHeight,
+        children: list.children.length,
+      });
+
+      // Check each shortcut item
+      Array.from(list.children).forEach((child, index) => {
+        const childRect = child.getBoundingClientRect();
+        console.log(`  Item ${index}:`, {
+          text: child.textContent.replace(/×/g, "").trim(),
+          rect: childRect,
+          visible: childRect.bottom <= window.innerHeight && childRect.top >= 0,
+        });
+      });
+    }
+  } else {
+    console.log("❌ Shortcuts element not found");
+  }
+
+  console.groupEnd();
+};
+
+/**
+ * Enhanced debug function to test data reading
+ */
+const debugDataReading = async () => {
+  console.group("🔍 Enhanced Data Reading Debug");
+
+  try {
+    const platform = window.RoamExtensionSuite;
+    const getCurrentUser = platform.getUtility("getCurrentUser");
+    const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
+    const findDataValue = platform.getUtility("findDataValue");
+
+    const user = getCurrentUser();
+    const preferencesPageTitle = `${user.displayName}/user preferences`;
+    const preferencesPageUid = getPageUidByTitle(preferencesPageTitle);
+
+    console.log("User:", user.displayName);
+    console.log("Preferences page title:", preferencesPageTitle);
+    console.log("Preferences page UID:", preferencesPageUid);
+
+    if (preferencesPageUid) {
+      // Try reading the data multiple times to see if it changes
+      for (let i = 1; i <= 3; i++) {
+        console.log(`--- Reading attempt ${i} ---`);
+        const shortcutsData = findDataValue(
+          preferencesPageUid,
+          "Personal Shortcuts"
+        );
+        console.log(`Shortcuts data (attempt ${i}):`, shortcutsData);
+        console.log(
+          `Type: ${typeof shortcutsData}, Array: ${Array.isArray(
+            shortcutsData
+          )}`
+        );
+
+        if (Array.isArray(shortcutsData)) {
+          shortcutsData.forEach((item, index) => {
+            console.log(`  Item ${index}: "${item}" (${typeof item})`);
+          });
+        }
+
+        if (i < 3) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Debug data reading error:", error);
+  }
+
+  console.groupEnd();
+};
+
 // ===================================================================
 // 🚀 ROAM EXTENSION EXPORT
 // ===================================================================
 
 export default {
   onload: async ({ extensionAPI }) => {
-    console.log("🔗 Personal Shortcuts (Enhanced & Fixed) starting...");
+    console.log("🔗 Personal Shortcuts (Complete Fixed Version) starting...");
 
     // ✅ VERIFY FOUNDATION DEPENDENCY
     if (!window.RoamExtensionSuite) {
@@ -778,6 +1051,14 @@ export default {
       {
         label: "Debug: Analyze Sidebar Structure",
         callback: debugSidebarStructure,
+      },
+      {
+        label: "Debug: Container Sizing Analysis",
+        callback: debugContainerSizing,
+      },
+      {
+        label: "Debug: Enhanced Data Reading Test",
+        callback: debugDataReading,
       },
       {
         label: "Debug: Test Shortcuts Injection",
@@ -863,19 +1144,21 @@ export default {
         addCurrentPageToShortcuts: addCurrentPageToShortcuts,
         removeFromShortcuts: removeFromShortcuts,
         refreshUI: refreshShortcutsUI,
-        version: "1.0.0",
+        debugDataReading: debugDataReading,
+        version: "1.0.2",
       },
       {
-        name: "Personal Shortcuts (Enhanced & Fixed)",
+        name: "Personal Shortcuts (Complete Fixed Version)",
         description:
-          "Enhanced sidebar shortcuts with working add/remove functionality and improved styling",
-        version: "1.0.0",
+          "Professional sidebar shortcuts with fixed container sizing and proper overflow handling",
+        version: "1.0.2",
         dependencies: ["foundation-registry", "utility-library"],
       }
     );
 
-    console.log("💡 Try: Cmd+P → 'Debug: Analyze Sidebar Structure'");
+    console.log("💡 Try: Cmd+P → 'Debug: Enhanced Data Reading Test'");
     console.log("💡 Try: Cmd+P → 'Shortcuts: Add Current Page'");
+    console.log("💡 Try: Cmd+P → 'Debug: Container Sizing Analysis'");
 
     // Store cleanup function
     window._shortcutsCleanup = () => {
