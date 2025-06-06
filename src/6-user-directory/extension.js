@@ -673,8 +673,8 @@ const getAllUserProfiles = async () => {
 // ===================================================================
 
 /**
- * 🔥 FIXED: Add context-aware navigation buttons with proper placement and styling
- * Moved to upper-left with warm yellow gradient and 🫂 emoji
+ * 🔥 FIXED: Add context-aware navigation buttons in main window upper-left corner
+ * Positioned relative to main content area, not left sidebar
  */
 const addNavigationButtons = () => {
   try {
@@ -700,18 +700,34 @@ const addNavigationButtons = () => {
     // Determine button type
     const isOwnPage = currentPageTitle === currentUser.displayName;
 
-    // 🔥 FIXED: Create button container in upper-LEFT with warm yellow styling
+    // 🔥 FIXED: Find main content area and position relative to it
+    const mainContent =
+      document.querySelector(".roam-article") ||
+      document.querySelector(".roam-main") ||
+      document.querySelector("#app > div > div");
+
+    if (!mainContent) {
+      console.warn("Could not find main content area for button placement");
+      return;
+    }
+
+    // Create button container positioned relative to main content
     const buttonContainer = document.createElement("div");
     buttonContainer.className = "user-directory-nav-button";
     buttonContainer.style.cssText = `
-      position: fixed;
-      top: 80px;
-      left: 20px;
+      position: absolute;
+      top: 10px;
+      left: 10px;
       z-index: 1000;
       display: flex;
       gap: 8px;
       flex-direction: column;
     `;
+
+    // Ensure main content has relative positioning
+    if (getComputedStyle(mainContent).position === "static") {
+      mainContent.style.position = "relative";
+    }
 
     // 🔥 FIXED: Directory button with warm yellow gradient and 🫂 emoji
     const directoryButton = document.createElement("button");
