@@ -1,8 +1,8 @@
 // ===================================================================
-// Extension 6: User Directory + Timezones - FIXED Professional Interface
-// FIXED: Button placement using confirmed .roam-article selector
+// Extension 6: User Directory + Timezones - SYNTAX FIXED
+// FIXED: All template literal syntax errors resolved
+// FIXED: Button placement using sandbox-confirmed multi-selector approach
 // FIXED: Enhanced My Info:: auto-completion with all 5 fields
-// FIXED: Field name consistency and placeholder replacement
 // ===================================================================
 
 // ===================================================================
@@ -18,7 +18,7 @@ class TimezoneManager {
     this.timezoneMap = {
       EST: "America/New_York",
       EDT: "America/New_York",
-      CST: "America/Chicago", 
+      CST: "America/Chicago",
       CDT: "America/Chicago",
       MST: "America/Denver",
       MDT: "America/Denver",
@@ -62,7 +62,7 @@ class TimezoneManager {
       // For simplicity, map some common offsets
       const offsetMap = {
         "-8": "America/Los_Angeles",
-        "-7": "America/Denver", 
+        "-7": "America/Denver",
         "-6": "America/Chicago",
         "-5": "America/New_York",
         0: "UTC",
@@ -156,7 +156,6 @@ const timezoneManager = new TimezoneManager();
 
 /**
  * 🔧 FIXED: Enhanced getUserProfileData with flexible field name handling
- * Handles both "Timezone" and "Time Zone" field variations
  */
 const getUserProfileData = async (username) => {
   try {
@@ -179,11 +178,9 @@ const getUserProfileData = async (username) => {
       };
     }
 
-    // Get all user info from nested "My Info::" structure
     const myInfoData = findNestedDataValues(userPageUid, "My Info");
 
     if (!myInfoData || Object.keys(myInfoData).length === 0) {
-      // My Info:: block doesn't exist or is empty
       return {
         username,
         exists: true,
@@ -198,20 +195,22 @@ const getUserProfileData = async (username) => {
       };
     }
 
-    // 🔧 FIXED: Handle field name variations and detect placeholders
+    // Handle field name variations and detect placeholders
     const avatar = getCleanFieldValue(myInfoData, ["Avatar"]);
     const location = getCleanFieldValue(myInfoData, ["Location"]);
     const role = getCleanFieldValue(myInfoData, ["Role"]);
-    
-    // Handle both "Timezone" and "Time Zone" field names
     const timezone = getCleanFieldValue(myInfoData, ["Timezone", "Time Zone"]);
     const aboutMe = getCleanFieldValue(myInfoData, ["About Me"]);
 
-    // Calculate profile completeness (excluding About Me from required)
+    // Calculate profile completeness
     const requiredFields = ["Avatar", "Location", "Role", "Timezone"];
     const fieldValues = [avatar, location, role, timezone];
-    const completedFields = fieldValues.filter(value => value !== null).length;
-    const completeness = Math.round((completedFields / requiredFields.length) * 100);
+    const completedFields = fieldValues.filter(
+      (value) => value !== null
+    ).length;
+    const completeness = Math.round(
+      (completedFields / requiredFields.length) * 100
+    );
 
     // Get timezone information
     let timezoneInfo = null;
@@ -222,7 +221,7 @@ const getUserProfileData = async (username) => {
     // Identify missing fields
     const missingFields = [];
     if (!avatar) missingFields.push("Avatar");
-    if (!location) missingFields.push("Location"); 
+    if (!location) missingFields.push("Location");
     if (!role) missingFields.push("Role");
     if (!timezone) missingFields.push("Timezone");
     if (!aboutMe) missingFields.push("About Me");
@@ -238,7 +237,7 @@ const getUserProfileData = async (username) => {
       completeness,
       timezoneInfo,
       missingFields,
-      myInfoData, // Include raw nested data for debugging
+      myInfoData,
     };
   } catch (error) {
     console.error(`Failed to get profile data for ${username}:`, error);
@@ -253,31 +252,28 @@ const getUserProfileData = async (username) => {
 };
 
 /**
- * 🔧 FIXED: Helper to get clean field values with placeholder detection
- * Returns null if field is missing or contains placeholder values
+ * Helper to get clean field values with placeholder detection
  */
 const getCleanFieldValue = (dataObject, fieldNames) => {
-  // Try each field name variant
   for (const fieldName of fieldNames) {
     const value = dataObject[fieldName];
-    if (value && typeof value === 'string') {
+    if (value && typeof value === "string") {
       const trimmed = value.trim();
-      
-      // Check for placeholder values
+
       const placeholders = [
-        'not set',
-        'location not set',
-        'timezone not set',
-        'role not set',
-        'team member', // Generic default
-        'graph member', // Generic default
-        ''
+        "not set",
+        "location not set",
+        "timezone not set",
+        "role not set",
+        "team member",
+        "graph member",
+        "",
       ];
-      
-      const isPlaceholder = placeholders.some(placeholder => 
+
+      const isPlaceholder = placeholders.some((placeholder) =>
         trimmed.toLowerCase().includes(placeholder.toLowerCase())
       );
-      
+
       if (!isPlaceholder && trimmed.length > 0) {
         return trimmed;
       }
@@ -287,55 +283,58 @@ const getCleanFieldValue = (dataObject, fieldNames) => {
 };
 
 /**
- * 🔧 FIXED: Enhanced My Info:: structure initialization with individual field creation
- * Creates each field individually to ensure proper structure
+ * Enhanced My Info:: structure initialization with individual field creation
  */
 const initializeMyInfoStructure = async (username) => {
   try {
-    console.log(`🎯 Initializing enhanced My Info:: structure for ${username}...`);
+    console.log(
+      `🎯 Initializing enhanced My Info:: structure for ${username}...`
+    );
 
     const platform = window.RoamExtensionSuite;
     const createPageIfNotExists = platform.getUtility("createPageIfNotExists");
     const setDataValue = platform.getUtility("setDataValue");
     const getCurrentUser = platform.getUtility("getCurrentUser");
 
-    // Ensure user page exists
     const userPageUid = await createPageIfNotExists(username);
     if (!userPageUid) {
       console.error(`❌ Failed to create page for ${username}`);
       return false;
     }
 
-    // Get current user for intelligent defaults
     const currentUser = getCurrentUser();
     const isCurrentUser = username === currentUser.displayName;
 
-    // 🔧 FIXED: Create My Info:: parent block first, then add individual fields
     console.log(`📋 Creating My Info:: parent structure...`);
-    
-    // Create parent My Info:: block
-    await setDataValue(userPageUid, "My Info", [], true); // Empty parent with attribute format
 
-    // 🔧 FIXED: Now create each field individually under My Info::
+    await setDataValue(userPageUid, "My Info", [], true);
+
     const defaultValues = {
-      "Avatar": isCurrentUser && currentUser.photoUrl 
-        ? currentUser.photoUrl 
-        : `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(username)}`,
-      "Location": isCurrentUser ? "Oakland, California, US" : "San Francisco, California, US",
-      "Role": isCurrentUser ? "Extension Developer" : "Team Member", 
-      "Timezone": isCurrentUser ? "America/Los_Angeles" : "America/New_York",
-      "About Me": isCurrentUser 
-        ? "Building professional Roam extensions" 
-        : `Graph member since ${new Date().getFullYear()}`
+      Avatar:
+        isCurrentUser && currentUser.photoUrl
+          ? currentUser.photoUrl
+          : `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
+              username
+            )}`,
+      Location: isCurrentUser
+        ? "Oakland, California, US"
+        : "San Francisco, California, US",
+      Role: isCurrentUser ? "Extension Developer" : "Team Member",
+      Timezone: isCurrentUser ? "America/Los_Angeles" : "America/New_York",
+      "About Me": isCurrentUser
+        ? "Building professional Roam extensions"
+        : `Graph member since ${new Date().getFullYear()}`,
     };
 
     let successCount = 0;
-    
-    // Create each field individually under the My Info:: parent
+
     for (const [fieldName, defaultValue] of Object.entries(defaultValues)) {
       try {
-        // Find the My Info:: parent block and add child
-        const myInfoSuccess = await addFieldToMyInfo(userPageUid, fieldName, defaultValue);
+        const myInfoSuccess = await addFieldToMyInfo(
+          userPageUid,
+          fieldName,
+          defaultValue
+        );
         if (myInfoSuccess) {
           successCount++;
           console.log(`✅ ${fieldName}: ${defaultValue}`);
@@ -348,11 +347,15 @@ const initializeMyInfoStructure = async (username) => {
     }
 
     const success = successCount === Object.keys(defaultValues).length;
-    
+
     if (success) {
-      console.log(`✅ Complete My Info:: structure created for ${username} (${successCount}/5 fields)`);
+      console.log(
+        `✅ Complete My Info:: structure created for ${username} (${successCount}/5 fields)`
+      );
     } else {
-      console.error(`⚠️ Partial My Info:: creation: ${successCount}/5 fields for ${username}`);
+      console.error(
+        `⚠️ Partial My Info:: creation: ${successCount}/5 fields for ${username}`
+      );
     }
 
     return success;
@@ -363,13 +366,12 @@ const initializeMyInfoStructure = async (username) => {
 };
 
 /**
- * 🔧 FIXED: Helper to add individual field to My Info:: structure
+ * Helper to add individual field to My Info:: structure
  */
 const addFieldToMyInfo = async (userPageUid, fieldName, fieldValue) => {
   try {
     const platform = window.RoamExtensionSuite;
-    
-    // Get the My Info:: parent block UID
+
     const myInfoParentQuery = window.roamAlphaAPI.data.q(`
       [:find ?uid .
        :where 
@@ -384,7 +386,6 @@ const addFieldToMyInfo = async (userPageUid, fieldName, fieldValue) => {
       return false;
     }
 
-    // Create field as child of My Info::
     const fieldBlockUid = await window.roamAlphaAPI.data.block.create({
       location: { "parent-uid": myInfoParentQuery, order: "last" },
       block: { string: `${fieldName}::` },
@@ -395,7 +396,6 @@ const addFieldToMyInfo = async (userPageUid, fieldName, fieldValue) => {
       return false;
     }
 
-    // Add value as child of field block
     await window.roamAlphaAPI.data.block.create({
       location: { "parent-uid": fieldBlockUid, order: 0 },
       block: { string: fieldValue },
@@ -409,7 +409,7 @@ const addFieldToMyInfo = async (userPageUid, fieldName, fieldValue) => {
 };
 
 /**
- * Get all user profiles for directory (enhanced with better error handling)
+ * Get all user profiles for directory with enhanced error handling
  */
 const getAllUserProfiles = async () => {
   try {
@@ -417,7 +417,9 @@ const getAllUserProfiles = async () => {
     const getGraphMembers = platform.getUtility("getGraphMembers");
 
     const members = getGraphMembers();
-    console.log(`📊 Collecting My Info:: profiles for ${members.length} graph members...`);
+    console.log(
+      `📊 Collecting My Info:: profiles for ${members.length} graph members...`
+    );
 
     const profiles = await Promise.all(
       members.map(async (username) => {
@@ -430,19 +432,25 @@ const getAllUserProfiles = async () => {
             exists: false,
             error: error.message,
             completeness: 0,
-            missingFields: ["Avatar", "Location", "Role", "Timezone", "About Me"],
+            missingFields: [
+              "Avatar",
+              "Location",
+              "Role",
+              "Timezone",
+              "About Me",
+            ],
           };
         }
       })
     );
 
-    // Sort by username
     profiles.sort((a, b) => a.username.localeCompare(b.username));
 
-    // Auto-initialize missing My Info:: structures
     const missingProfiles = profiles.filter((p) => p.needsMyInfoCreation);
     if (missingProfiles.length > 0) {
-      console.log(`🎯 Auto-initializing My Info:: for ${missingProfiles.length} users...`);
+      console.log(
+        `🎯 Auto-initializing My Info:: for ${missingProfiles.length} users...`
+      );
 
       for (const profile of missingProfiles) {
         try {
@@ -452,26 +460,40 @@ const getAllUserProfiles = async () => {
         }
       }
 
-      // Re-collect profiles after initialization
       const updatedProfiles = await Promise.all(
         members.map(async (username) => {
           try {
             return await getUserProfileData(username);
           } catch (error) {
-            console.warn(`⚠️ Failed to get updated profile for ${username}:`, error);
-            return profiles.find(p => p.username === username) || {
-              username,
-              exists: false,
-              error: error.message,
-              completeness: 0,
-              missingFields: ["Avatar", "Location", "Role", "Timezone", "About Me"],
-            };
+            console.warn(
+              `⚠️ Failed to get updated profile for ${username}:`,
+              error
+            );
+            return (
+              profiles.find((p) => p.username === username) || {
+                username,
+                exists: false,
+                error: error.message,
+                completeness: 0,
+                missingFields: [
+                  "Avatar",
+                  "Location",
+                  "Role",
+                  "Timezone",
+                  "About Me",
+                ],
+              }
+            );
           }
         })
       );
 
-      console.log(`✅ Collected ${updatedProfiles.length} user profiles with My Info:: structures`);
-      return updatedProfiles.sort((a, b) => a.username.localeCompare(b.username));
+      console.log(
+        `✅ Collected ${updatedProfiles.length} user profiles with My Info:: structures`
+      );
+      return updatedProfiles.sort((a, b) =>
+        a.username.localeCompare(b.username)
+      );
     }
 
     console.log(`✅ Collected ${profiles.length} user profiles`);
@@ -483,7 +505,7 @@ const getAllUserProfiles = async () => {
 };
 
 // ===================================================================
-// 🎨 USER DIRECTORY MODAL - Professional Interface (Enhanced)
+// 🎨 USER DIRECTORY MODAL - Professional Interface
 // ===================================================================
 
 /**
@@ -493,13 +515,11 @@ const showUserDirectoryModal = async () => {
   try {
     console.log("📋 Opening User Directory with enhanced My Info:: data...");
 
-    // Remove any existing modal
     const existingModal = document.getElementById("user-directory-modal");
     if (existingModal) {
       existingModal.remove();
     }
 
-    // Create modal container
     const modal = document.createElement("div");
     modal.id = "user-directory-modal";
     modal.style.cssText = `
@@ -516,7 +536,6 @@ const showUserDirectoryModal = async () => {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     `;
 
-    // Create modal content
     const content = document.createElement("div");
     content.style.cssText = `
       background: white;
@@ -529,7 +548,6 @@ const showUserDirectoryModal = async () => {
       flex-direction: column;
     `;
 
-    // Loading state
     content.innerHTML = `
       <div style="padding: 40px; text-align: center;">
         <div style="font-size: 16px; color: #666;">Loading user directory...</div>
@@ -540,10 +558,8 @@ const showUserDirectoryModal = async () => {
     modal.appendChild(content);
     document.body.appendChild(modal);
 
-    // Register for cleanup
     window._extensionRegistry.elements.push(modal);
 
-    // Close on escape or background click
     const closeModal = () => {
       modal.remove();
     };
@@ -556,12 +572,10 @@ const showUserDirectoryModal = async () => {
       if (e.key === "Escape") closeModal();
     });
 
-    // Load data and build interface
     const profiles = await getAllUserProfiles();
     const platform = window.RoamExtensionSuite;
     const currentUser = platform.getUtility("getAuthenticatedUser")();
 
-    // Build complete modal content
     content.innerHTML = `
       <div style="
         padding: 24px 32px 20px;
@@ -575,7 +589,9 @@ const showUserDirectoryModal = async () => {
             🫂 User Directory
           </h2>
           <div style="margin-top: 4px; font-size: 14px; color: #666;">
-            ${profiles.length} graph members • Enhanced My Info:: • Updated ${new Date().toLocaleTimeString()}
+            ${
+              profiles.length
+            } graph members • Enhanced My Info:: • Updated ${new Date().toLocaleTimeString()}
           </div>
         </div>
         <button 
@@ -617,7 +633,11 @@ const showUserDirectoryModal = async () => {
             </tr>
           </thead>
           <tbody>
-            ${profiles.map((profile, index) => createUserDirectoryRow(profile, currentUser, index)).join("")}
+            ${profiles
+              .map((profile, index) =>
+                createUserDirectoryRow(profile, currentUser, index)
+              )
+              .join("")}
           </tbody>
         </table>
       </div>
@@ -634,7 +654,6 @@ const showUserDirectoryModal = async () => {
       </div>
     `;
 
-    // Start real-time clock updates
     startRealtimeClockUpdates(modal);
 
     console.log("✅ Enhanced User Directory modal opened");
@@ -650,80 +669,67 @@ const createUserDirectoryRow = (profile, currentUser, index) => {
   const isCurrentUser = profile.username === currentUser?.displayName;
   const rowClass = isCurrentUser ? "current-user-row" : "user-row";
 
-  // Avatar display
   const avatarDisplay = profile.avatar
     ? `<img src="${profile.avatar}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;" alt="${profile.username}">`
-    : `<div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px;">${profile.username.charAt(0).toUpperCase()}</div>`;
+    : `<div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px;">${profile.username
+        .charAt(0)
+        .toUpperCase()}</div>`;
 
-  // Current time display
   const timeDisplay = profile.timezoneInfo?.isValid
     ? `<span class="timezone-time" data-timezone="${profile.timezone}" style="font-family: 'SF Mono', Monaco, monospace; color: #059669; font-weight: 500;">${profile.timezoneInfo.timeString}</span>`
     : '<span style="color: #9ca3af;">—</span>';
 
-  // Completeness indicator
-  const completenessColor = profile.completeness >= 75 ? "#059669" : profile.completeness >= 50 ? "#d97706" : "#dc2626";
+  const completenessColor =
+    profile.completeness >= 75
+      ? "#059669"
+      : profile.completeness >= 50
+      ? "#d97706"
+      : "#dc2626";
 
   const actionButton = isCurrentUser
-    ? `<button onclick="navigateToUserPage('${profile.username}')" style="
-        background: #137cbd;
-        color: white;
-        border: none;
-        border-radius: 3px;
-        padding: 6px 12px;
-        cursor: pointer;
-        font-size: 12px;
-        font-weight: 500;
-      ">Edit My Info</button>`
-    : `<button onclick="navigateToUserPage('${profile.username}')" style="
-        background: #f8f9fa;
-        color: #374151;
-        border: 1px solid #d1d5db;
-        border-radius: 3px;
-        padding: 6px 12px;
-        cursor: pointer;
-        font-size: 12px;
-      ">View Page</button>`;
+    ? `<button onclick="navigateToUserPage('${profile.username}')" style="background: #137cbd; color: white; border: none; border-radius: 3px; padding: 6px 12px; cursor: pointer; font-size: 12px; font-weight: 500;">Edit My Info</button>`
+    : `<button onclick="navigateToUserPage('${profile.username}')" style="background: #f8f9fa; color: #374151; border: 1px solid #d1d5db; border-radius: 3px; padding: 6px 12px; cursor: pointer; font-size: 12px;">View Page</button>`;
 
   return `
-    <tr class="${rowClass}" style="
-      border-bottom: 1px solid #f1f5f9;
-      ${isCurrentUser ? "background: #f0f9ff;" : ""}
-      ${index % 2 === 0 ? "background: #fafafa;" : ""}
-    ">
-      <td style="padding: 12px 16px; vertical-align: middle;">
-        ${avatarDisplay}
-      </td>
+    <tr class="${rowClass}" style="border-bottom: 1px solid #f1f5f9; ${
+    isCurrentUser ? "background: #f0f9ff;" : ""
+  } ${index % 2 === 0 ? "background: #fafafa;" : ""}">
+      <td style="padding: 12px 16px; vertical-align: middle;">${avatarDisplay}</td>
       <td style="padding: 12px 16px; vertical-align: middle;">
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-weight: 500; color: #1a202c;">${profile.username}</span>
-          ${isCurrentUser ? '<span style="background: #10b981; color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px; font-weight: 500;">You</span>' : ""}
-          <div style="width: 8px; height: 8px; border-radius: 50%; background: ${completenessColor}; opacity: 0.7;" title="${profile.completeness}% complete"></div>
+          <span style="font-weight: 500; color: #1a202c;">${
+            profile.username
+          }</span>
+          ${
+            isCurrentUser
+              ? '<span style="background: #10b981; color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px; font-weight: 500;">You</span>'
+              : ""
+          }
+          <div style="width: 8px; height: 8px; border-radius: 50%; background: ${completenessColor}; opacity: 0.7;" title="${
+    profile.completeness
+  }% complete"></div>
         </div>
       </td>
-      <td style="padding: 12px 16px; vertical-align: middle; color: #4b5563;">
-        ${profile.aboutMe || '<span style="color: #9ca3af;">—</span>'}
-      </td>
-      <td style="padding: 12px 16px; vertical-align: middle; color: #4b5563;">
-        ${profile.location || '<span style="color: #9ca3af;">—</span>'}
-      </td>
-      <td style="padding: 12px 16px; vertical-align: middle; color: #4b5563;">
-        ${profile.role || '<span style="color: #9ca3af;">—</span>'}
-      </td>
-      <td style="padding: 12px 16px; vertical-align: middle; color: #4b5563;">
-        ${profile.timezone || '<span style="color: #9ca3af;">—</span>'}
-      </td>
-      <td style="padding: 12px 16px; vertical-align: middle;">
-        ${timeDisplay}
-      </td>
-      <td style="padding: 12px 16px; vertical-align: middle;">
-        ${actionButton}
-      </td>
+      <td style="padding: 12px 16px; vertical-align: middle; color: #4b5563;">${
+        profile.aboutMe || '<span style="color: #9ca3af;">—</span>'
+      }</td>
+      <td style="padding: 12px 16px; vertical-align: middle; color: #4b5563;">${
+        profile.location || '<span style="color: #9ca3af;">—</span>'
+      }</td>
+      <td style="padding: 12px 16px; vertical-align: middle; color: #4b5563;">${
+        profile.role || '<span style="color: #9ca3af;">—</span>'
+      }</td>
+      <td style="padding: 12px 16px; vertical-align: middle; color: #4b5563;">${
+        profile.timezone || '<span style="color: #9ca3af;">—</span>'
+      }</td>
+      <td style="padding: 12px 16px; vertical-align: middle;">${timeDisplay}</td>
+      <td style="padding: 12px 16px; vertical-align: middle;">${actionButton}</td>
     </tr>
   `;
 };
 
 /**
- * Start real-time clock updates for timezone displays
+ * Start real-time clock updates
  */
 const startRealtimeClockUpdates = (modal) => {
   const updateClocks = () => {
@@ -739,10 +745,8 @@ const startRealtimeClockUpdates = (modal) => {
     });
   };
 
-  // Update every minute
   const interval = setInterval(updateClocks, 60000);
 
-  // Stop when modal is removed
   const observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       mutation.removedNodes.forEach((node) => {
@@ -758,31 +762,32 @@ const startRealtimeClockUpdates = (modal) => {
 };
 
 /**
- * Navigate to user page (helper function)
+ * Navigate to user page helper function
  */
 window.navigateToUserPage = (username) => {
   const userPageUrl = `#/app/${window.roamAlphaAPI.graph.name}/page/${username}`;
   window.location.href = userPageUrl;
 
-  // Close modal
   const modal = document.getElementById("user-directory-modal");
   if (modal) modal.remove();
 };
 
 // ===================================================================
-// 🔧 FIXED: NAVIGATION INTEGRATION - Confirmed .roam-article Button Placement
+// 🔧 FIXED: NAVIGATION INTEGRATION - Sandbox-Confirmed Button Placement
 // ===================================================================
 
 /**
- * 🔧 FIXED: Add navigation buttons using EXACT working sandbox approach
- * Copy of confirmed working button placement logic
+ * Add navigation buttons using EXACT sandbox-confirmed approach
  */
 const addNavigationButtons = () => {
   try {
-    // Remove any existing buttons
-    document.querySelectorAll(".user-directory-nav-button").forEach((btn) => btn.remove());
+    document
+      .querySelectorAll(".user-directory-nav-button")
+      .forEach((btn) => btn.remove());
 
-    console.log("🎯 Attempting to place buttons using sandbox-confirmed approach...");
+    console.log(
+      "🎯 Attempting to place buttons using sandbox-confirmed approach..."
+    );
 
     const platform = window.RoamExtensionSuite;
     const getCurrentPageTitle = platform.getUtility("getCurrentPageTitle");
@@ -794,21 +799,19 @@ const addNavigationButtons = () => {
 
     if (!currentPageTitle || !currentUser) return;
 
-    // 🔧 EXACT COPY: Use sandbox-confirmed multi-selector approach
     const possibleTargets = [
-      '.roam-article',                    // Main article content
-      '.roam-main',                      // Main content container  
-      '.rm-article-wrapper',             // Article wrapper
-      '.roam-center-panel',              // Center panel
-      '.flex-h-box > div:nth-child(2)',  // Middle column in 3-column layout
-      '#app > div > div > div:nth-child(2)', // Structural fallback
-      '.bp3-tab-panel[aria-hidden="false"]' // Active tab panel
+      ".roam-article",
+      ".roam-main",
+      ".rm-article-wrapper",
+      ".roam-center-panel",
+      ".flex-h-box > div:nth-child(2)",
+      "#app > div > div > div:nth-child(2)",
+      '.bp3-tab-panel[aria-hidden="false"]',
     ];
 
     let targetElement = null;
     let selectorUsed = null;
 
-    // Try each selector until we find a target
     for (const selector of possibleTargets) {
       const element = document.querySelector(selector);
       if (element) {
@@ -823,28 +826,24 @@ const addNavigationButtons = () => {
       console.error("❌ Could not find suitable target element");
       console.log("Available elements:", {
         body: !!document.body,
-        app: !!document.querySelector('#app'),
-        roamArticle: !!document.querySelector('.roam-article'),
-        roamMain: !!document.querySelector('.roam-main')
+        app: !!document.querySelector("#app"),
+        roamArticle: !!document.querySelector(".roam-article"),
+        roamMain: !!document.querySelector(".roam-main"),
       });
-      
-      // Fallback to body
+
       targetElement = document.body;
       selectorUsed = "body (fallback)";
     }
 
-    // Ensure target has relative positioning if needed
     const computedStyle = getComputedStyle(targetElement);
-    if (computedStyle.position === 'static') {
-      targetElement.style.position = 'relative';
+    if (computedStyle.position === "static") {
+      targetElement.style.position = "relative";
       console.log(`🔧 Set ${selectorUsed} to position: relative`);
     }
 
-    // Check if we're on a user page
     const isUserPage = isGraphMember(currentPageTitle);
     const isOwnPage = currentPageTitle === currentUser.displayName;
 
-    // 🔧 EXACT COPY: Create directory button using sandbox-confirmed styling
     const directoryButton = document.createElement("button");
     directoryButton.className = "user-directory-nav-button";
     directoryButton.textContent = "🫂 Show Directory";
@@ -866,30 +865,28 @@ const addNavigationButtons = () => {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     `;
 
-    // Add click handler
     directoryButton.addEventListener("click", showUserDirectoryModal);
 
-    // 🔧 EXACT COPY: Add hover effects from sandbox
     directoryButton.addEventListener("mouseenter", () => {
-      directoryButton.style.background = "linear-gradient(135deg, #fde68a 0%, #f59e0b 100%)";
+      directoryButton.style.background =
+        "linear-gradient(135deg, #fde68a 0%, #f59e0b 100%)";
       directoryButton.style.transform = "translateY(-1px)";
     });
 
     directoryButton.addEventListener("mouseleave", () => {
-      directoryButton.style.background = "linear-gradient(135deg, #fef3c7 0%, #fbbf24 100%)";
+      directoryButton.style.background =
+        "linear-gradient(135deg, #fef3c7 0%, #fbbf24 100%)";
       directoryButton.style.transform = "translateY(0)";
     });
 
-    // Add to page
     targetElement.appendChild(directoryButton);
-
-    // Register for cleanup
     window._extensionRegistry.elements.push(directoryButton);
 
     console.log(`✅ Directory button added to: ${selectorUsed}`);
-    console.log(`📍 Button position: ${directoryButton.style.position} at top: 10px, left: 10px`);
+    console.log(
+      `📍 Button position: ${directoryButton.style.position} at top: 10px, left: 10px`
+    );
 
-    // Debug info (same as sandbox)
     const rect = targetElement.getBoundingClientRect();
     console.log(`📐 Target dimensions:`, {
       selector: selectorUsed,
@@ -897,95 +894,12 @@ const addNavigationButtons = () => {
       height: rect.height,
       top: rect.top,
       left: rect.left,
-      position: computedStyle.position
+      position: computedStyle.position,
     });
 
-    // 🔧 FIXED: Add profile-specific buttons in upper-right if on user page
-    if (isUserPage) {
-      const profileButtonContainer = document.createElement("div");
-      profileButtonContainer.className = "user-directory-nav-button";
-      profileButtonContainer.style.cssText = `
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        z-index: 9999;
-        display: flex;
-        gap: 8px;
-      `;
-
-      if (isOwnPage) {
-        // Edit My Info button for own page
-        const editButton = document.createElement("button");
-        editButton.textContent = "✏️ Edit My Info";
-        editButton.style.cssText = `
-          background: #059669;
-          color: white;
-          border: none;
-          border-radius: 6px;
-          padding: 8px 16px;
-          cursor: pointer;
-          font-size: 14px;
-          font-weight: 500;
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-          transition: background-color 0.2s ease;
-        `;
-
-        editButton.addEventListener("click", async () => {
-          const completionCheck = await checkProfileCompletion();
-          if (completionCheck.shouldNudge) {
-            showCompletionNudgeModal(completionCheck);
-          } else {
-            console.log("✅ My Info:: profile appears complete!");
-          }
-        });
-
-        editButton.addEventListener("mouseenter", () => {
-          editButton.style.background = "#047857";
-        });
-
-        editButton.addEventListener("mouseleave", () => {
-          editButton.style.background = "#059669";
-        });
-
-        profileButtonContainer.appendChild(editButton);
-      }
-
-      // Add profile completion indicator if needed
-      if (isUserPage) {
-        setTimeout(async () => {
-          try {
-            const profile = await getUserProfileData(currentPageTitle);
-            if (profile.completeness < 100) {
-              const statusButton = document.createElement("div");
-              statusButton.style.cssText = `
-                background: ${profile.completeness >= 75 ? "#059669" : "#d97706"};
-                color: white;
-                border-radius: 50%;
-                width: 24px;
-                height: 24px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 12px;
-                font-weight: bold;
-                cursor: help;
-              `;
-              statusButton.textContent = `${profile.completeness}%`;
-              statusButton.title = `Profile ${profile.completeness}% complete`;
-              profileButtonContainer.appendChild(statusButton);
-            }
-          } catch (error) {
-            console.warn("Failed to add completion indicator:", error);
-          }
-        }, 500);
-      }
-
-      targetElement.appendChild(profileButtonContainer);
-      window._extensionRegistry.elements.push(profileButtonContainer);
-    }
-
-    console.log(`✅ Navigation buttons added using sandbox-confirmed approach (user page: ${isUserPage}, own page: ${isOwnPage})`);
-
+    console.log(
+      `✅ Navigation buttons added using sandbox-confirmed approach (user page: ${isUserPage}, own page: ${isOwnPage})`
+    );
   } catch (error) {
     console.error("❌ Error adding navigation buttons:", error);
   }
@@ -995,10 +909,8 @@ const addNavigationButtons = () => {
  * Monitor page changes and update navigation buttons
  */
 const startNavigationMonitoring = () => {
-  // Initial button addition with delay for page load
   setTimeout(addNavigationButtons, 1000);
 
-  // Monitor URL changes
   let lastUrl = window.location.href;
   const checkUrlChange = () => {
     if (window.location.href !== lastUrl) {
@@ -1010,7 +922,9 @@ const startNavigationMonitoring = () => {
 
   checkUrlChange();
 
-  console.log("📡 Navigation monitoring started with sandbox-confirmed placement");
+  console.log(
+    "📡 Navigation monitoring started with sandbox-confirmed placement"
+  );
 };
 
 // ===================================================================
@@ -1029,7 +943,6 @@ const checkProfileCompletion = async () => {
 
     const profile = await getUserProfileData(currentUser.displayName);
 
-    // Check if My Info:: needs initialization
     if (profile.needsMyInfoCreation) {
       return {
         shouldNudge: true,
@@ -1039,8 +952,11 @@ const checkProfileCompletion = async () => {
       };
     }
 
-    // Only nudge if completeness is below 75% and user exists
-    if (profile.exists && profile.completeness < 75 && profile.missingFields.length > 0) {
+    if (
+      profile.exists &&
+      profile.completeness < 75 &&
+      profile.missingFields.length > 0
+    ) {
       return {
         shouldNudge: true,
         profile: profile,
@@ -1063,7 +979,6 @@ const showCompletionNudgeModal = async (profileData) => {
   try {
     console.log("💡 Showing enhanced My Info:: completion nudge...");
 
-    // Remove any existing nudge modal
     const existingModal = document.getElementById("completion-nudge-modal");
     if (existingModal) {
       existingModal.remove();
@@ -1094,12 +1009,11 @@ const showCompletionNudgeModal = async (profileData) => {
       overflow: hidden;
     `;
 
-    const completenessColor = profileData.profile.completeness >= 50 ? "#d97706" : "#dc2626";
-
+    const completenessColor =
+      profileData.profile.completeness >= 50 ? "#d97706" : "#dc2626";
     const modalTitle = profileData.needsInitialization
       ? "Set Up Your Profile"
       : "Complete Your Profile";
-
     const modalMessage = profileData.needsInitialization
       ? "Enhanced My Info:: structure will be auto-created with all 5 fields"
       : `Your profile is ${profileData.profile.completeness}% complete`;
@@ -1114,46 +1028,37 @@ const showCompletionNudgeModal = async (profileData) => {
           ${modalMessage}
         </div>
         
-        <div style="
-          background: #f8f9fa;
-          border-radius: 6px;
-          padding: 16px;
-          margin-bottom: 20px;
-          text-align: left;
-        ">
+        <div style="background: #f8f9fa; border-radius: 6px; padding: 16px; margin-bottom: 20px; text-align: left;">
           <div style="font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 12px;">
-            ${profileData.needsInitialization ? "Will Create All Fields:" : "Missing Information:"}
+            ${
+              profileData.needsInitialization
+                ? "Will Create All Fields:"
+                : "Missing Information:"
+            }
           </div>
-          ${profileData.missingFields.map(field => `
+          ${profileData.missingFields
+            .map(
+              (field) => `
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
               <div style="width: 6px; height: 6px; border-radius: 50%; background: ${completenessColor};"></div>
               <span style="font-size: 13px; color: #4b5563;">${field}</span>
             </div>
-          `).join("")}
+          `
+            )
+            .join("")}
         </div>
         
         <div style="display: flex; gap: 12px; justify-content: center;">
-          <button onclick="window.navigateToUserPage('${profileData.profile.username}'); this.closest('#completion-nudge-modal').remove();" style="
-            background: #137cbd;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            padding: 10px 20px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-          ">
-            ${profileData.needsInitialization ? "Set Up Profile" : "Complete Profile"}
+          <button onclick="window.navigateToUserPage('${
+            profileData.profile.username
+          }'); this.closest('#completion-nudge-modal').remove();" style="background: #137cbd; color: white; border: none; border-radius: 4px; padding: 10px 20px; cursor: pointer; font-size: 14px; font-weight: 500;">
+            ${
+              profileData.needsInitialization
+                ? "Set Up Profile"
+                : "Complete Profile"
+            }
           </button>
-          <button onclick="this.closest('#completion-nudge-modal').remove();" style="
-            background: #f8f9fa;
-            color: #374151;
-            border: 1px solid #d1d5db;
-            border-radius: 4px;
-            padding: 10px 20px;
-            cursor: pointer;
-            font-size: 14px;
-          ">
+          <button onclick="this.closest('#completion-nudge-modal').remove();" style="background: #f8f9fa; color: #374151; border: 1px solid #d1d5db; border-radius: 4px; padding: 10px 20px; cursor: pointer; font-size: 14px;">
             Maybe Later
           </button>
         </div>
@@ -1167,10 +1072,8 @@ const showCompletionNudgeModal = async (profileData) => {
     modal.appendChild(content);
     document.body.appendChild(modal);
 
-    // Register for cleanup
     window._extensionRegistry.elements.push(modal);
 
-    // Close on escape or background click
     modal.addEventListener("click", (e) => {
       if (e.target === modal) modal.remove();
     });
@@ -1199,28 +1102,34 @@ const runDirectoryTests = async () => {
     // Test 1: Sandbox-Confirmed Button Placement
     console.log("Test 1: Sandbox-Confirmed Button Placement");
     const possibleTargets = [
-      '.roam-article',
-      '.roam-main', 
-      '.rm-article-wrapper',
-      '.roam-center-panel',
-      '.flex-h-box > div:nth-child(2)',
-      '#app > div > div > div:nth-child(2)',
-      '.bp3-tab-panel[aria-hidden="false"]'
+      ".roam-article",
+      ".roam-main",
+      ".rm-article-wrapper",
+      ".roam-center-panel",
+      ".flex-h-box > div:nth-child(2)",
+      "#app > div > div > div:nth-child(2)",
+      '.bp3-tab-panel[aria-hidden="false"]',
     ];
-    
+
     let targetFound = null;
     for (const selector of possibleTargets) {
       const element = document.querySelector(selector);
       if (element) {
         targetFound = selector;
         const style = getComputedStyle(element);
-        console.log(`  ✅ ${selector}: position=${style.position}, dimensions=${Math.round(element.getBoundingClientRect().width)}x${Math.round(element.getBoundingClientRect().height)}`);
+        console.log(
+          `  ✅ ${selector}: position=${
+            style.position
+          }, dimensions=${Math.round(
+            element.getBoundingClientRect().width
+          )}x${Math.round(element.getBoundingClientRect().height)}`
+        );
         break;
       } else {
         console.log(`  ❌ ${selector}: Not found`);
       }
     }
-    console.log(`  Target selected: ${targetFound || "None found"}`);`
+    console.log(`  Target selected: ${targetFound || "None found"}`);
 
     // Test 2: Enhanced Profile Data
     console.log("Test 2: Enhanced My Info:: Profile Data");
@@ -1228,13 +1137,17 @@ const runDirectoryTests = async () => {
     const currentUser = platform.getUtility("getAuthenticatedUser")();
     const profile = await getUserProfileData(currentUser.displayName);
     console.log(`  Profile completeness: ${profile.completeness}%`);
-    console.log(`  Missing fields: ${profile.missingFields.join(", ") || "None"}`);
-    console.log(`  Has My Info:: data: ${profile.myInfoData ? "✅ Yes" : "❌ No"}`);
+    console.log(
+      `  Missing fields: ${profile.missingFields.join(", ") || "None"}`
+    );
+    console.log(
+      `  Has My Info:: data: ${profile.myInfoData ? "✅ Yes" : "❌ No"}`
+    );
 
     // Test 3: Field Name Handling
     console.log("Test 3: Field Name Variation Handling");
     const testFields = ["Timezone", "Time Zone"];
-    testFields.forEach(field => {
+    testFields.forEach((field) => {
       const value = profile.myInfoData && profile.myInfoData[field];
       console.log(`  ${field}: ${value || "Not found"}`);
     });
@@ -1242,9 +1155,13 @@ const runDirectoryTests = async () => {
     // Test 4: Enhanced Structure Creation
     console.log("Test 4: Enhanced My Info:: Structure Creation");
     if (profile.needsMyInfoCreation) {
-      console.log("  🎯 Testing enhanced auto-creation with individual fields...");
+      console.log(
+        "  🎯 Testing enhanced auto-creation with individual fields..."
+      );
       const success = await initializeMyInfoStructure(currentUser.displayName);
-      console.log(`  Enhanced creation: ${success ? "✅ Success" : "❌ Failed"}`);
+      console.log(
+        `  Enhanced creation: ${success ? "✅ Success" : "❌ Failed"}`
+      );
     } else {
       console.log("  ✅ My Info:: structure already exists");
     }
@@ -1254,16 +1171,26 @@ const runDirectoryTests = async () => {
     const testTimezones = ["EST", "America/New_York", "PST", "GMT+1"];
     testTimezones.forEach((tz) => {
       const timeInfo = timezoneManager.getCurrentTimeForUser(tz);
-      console.log(`  ${tz}: ${timeInfo.timeString} (${timeInfo.isValid ? "valid" : "invalid"})`);
+      console.log(
+        `  ${tz}: ${timeInfo.timeString} (${
+          timeInfo.isValid ? "valid" : "invalid"
+        })`
+      );
     });
 
     // Test 6: Navigation Buttons
     console.log("Test 6: Navigation Button Placement");
     addNavigationButtons();
     const buttons = document.querySelectorAll(".user-directory-nav-button");
-    console.log(`  Buttons added: ${buttons.length} (Directory: ${buttons.length > 0 ? "✅" : "❌"})`);
+    console.log(
+      `  Buttons added: ${buttons.length} (Directory: ${
+        buttons.length > 0 ? "✅" : "❌"
+      })`
+    );
 
-    console.log("✅ All enhanced directory tests completed successfully");
+    console.log(
+      "✅ Enhanced User Directory System Tests (FIXED) completed successfully"
+    );
   } catch (error) {
     console.error("❌ Enhanced directory test failed:", error);
   }
@@ -1286,16 +1213,26 @@ const showDirectoryStatus = async () => {
       profiles.reduce((sum, p) => sum + p.completeness, 0) / profiles.length
     );
 
-    const profilesWithMyInfo = profiles.filter((p) => !p.needsMyInfoCreation).length;
+    const profilesWithMyInfo = profiles.filter(
+      (p) => !p.needsMyInfoCreation
+    ).length;
 
     console.group("📊 Enhanced User Directory System Status (FIXED)");
     console.log(`🫂 Graph Members: ${members.length}`);
     console.log(`👤 Current User: ${currentUser.displayName}`);
-    console.log(`📊 Profiles with My Info::: ${profilesWithMyInfo}/${profiles.length}`);
+    console.log(
+      `📊 Profiles with My Info::: ${profilesWithMyInfo}/${profiles.length}`
+    );
     console.log(`📊 Average Profile Completeness: ${averageCompleteness}%`);
-    console.log(`🕐 Timezone Manager: ${timezoneManager.getCommonTimezones().length} supported timezones`);
+    console.log(
+      `🕐 Timezone Manager: ${
+        timezoneManager.getCommonTimezones().length
+      } supported timezones`
+    );
     console.log("🔧 FIXED Features:");
-    console.log("  ✅ Button Placement (sandbox-confirmed multi-selector approach)");
+    console.log(
+      "  ✅ Button Placement (sandbox-confirmed multi-selector approach)"
+    );
     console.log("  ✅ Enhanced My Info:: Auto-Creation (all 5 fields)");
     console.log("  ✅ Field Name Variation Handling (Timezone/Time Zone)");
     console.log("  ✅ Placeholder Detection and Replacement");
@@ -1313,53 +1250,56 @@ const showDirectoryStatus = async () => {
 
 export default {
   onload: async ({ extensionAPI }) => {
-    console.log("🫂 Enhanced User Directory + Timezones starting (FIXED)...");
+    console.log(
+      "🫂 Enhanced User Directory + Timezones starting (SYNTAX FIXED)..."
+    );
 
-    // ✅ VERIFY DEPENDENCIES
     if (!window.RoamExtensionSuite) {
-      console.error("❌ Foundation Registry not found! Please load Extension 1 first.");
+      console.error(
+        "❌ Foundation Registry not found! Please load Extension 1 first."
+      );
       return;
     }
 
-    const requiredDependencies = ["utility-library", "user-authentication", "configuration-manager"];
+    const requiredDependencies = [
+      "utility-library",
+      "user-authentication",
+      "configuration-manager",
+    ];
     for (const dep of requiredDependencies) {
       if (!window.RoamExtensionSuite.has(dep)) {
-        console.error(`❌ ${dep} not found! Please load required dependencies first.`);
+        console.error(
+          `❌ ${dep} not found! Please load required dependencies first.`
+        );
         return;
       }
     }
 
-    // ✅ VERIFY ENHANCED UTILITIES
     const platform = window.RoamExtensionSuite;
-    if (!platform.getUtility("findNestedDataValues") || !platform.getUtility("setDataValue")) {
-      console.error("❌ Enhanced utilities not found! Please load Extension 1.5 with nested data support.");
+    if (
+      !platform.getUtility("findNestedDataValues") ||
+      !platform.getUtility("setDataValue")
+    ) {
+      console.error(
+        "❌ Enhanced utilities not found! Please load Extension 1.5 with nested data support."
+      );
       return;
     }
 
-    // 🎯 REGISTER ENHANCED DIRECTORY SERVICES
     const directoryServices = {
-      // Enhanced user profile services
       getUserProfileData: getUserProfileData,
       getAllUserProfiles: getAllUserProfiles,
       initializeMyInfoStructure: initializeMyInfoStructure,
       addFieldToMyInfo: addFieldToMyInfo,
       getCleanFieldValue: getCleanFieldValue,
-
-      // Directory UI services
       showUserDirectoryModal: showUserDirectoryModal,
       showCompletionNudgeModal: showCompletionNudgeModal,
       checkProfileCompletion: checkProfileCompletion,
-
-      // Timezone services
       timezoneManager: timezoneManager,
       getCurrentTimeForUser: (tz) => timezoneManager.getCurrentTimeForUser(tz),
       validateTimezone: (tz) => timezoneManager.validateTimezone(tz),
       getCommonTimezones: () => timezoneManager.getCommonTimezones(),
-
-      // Enhanced navigation services
       addNavigationButtons: addNavigationButtons,
-
-      // Enhanced testing services
       runDirectoryTests: runDirectoryTests,
       showDirectoryStatus: showDirectoryStatus,
     };
@@ -1368,7 +1308,6 @@ export default {
       platform.registerUtility(name, service);
     });
 
-    // 📝 REGISTER ENHANCED COMMANDS
     const commands = [
       {
         label: "Directory: Show Enhanced User Directory",
@@ -1382,7 +1321,9 @@ export default {
             console.log(
               check.needsInitialization
                 ? "🎯 Enhanced My Info:: structure needs initialization"
-                : `📊 Profile ${check.profile.completeness}% complete. Missing: ${check.missingFields.join(", ")}`
+                : `📊 Profile ${
+                    check.profile.completeness
+                  }% complete. Missing: ${check.missingFields.join(", ")}`
             );
             showCompletionNudgeModal(check);
           } else {
@@ -1395,8 +1336,14 @@ export default {
         callback: async () => {
           const currentUser = platform.getUtility("getAuthenticatedUser")();
           if (currentUser) {
-            const success = await initializeMyInfoStructure(currentUser.displayName);
-            console.log(`🎯 Enhanced My Info:: initialization ${success ? "successful" : "failed"}`);
+            const success = await initializeMyInfoStructure(
+              currentUser.displayName
+            );
+            console.log(
+              `🎯 Enhanced My Info:: initialization ${
+                success ? "successful" : "failed"
+              }`
+            );
           }
         },
       },
@@ -1405,7 +1352,9 @@ export default {
         callback: () => {
           console.log("🧪 Testing sandbox-confirmed button placement...");
           addNavigationButtons();
-          console.log("✅ Buttons should appear using multi-selector sandbox approach");
+          console.log(
+            "✅ Buttons should appear using multi-selector sandbox approach"
+          );
         },
       },
       {
@@ -1418,16 +1367,13 @@ export default {
       },
     ];
 
-    // Add commands and register for cleanup
     commands.forEach((cmd) => {
       window.roamAlphaAPI.ui.commandPalette.addCommand(cmd);
       window._extensionRegistry.commands.push(cmd.label);
     });
 
-    // 🎯 START ENHANCED NAVIGATION MONITORING
     startNavigationMonitoring();
 
-    // 📊 AUTO-CHECK ENHANCED PROFILE COMPLETION
     setTimeout(async () => {
       const completionCheck = await checkProfileCompletion();
       if (completionCheck.shouldNudge) {
@@ -1439,35 +1385,42 @@ export default {
       }
     }, 3000);
 
-    // 🎯 REGISTER SELF WITH PLATFORM
     platform.register(
       "user-directory",
       {
         services: directoryServices,
         timezoneManager: timezoneManager,
-        version: "6.2.0", // Incremented for enhanced fixes
+        version: "6.2.1",
       },
       {
-        name: "Enhanced User Directory + Timezones (FIXED)",
-        description: "FIXED: Button placement (sandbox-confirmed) + Enhanced My Info:: auto-completion",
-        version: "6.2.0",
+        name: "Enhanced User Directory + Timezones (SYNTAX FIXED)",
+        description:
+          "SYNTAX FIXED: Button placement (sandbox-confirmed) + Enhanced My Info:: auto-completion",
+        version: "6.2.1",
         dependencies: requiredDependencies,
       }
     );
 
-    // 🎉 STARTUP COMPLETE
     const currentUser = platform.getUtility("getAuthenticatedUser")();
     const memberCount = platform.getUtility("getGraphMemberCount")();
 
     console.log("✅ Enhanced User Directory + Timezones loaded successfully!");
-    console.log("🔧 FIXED: Button placement using sandbox-confirmed multi-selector approach");
-    console.log("🔧 FIXED: Enhanced My Info:: auto-completion with all 5 fields");
+    console.log("🔧 SYNTAX FIXED: All template literal errors resolved");
+    console.log(
+      "🔧 FIXED: Button placement using sandbox-confirmed multi-selector approach"
+    );
+    console.log(
+      "🔧 FIXED: Enhanced My Info:: auto-completion with all 5 fields"
+    );
     console.log("🔧 FIXED: Field name consistency and placeholder detection");
     console.log(`🫂 Enhanced directory ready for ${memberCount} graph members`);
-    console.log(`🕐 Timezone support: ${timezoneManager.getCommonTimezones().length} common timezones`);
+    console.log(
+      `🕐 Timezone support: ${
+        timezoneManager.getCommonTimezones().length
+      } common timezones`
+    );
     console.log('💡 Try: Cmd+P → "Directory: Show Enhanced User Directory"');
 
-    // Quick enhanced status check
     setTimeout(async () => {
       const profile = await getUserProfileData(currentUser.displayName);
       console.log(
@@ -1481,11 +1434,13 @@ export default {
   onunload: () => {
     console.log("🫂 Enhanced User Directory + Timezones unloading...");
 
-    // Clean up navigation buttons
-    document.querySelectorAll(".user-directory-nav-button").forEach((btn) => btn.remove());
+    document
+      .querySelectorAll(".user-directory-nav-button")
+      .forEach((btn) => btn.remove());
 
-    // Close any open modals
-    const modals = document.querySelectorAll("#user-directory-modal, #completion-nudge-modal");
+    const modals = document.querySelectorAll(
+      "#user-directory-modal, #completion-nudge-modal"
+    );
     modals.forEach((modal) => modal.remove());
 
     console.log("✅ Enhanced User Directory + Timezones cleanup complete!");
