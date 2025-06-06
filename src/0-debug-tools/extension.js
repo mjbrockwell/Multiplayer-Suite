@@ -1,1013 +1,462 @@
 // ===================================================================
-// Extension 0: Debug Tools - Swappable Development Platform
-// Professional debugging interface focused on current development priorities
+// Extension 0: Dynamic Debug Platform - Swappable Intelligence
+// Focus: Extension 6 (User Directory) debugging module
+// Professional debugging interface for current development priorities
 // ===================================================================
 
 // ===================================================================
-// 🛠️ DEBUG MODULE ARCHITECTURE - Plugin System
+// 🔍 EXTENSION 6 DEBUG MODULE - User Directory Diagnostics
 // ===================================================================
 
-const DEBUG_MODULES = {
-  "settings-manager": {
-    id: "settings-manager",
-    name: "⚙️ Settings Manager Debug",
-    description: "Debug tree-based configuration and user preferences",
-    active: true, // Current development focus
-    component: null, // Will be set below
-  },
-  "foundation-registry": {
-    id: "foundation-registry",
-    name: "🏛️ Foundation Registry Debug",
-    description: "Debug extension coordination and cleanup",
-    active: false,
-    component: null,
-  },
-  "user-authentication": {
-    id: "user-authentication",
-    name: "👤 User Authentication Debug",
-    description: "Debug user detection methods and caching",
-    active: false,
-    component: null,
-  },
-  "performance-monitor": {
-    id: "performance-monitor",
-    name: "📊 Performance Monitor",
-    description: "Monitor extension performance and resource usage",
-    active: false,
-    component: null,
-  },
-};
-
-// ===================================================================
-// 🎯 SETTINGS MANAGER DEBUG MODULE - Current Development Focus
-// ===================================================================
-
-const createSettingsManagerDebugModule = () => {
-  console.log("🔧 Creating Settings Manager Debug Module...");
-
-  const container = document.createElement("div");
-  container.className = "debug-module settings-manager-debug";
-
-  console.log("📝 Adding HTML content to module...");
-
-  container.innerHTML = `
-    <div class="debug-section">
-      <h4>🔍 Settings Detection & Analysis</h4>
-      <div class="debug-controls">
-        <button id="debug-detect-user" class="debug-btn">Detect Current User</button>
-        <button id="debug-check-page" class="debug-btn">Check Preferences Page</button>
-        <button id="debug-scan-tree" class="debug-btn">Scan Tree Structure</button>
-        <button id="debug-force-create" class="debug-btn primary">Force Create Preferences</button>
-      </div>
-    </div>
+/**
+ * Comprehensive Extension 6 debugging dashboard
+ */
+const createUserDirectoryDebugger = () => {
+  const debugger = {
+    name: 'User Directory Debugger',
+    description: 'Debug Extension 6: User Directory + Timezones data collection and UI',
     
-    <div class="debug-section">
-      <h4>📊 Real-time Status</h4>
-      <div id="settings-debug-status" class="debug-status">
-        <div class="status-item">
-          <strong>User:</strong> <span id="current-user-status">Not checked</span>
-        </div>
-        <div class="status-item">
-          <strong>Page Exists:</strong> <span id="page-exists-status">Not checked</span>
-        </div>
-        <div class="status-item">
-          <strong>Settings Count:</strong> <span id="settings-count-status">Not checked</span>
-        </div>
-        <div class="status-item">
-          <strong>Last Update:</strong> <span id="last-update-status">Never</span>
-        </div>
-      </div>
-    </div>
+    async runDiagnostics() {
+      console.group('🔍 Extension 6: User Directory Debug Diagnostics');
+      
+      try {
+        const platform = window.RoamExtensionSuite;
+        
+        // Test 1: Platform Dependencies Check
+        console.log('=== DEPENDENCY CHECK ===');
+        const requiredDeps = ['foundation-registry', 'utility-library', 'user-authentication', 'configuration-manager', 'user-directory'];
+        requiredDeps.forEach(dep => {
+          const status = platform.has(dep) ? '✅' : '❌';
+          console.log(`${status} ${dep}: ${platform.has(dep)}`);
+        });
+        
+        // Test 2: Extension 2 Data Sources
+        console.log('\n=== EXTENSION 2 DATA SOURCES ===');
+        const getGraphMembers = platform.getUtility('getGraphMembers');
+        const getAuthenticatedUser = platform.getUtility('getAuthenticatedUser');
+        
+        if (getGraphMembers) {
+          const members = getGraphMembers();
+          console.log(`📋 Graph Members (${members.length}):`, members);
+        } else {
+          console.log('❌ getGraphMembers utility not found');
+        }
+        
+        if (getAuthenticatedUser) {
+          const user = getAuthenticatedUser();
+          console.log('👤 Current User:', user);
+        } else {
+          console.log('❌ getAuthenticatedUser utility not found');
+        }
+        
+        // Test 3: Universal Parser Testing
+        console.log('\n=== UNIVERSAL PARSER TESTING ===');
+        const findDataValue = platform.getUtility('findDataValue');
+        const getPageUidByTitle = platform.getUtility('getPageUidByTitle');
+        
+        if (findDataValue && getPageUidByTitle) {
+          // Test graph members page
+          const membersPageUid = getPageUidByTitle('roam/graph members');
+          console.log(`📄 Members Page UID: ${membersPageUid}`);
+          
+          if (membersPageUid) {
+            const directoryData = findDataValue(membersPageUid, 'Directory');
+            console.log('📋 Directory:: data:', directoryData);
+          } else {
+            console.log('❌ roam/graph members page not found');
+          }
+          
+          // Test current user page
+          const currentUser = getAuthenticatedUser();
+          if (currentUser) {
+            const userPageUid = getPageUidByTitle(currentUser.displayName);
+            console.log(`👤 User Page UID (${currentUser.displayName}): ${userPageUid}`);
+            
+            if (userPageUid) {
+              const testFields = ['Avatar', 'Location', 'Role', 'Timezone', 'About Me'];
+              testFields.forEach(field => {
+                const value = findDataValue(userPageUid, field);
+                console.log(`  ${field}: ${value || 'Not found'}`);
+              });
+            }
+          }
+        } else {
+          console.log('❌ Universal parser utilities not found');
+        }
+        
+        // Test 4: Extension 6 Services
+        console.log('\n=== EXTENSION 6 SERVICES ===');
+        const directoryServices = [
+          'getUserProfileData',
+          'getAllUserProfiles', 
+          'showUserDirectoryModal',
+          'checkProfileCompletion',
+          'timezoneManager'
+        ];
+        
+        directoryServices.forEach(service => {
+          const available = platform.getUtility(service) ? '✅' : '❌';
+          console.log(`${available} ${service}`);
+        });
+        
+        // Test 5: Live Data Collection
+        console.log('\n=== LIVE DATA COLLECTION TEST ===');
+        const getUserProfileData = platform.getUtility('getUserProfileData');
+        const getAllUserProfiles = platform.getUtility('getAllUserProfiles');
+        
+        if (getUserProfileData && currentUser) {
+          console.log('Testing getUserProfileData...');
+          const profileData = await getUserProfileData(currentUser.displayName);
+          console.log('Profile Data:', profileData);
+        }
+        
+        if (getAllUserProfiles) {
+          console.log('Testing getAllUserProfiles...');
+          const allProfiles = await getAllUserProfiles();
+          console.log(`All Profiles (${allProfiles.length}):`, allProfiles);
+        }
+        
+        // Test 6: Page Detection
+        console.log('\n=== PAGE DETECTION TEST ===');
+        const getCurrentPageTitle = platform.getUtility('getCurrentPageTitle');
+        const isGraphMember = platform.getUtility('isGraphMember');
+        
+        if (getCurrentPageTitle) {
+          const currentPage = getCurrentPageTitle();
+          console.log(`📄 Current Page: ${currentPage}`);
+          
+          if (currentPage && isGraphMember) {
+            const isMember = isGraphMember(currentPage);
+            console.log(`👥 Is Graph Member: ${isMember}`);
+          }
+        }
+        
+        console.log('✅ Diagnostics completed');
+        
+      } catch (error) {
+        console.error('❌ Diagnostic error:', error);
+      }
+      
+      console.groupEnd();
+    },
     
-    <div class="debug-section">
-      <h4>🧪 Test Actions</h4>
-      <div class="debug-controls">
-        <button id="debug-test-get" class="debug-btn">Test Get Preference</button>
-        <button id="debug-test-set" class="debug-btn">Test Set Preference</button>
-        <button id="debug-test-parse" class="debug-btn">Test Shortcuts Parser</button>
-        <button id="debug-clear-cache" class="debug-btn warning">Clear All Caches</button>
-      </div>
-    </div>
+    async createTestData() {
+      console.group('🧪 Creating Test Data for Extension 6');
+      
+      try {
+        const platform = window.RoamExtensionSuite;
+        const createPageIfNotExists = platform.getUtility('createPageIfNotExists');
+        const setDataValue = platform.getUtility('setDataValue');
+        const getAuthenticatedUser = platform.getUtility('getAuthenticatedUser');
+        
+        if (!createPageIfNotExists || !setDataValue) {
+          console.log('❌ Required utilities not found');
+          return;
+        }
+        
+        const currentUser = getAuthenticatedUser();
+        if (!currentUser) {
+          console.log('❌ Current user not found');
+          return;
+        }
+        
+        // Create/ensure graph members page exists
+        console.log('📋 Creating/updating graph members directory...');
+        const membersPageUid = await createPageIfNotExists('roam/graph members');
+        
+        if (membersPageUid) {
+          // Add current user to directory
+          await setDataValue(membersPageUid, 'Directory', [currentUser.displayName], true);
+          console.log(`✅ Added ${currentUser.displayName} to graph members`);
+        }
+        
+        // Create/update user profile page
+        console.log('👤 Creating/updating user profile...');
+        const userPageUid = await createPageIfNotExists(currentUser.displayName);
+        
+        if (userPageUid) {
+          // Add sample profile data
+          await setDataValue(userPageUid, 'Avatar', 'https://api.dicebear.com/7.x/initials/svg?seed=' + currentUser.displayName, true);
+          await setDataValue(userPageUid, 'Location', 'Oakland, California, US', true);
+          await setDataValue(userPageUid, 'Role', 'Extension Developer', true);
+          await setDataValue(userPageUid, 'Timezone', 'America/Los_Angeles', true);
+          await setDataValue(userPageUid, 'About Me', 'Building professional Roam extensions', true);
+          
+          console.log(`✅ Created sample profile data for ${currentUser.displayName}`);
+        }
+        
+        console.log('🎯 Test data creation completed!');
+        console.log('💡 Try running diagnostics again or opening the directory modal');
+        
+      } catch (error) {
+        console.error('❌ Test data creation failed:', error);
+      }
+      
+      console.groupEnd();
+    },
     
-    <div class="debug-section">
-      <h4>📝 Debug Log</h4>
-      <div id="settings-debug-log" class="debug-log">
-        <div class="log-item info">🎯 Settings Manager Debug Module Ready</div>
-      </div>
-      <div class="debug-controls">
-        <button id="debug-clear-log" class="debug-btn small">Clear Log</button>
-        <button id="debug-copy-log" class="debug-btn small">Copy Log</button>
-      </div>
-    </div>
-  `;
-
-  console.log("🎯 Setting up event handlers...");
-
-  // Set up event handlers
-  setTimeout(() => {
-    setupSettingsDebugHandlers(container);
-    console.log("✅ Settings Manager Debug Module created and configured");
-  }, 50);
-
-  return container;
-};
-
-const setupSettingsDebugHandlers = (container) => {
-  const log = (message, type = "info") => {
-    const logContainer = container.querySelector("#settings-debug-log");
-    const logItem = document.createElement("div");
-    logItem.className = `log-item ${type}`;
-    logItem.innerHTML = `<span class="timestamp">${new Date().toLocaleTimeString()}</span> ${message}`;
-    logContainer.appendChild(logItem);
-    logContainer.scrollTop = logContainer.scrollHeight;
-
-    // Update last update time
-    const lastUpdate = container.querySelector("#last-update-status");
-    if (lastUpdate) lastUpdate.textContent = new Date().toLocaleTimeString();
-  };
-
-  const updateStatus = (key, value, type = "success") => {
-    const element = container.querySelector(`#${key}-status`);
-    if (element) {
-      element.textContent = value;
-      element.className = `status-value ${type}`;
+    async testDirectoryModal() {
+      console.log('🧪 Testing Directory Modal...');
+      
+      const platform = window.RoamExtensionSuite;
+      const showUserDirectoryModal = platform.getUtility('showUserDirectoryModal');
+      
+      if (showUserDirectoryModal) {
+        await showUserDirectoryModal();
+        console.log('✅ Directory modal launched');
+      } else {
+        console.log('❌ showUserDirectoryModal not found');
+      }
+    },
+    
+    async testNavigationButtons() {
+      console.log('🧪 Testing Navigation Buttons...');
+      
+      const platform = window.RoamExtensionSuite;
+      const addNavigationButtons = platform.getUtility('addNavigationButtons');
+      
+      if (addNavigationButtons) {
+        addNavigationButtons();
+        console.log('✅ Navigation buttons triggered');
+        console.log('💡 Check top-right corner of page for buttons');
+      } else {
+        console.log('❌ addNavigationButtons not found');
+      }
+    },
+    
+    inspectCurrentState() {
+      console.group('🔍 Current State Inspection');
+      
+      // Check current page URL and title
+      console.log('URL:', window.location.href);
+      
+      // Check for existing navigation buttons
+      const existingButtons = document.querySelectorAll('.user-directory-nav-button');
+      console.log(`Existing nav buttons: ${existingButtons.length}`);
+      
+      // Check for modal elements
+      const existingModal = document.getElementById('user-directory-modal');
+      console.log(`Directory modal exists: ${!!existingModal}`);
+      
+      // Check platform status
+      if (window.RoamExtensionSuite) {
+        console.log('Platform status:', window.RoamExtensionSuite.getStatus());
+      }
+      
+      console.groupEnd();
     }
   };
-
-  // Get platform utilities
-  const platform = window.RoamExtensionSuite;
-  const getCurrentUser = platform?.getUtility("getCurrentUser");
-  const getUserPreference = platform?.getUtility("getUserPreference");
-  const setUserPreference = platform?.getUtility("setUserPreference");
-  const getAllUserPreferences = platform?.getUtility("getAllUserPreferences");
-  const parsePersonalShortcuts = platform?.getUtility("parsePersonalShortcuts");
-
-  // User Detection
-  container
-    .querySelector("#debug-detect-user")
-    ?.addEventListener("click", async () => {
-      try {
-        log("🔍 Detecting current user...", "info");
-        const user = getCurrentUser();
-        log(
-          `✅ User detected: ${user.displayName} (method: ${user.method})`,
-          "success"
-        );
-        updateStatus("current-user", user.displayName, "success");
-      } catch (error) {
-        log(`❌ User detection failed: ${error.message}`, "error");
-        updateStatus("current-user", "Error", "error");
-      }
-    });
-
-  // Page Check
-  container
-    .querySelector("#debug-check-page")
-    ?.addEventListener("click", async () => {
-      try {
-        log("📄 Checking preferences page...", "info");
-        const user = getCurrentUser();
-        const pageTitle = `${user.displayName}/user preferences`;
-
-        const pageUid = window.roamAlphaAPI.data.q(`
-        [:find ?uid .
-         :where [?page :node/title "${pageTitle}"] [?page :block/uid ?uid]]
-      `);
-
-        if (pageUid) {
-          log(`✅ Page exists with UID: ${pageUid}`, "success");
-          updateStatus("page-exists", "Yes", "success");
-        } else {
-          log(`❌ Page does not exist: "${pageTitle}"`, "warning");
-          updateStatus("page-exists", "No", "warning");
-        }
-      } catch (error) {
-        log(`❌ Page check failed: ${error.message}`, "error");
-        updateStatus("page-exists", "Error", "error");
-      }
-    });
-
-  // Tree Structure Scan
-  container
-    .querySelector("#debug-scan-tree")
-    ?.addEventListener("click", async () => {
-      try {
-        log("🌳 Scanning tree structure...", "info");
-        const user = getCurrentUser();
-
-        // First check what's actually in the page
-        const pageTitle = `${user.displayName}/user preferences`;
-        const pageUid = window.roamAlphaAPI.data.q(`
-        [:find ?uid .
-         :where [?page :node/title "${pageTitle}"] [?page :block/uid ?uid]]
-      `);
-
-        if (pageUid) {
-          // Get raw tree structure
-          const rawTree = window.roamAlphaAPI.data.q(`
-          [:find ?uid ?string ?order
-           :where 
-           [?parent :block/uid "${pageUid}"]
-           [?parent :block/children ?child]
-           [?child :block/uid ?uid]
-           [?child :block/string ?string]
-           [?child :block/order ?order]]
-        `);
-
-          log(`📊 Raw blocks in page: ${rawTree.length}`, "info");
-          rawTree.forEach(([uid, text, order]) => {
-            log(`  Block ${order}: "${text}" (${uid})`, "info");
-          });
-        }
-
-        // Now get processed preferences
-        const prefs = await getAllUserPreferences(user.displayName);
-        const count = Object.keys(prefs).length;
-        log(
-          `📊 Processed preferences: ${count}`,
-          count > 0 ? "success" : "warning"
-        );
-
-        if (count > 0) {
-          Object.entries(prefs).forEach(([key, value]) => {
-            log(`  • ${key}: "${value}"`, "info");
-          });
-        } else {
-          log(
-            "❌ No processed preferences found - page may have blocks but wrong structure",
-            "warning"
-          );
-        }
-
-        updateStatus(
-          "settings-count",
-          count,
-          count > 0 ? "success" : "warning"
-        );
-      } catch (error) {
-        log(`❌ Tree scan failed: ${error.message}`, "error");
-        updateStatus("settings-count", "Error", "error");
-      }
-    });
-
-  // Enhanced Force Create with detailed block creation tracing
-  container
-    .querySelector("#debug-force-create")
-    ?.addEventListener("click", async () => {
-      try {
-        log("🔧 Starting detailed force create analysis...", "info");
-        const user = getCurrentUser();
-        const pageTitle = `${user.displayName}/user preferences`;
-
-        // STEP 1: Check initial state
-        log("📊 STEP 1: Checking initial state...", "info");
-        const initialPageUid = window.roamAlphaAPI.data.q(`
-      [:find ?uid . :where [?page :node/title "${pageTitle}"] [?page :block/uid ?uid]]
-    `);
-        log(
-          `Initial page UID: ${initialPageUid || "NONE"}`,
-          initialPageUid ? "success" : "warning"
-        );
-
-        if (initialPageUid) {
-          const initialBlocks = window.roamAlphaAPI.data.q(`
-        [:find ?uid ?string ?order
-         :where 
-         [?parent :block/uid "${initialPageUid}"]
-         [?parent :block/children ?child]
-         [?child :block/uid ?uid]
-         [?child :block/string ?string]
-         [?child :block/order ?order]]
-      `);
-          log(`Initial blocks: ${initialBlocks.length}`, "info");
-        }
-
-        // STEP 2: Trigger getUserPreference (which should create the setting)
-        log(
-          "🎯 STEP 2: Calling getUserPreference (should trigger creation)...",
-          "info"
-        );
-        const startTime = Date.now();
-        const result = await getUserPreference(
-          user.displayName,
-          "Loading Page Preference",
-          "Daily Page"
-        );
-        const endTime = Date.now();
-        log(
-          `getUserPreference result: "${result}" (took ${
-            endTime - startTime
-          }ms)`,
-          "success"
-        );
-
-        // STEP 3: Immediate check - what was actually created?
-        log("🔍 STEP 3: Immediate post-creation check...", "info");
-        const postCreatePageUid = window.roamAlphaAPI.data.q(`
-      [:find ?uid . :where [?page :node/title "${pageTitle}"] [?page :block/uid ?uid]]
-    `);
-        log(
-          `Post-create page UID: ${postCreatePageUid || "NONE"}`,
-          postCreatePageUid ? "success" : "error"
-        );
-
-        if (postCreatePageUid) {
-          const postCreateBlocks = window.roamAlphaAPI.data.q(`
-        [:find ?uid ?string ?order
-         :where 
-         [?parent :block/uid "${postCreatePageUid}"]
-         [?parent :block/children ?child]
-         [?child :block/uid ?uid]
-         [?child :block/string ?string]
-         [?child :block/order ?order]]
-      `);
-
-          log(`Post-create blocks: ${postCreateBlocks.length}`, "info");
-          postCreateBlocks.forEach(([uid, text, order], index) => {
-            log(`  Block ${order}: "${text}" (${uid})`, "info");
-
-            // Check for children immediately
-            const immediateChildren = window.roamAlphaAPI.data.q(`
-          [:find ?childUid ?childString ?childOrder
-           :where 
-           [?parent :block/uid "${uid}"]
-           [?parent :block/children ?child]
-           [?child :block/uid ?childUid]
-           [?child :block/string ?childString]
-           [?child :block/order ?childOrder]]
-        `);
-
-            if (immediateChildren.length > 0) {
-              immediateChildren.forEach(([childUid, childText, childOrder]) => {
-                log(
-                  `    Child ${childOrder}: "${childText}" (${childUid})`,
-                  "success"
-                );
-              });
-            } else {
-              log(`    No immediate children found`, "warning");
-            }
-          });
-        }
-
-        // STEP 4: Wait for potential async operations
-        log("⏳ STEP 4: Waiting 1 second for async operations...", "info");
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        // STEP 5: Check again after delay
-        log("🔍 STEP 5: Post-delay check...", "info");
-        const delayedPageUid = window.roamAlphaAPI.data.q(`
-      [:find ?uid . :where [?page :node/title "${pageTitle}"] [?page :block/uid ?uid]]
-    `);
-
-        if (delayedPageUid) {
-          const delayedBlocks = window.roamAlphaAPI.data.q(`
-        [:find ?uid ?string ?order
-         :where 
-         [?parent :block/uid "${delayedPageUid}"]
-         [?parent :block/children ?child]
-         [?child :block/uid ?uid]
-         [?child :block/string ?string]
-         [?child :block/order ?order]]
-      `);
-
-          log(`Post-delay blocks: ${delayedBlocks.length}`, "info");
-          delayedBlocks.forEach(([uid, text, order]) => {
-            log(`  Block ${order}: "${text}" (${uid})`, "info");
-
-            // Check for children after delay
-            const delayedChildren = window.roamAlphaAPI.data.q(`
-          [:find ?childUid ?childString ?childOrder
-           :where 
-           [?parent :block/uid "${uid}"]
-           [?parent :block/children ?child]
-           [?child :block/uid ?childUid]
-           [?child :block/string ?childString]
-           [?child :block/order ?childOrder]]
-        `);
-
-            if (delayedChildren.length > 0) {
-              delayedChildren.forEach(([childUid, childText, childOrder]) => {
-                log(
-                  `    Child ${childOrder}: "${childText}" (${childUid})`,
-                  "success"
-                );
-              });
-            } else {
-              log(`    Still no children found`, "error");
-            }
-          });
-        }
-
-        // STEP 6: Test getAllUserPreferences reading
-        log("📖 STEP 6: Testing getAllUserPreferences reading...", "info");
-        const readStartTime = Date.now();
-        const allPrefs = await getAllUserPreferences(user.displayName);
-        const readEndTime = Date.now();
-        const prefCount = Object.keys(allPrefs).length;
-        log(
-          `getAllUserPreferences found: ${prefCount} preferences (took ${
-            readEndTime - readStartTime
-          }ms)`,
-          prefCount > 0 ? "success" : "error"
-        );
-
-        if (prefCount > 0) {
-          Object.entries(allPrefs).forEach(([key, value]) => {
-            log(`  📝 Found: "${key}" = "${value}"`, "success");
-          });
-        } else {
-          log(
-            "❌ getAllUserPreferences found nothing - this is the bug!",
-            "error"
-          );
-        }
-
-        // STEP 7: Test the regex matching directly
-        log("🧪 STEP 7: Testing regex matching on raw blocks...", "info");
-        if (delayedPageUid) {
-          const allBlocks = window.roamAlphaAPI.data.q(`
-        [:find ?uid ?string
-         :where 
-         [?parent :block/uid "${delayedPageUid}"]
-         [?parent :block/children ?child]
-         [?child :block/uid ?uid]
-         [?child :block/string ?string]]
-      `);
-
-          // Test the toFlexRegex function
-          const testKey = "Loading Page Preference";
-          const flexRegex = new RegExp(
-            `^\\s*${testKey.replace(
-              /([()])/g,
-              "\\$1"
-            )}\\s*(#\\.[\\w\\d-]*\\s*)?$`,
-            "i"
-          );
-
-          log(`Testing regex: ${flexRegex.toString()}`, "info");
-
-          allBlocks.forEach(([uid, text]) => {
-            const matches = flexRegex.test(text.trim());
-            log(
-              `  Block "${text}" matches: ${matches}`,
-              matches ? "success" : "warning"
-            );
-          });
-        }
-
-        // STEP 8: Summary
-        log("📊 STEP 8: Summary of findings...", "info");
-        log(`✅ getUserPreference returned: "${result}"`, "success");
-        log(
-          `❌ getAllUserPreferences found: ${prefCount} preferences`,
-          prefCount > 0 ? "success" : "error"
-        );
-        if (postCreatePageUid) {
-          log(`✅ Page exists with UID: ${postCreatePageUid}`, "success");
-        }
-
-        updateStatus(
-          "settings-count",
-          prefCount,
-          prefCount > 0 ? "success" : "error"
-        );
-      } catch (error) {
-        log(`❌ Enhanced debug failed: ${error.message}`, "error");
-        console.error("Enhanced debug error details:", error);
-      }
-    });
-
-  // Test Get
-  container
-    .querySelector("#debug-test-get")
-    ?.addEventListener("click", async () => {
-      try {
-        log("🧪 Testing getUserPreference...", "info");
-        const user = getCurrentUser();
-        const pref = await getUserPreference(
-          user.displayName,
-          "Journal Header Color",
-          "blue"
-        );
-        log(`✅ Got preference: Journal Header Color = "${pref}"`, "success");
-      } catch (error) {
-        log(`❌ Get preference failed: ${error.message}`, "error");
-      }
-    });
-
-  // Test Set
-  container
-    .querySelector("#debug-test-set")
-    ?.addEventListener("click", async () => {
-      try {
-        log("🧪 Testing setUserPreference...", "info");
-        const user = getCurrentUser();
-        const testValue = `Debug Test ${Date.now()}`;
-        await setUserPreference(
-          user.displayName,
-          "Debug Test Setting",
-          testValue
-        );
-        log(
-          `✅ Set preference: Debug Test Setting = "${testValue}"`,
-          "success"
-        );
-      } catch (error) {
-        log(`❌ Set preference failed: ${error.message}`, "error");
-      }
-    });
-
-  // Test Parser
-  container
-    .querySelector("#debug-test-parse")
-    ?.addEventListener("click", async () => {
-      try {
-        log("🧪 Testing shortcuts parser...", "info");
-        const user = getCurrentUser();
-        const shortcutsString = await getUserPreference(
-          user.displayName,
-          "Personal Shortcuts",
-          "(Daily Notes)(Chat Room)"
-        );
-        const parsed = parsePersonalShortcuts(shortcutsString);
-        log(`Raw: "${shortcutsString}"`, "info");
-        log(`Parsed: [${parsed.join(", ")}]`, "success");
-      } catch (error) {
-        log(`❌ Parser test failed: ${error.message}`, "error");
-      }
-    });
-
-  // Clear Log
-  container.querySelector("#debug-clear-log")?.addEventListener("click", () => {
-    const logContainer = container.querySelector("#settings-debug-log");
-    logContainer.innerHTML = '<div class="log-item info">🧹 Log cleared</div>';
-  });
-
-  // Copy Log
-  container.querySelector("#debug-copy-log")?.addEventListener("click", () => {
-    const logItems = container.querySelectorAll(".log-item");
-    const logText = Array.from(logItems)
-      .map((item) => item.textContent)
-      .join("\n");
-    navigator.clipboard.writeText(logText).then(() => {
-      log("📋 Log copied to clipboard", "success");
-    });
-  });
-
-  // Auto-refresh status every 10 seconds
-  const autoRefresh = () => {
-    if (container.parentElement) {
-      container.querySelector("#debug-detect-user")?.click();
-      setTimeout(autoRefresh, 10000);
-    }
-  };
-  setTimeout(autoRefresh, 2000); // Start after 2 seconds
+  
+  return debugger;
 };
 
 // ===================================================================
-// 🎨 DEBUG WINDOW UI - Professional Interface
+// 🎯 DEBUG INTERFACE CREATION - Professional Debug UI
 // ===================================================================
 
-const createDebugWindow = () => {
-  // Remove existing window
-  const existing = document.getElementById("roam-extension-debug-window");
+/**
+ * Create professional debug interface
+ */
+const createDebugInterface = () => {
+  // Remove existing debug interface
+  const existing = document.getElementById('extension-debug-interface');
   if (existing) existing.remove();
-
-  // Create main window
-  const window = document.createElement("div");
-  window.id = "roam-extension-debug-window";
-  window.style.cssText = `
+  
+  const debugInterface = document.createElement('div');
+  debugInterface.id = 'extension-debug-interface';
+  debugInterface.style.cssText = `
     position: fixed;
-    top: 60px;
+    top: 20px;
     left: 20px;
-    width: 450px;
-    max-height: 80vh;
+    width: 320px;
     background: white;
-    border: 1px solid #e1e5e9;
+    border: 2px solid #137cbd;
     border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-    z-index: 10001;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 10000;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    font-size: 13px;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
   `;
-
-  // Header
-  const header = document.createElement("div");
-  header.style.cssText = `
-    background: #0f172a;
-    color: white;
-    padding: 12px 16px;
-    font-weight: 600;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-radius: 8px 8px 0 0;
-  `;
-
-  // Module selector
-  const moduleSelector = document.createElement("select");
-  moduleSelector.id = "debug-module-selector";
-  moduleSelector.style.cssText = `
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 4px;
-    padding: 4px 8px;
-    font-size: 12px;
-  `;
-
-  Object.values(DEBUG_MODULES).forEach((module) => {
-    const option = document.createElement("option");
-    option.value = module.id;
-    option.textContent = module.name;
-    option.selected = module.active;
-    moduleSelector.appendChild(option);
-  });
-
-  header.innerHTML = `
-    <span>🛠️ Debug Tools</span>
-    <div style="display: flex; align-items: center; gap: 12px;">
-      <button id="debug-window-minimize" style="
-        background: none; border: none; color: white; 
-        font-size: 16px; cursor: pointer; padding: 0;
-      ">–</button>
-      <button id="debug-window-close" style="
-        background: none; border: none; color: white; 
-        font-size: 16px; cursor: pointer; padding: 0;
-      ">×</button>
-    </div>
-  `;
-
-  header.insertBefore(moduleSelector, header.lastElementChild);
-
-  // Content area
-  const content = document.createElement("div");
-  content.id = "debug-window-content";
-  content.style.cssText = `
-    padding: 16px;
-    overflow-y: auto;
-    flex: 1;
-    background: #fafbfc;
-  `;
-
-  // Add CSS for debug components
-  const debugStyles = document.createElement("style");
-  debugStyles.textContent = `
-    .debug-section {
-      margin-bottom: 20px;
-      background: white;
-      border: 1px solid #e1e5e9;
-      border-radius: 6px;
-      padding: 12px;
-    }
-    
-    .debug-section h4 {
-      margin: 0 0 12px 0;
-      font-size: 14px;
-      font-weight: 600;
-      color: #0f172a;
-    }
-    
-    .debug-controls {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-    
-    .debug-btn {
-      padding: 6px 12px;
-      border: 1px solid #d1d5db;
-      border-radius: 4px;
-      background: white;
-      color: #374151;
-      cursor: pointer;
-      font-size: 12px;
-      font-weight: 500;
-      transition: all 0.2s ease;
-    }
-    
-    .debug-btn:hover {
-      background: #f9fafb;
-      border-color: #9ca3af;
-    }
-    
-    .debug-btn.primary {
+  
+  const userDirectoryDebugger = createUserDirectoryDebugger();
+  
+  debugInterface.innerHTML = `
+    <div style="
       background: #137cbd;
       color: white;
-      border-color: #137cbd;
-    }
-    
-    .debug-btn.primary:hover {
-      background: #106ba3;
-    }
-    
-    .debug-btn.warning {
-      background: #f59e0b;
-      color: white;
-      border-color: #f59e0b;
-    }
-    
-    .debug-btn.small {
-      padding: 4px 8px;
-      font-size: 11px;
-    }
-    
-    .debug-status {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 4px;
-      padding: 12px;
-    }
-    
-    .status-item {
+      padding: 12px 16px;
+      border-radius: 6px 6px 0 0;
+      font-weight: 600;
       display: flex;
       justify-content: space-between;
-      margin-bottom: 8px;
-      font-size: 12px;
-    }
+      align-items: center;
+    ">
+      <span>🛠️ Extension 6 Debug Platform</span>
+      <button onclick="this.closest('#extension-debug-interface').remove()" style="
+        background: none;
+        border: none;
+        color: white;
+        cursor: pointer;
+        font-size: 16px;
+      ">×</button>
+    </div>
     
-    .status-item:last-child {
-      margin-bottom: 0;
-    }
-    
-    .status-value.success {
-      color: #059669;
-      font-weight: 500;
-    }
-    
-    .status-value.warning {
-      color: #d97706;
-      font-weight: 500;
-    }
-    
-    .status-value.error {
-      color: #dc2626;
-      font-weight: 500;
-    }
-    
-    .debug-log {
-      background: #1f2937;
-      color: #f9fafb;
-      border-radius: 4px;
-      padding: 8px;
-      max-height: 200px;
-      overflow-y: auto;
-      font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
-      font-size: 11px;
-      line-height: 1.4;
-    }
-    
-    .log-item {
-      margin-bottom: 4px;
-      padding: 2px 0;
-    }
-    
-    .log-item.success {
-      color: #10b981;
-    }
-    
-    .log-item.warning {
-      color: #f59e0b;
-    }
-    
-    .log-item.error {
-      color: #ef4444;
-    }
-    
-    .log-item .timestamp {
-      color: #9ca3af;
-      font-size: 10px;
-    }
-  `;
-
-  // Assemble window
-  window.appendChild(debugStyles);
-  window.appendChild(header);
-  window.appendChild(content);
-
-  // Add to page first
-  document.body.appendChild(window);
-
-  // Event handlers
-  setupDebugWindowHandlers(window);
-
-  // Load initial module (after adding to DOM)
-  setTimeout(() => {
-    console.log("🔄 Loading initial debug module...");
-    loadDebugModule("settings-manager");
-  }, 100);
-
-  return window;
-};
-
-const loadDebugModule = (moduleId) => {
-  console.log(`🔄 Loading debug module: ${moduleId}`);
-  const content = document.getElementById("debug-window-content");
-  if (!content) {
-    console.error("❌ Debug window content area not found!");
-    return;
-  }
-
-  // Clear content
-  content.innerHTML =
-    '<div style="padding: 12px; color: #666;">Loading module...</div>';
-
-  // Load module
-  const module = DEBUG_MODULES[moduleId];
-  if (!module) {
-    console.error(`❌ Debug module not found: ${moduleId}`);
-    content.innerHTML =
-      '<div style="padding: 12px; color: #dc2626;">Error: Module not found</div>';
-    return;
-  }
-
-  console.log(`📦 Creating module component for: ${module.name}`);
-
-  // Create module component
-  let moduleComponent;
-  try {
-    switch (moduleId) {
-      case "settings-manager":
-        moduleComponent = createSettingsManagerDebugModule();
-        console.log("✅ Settings manager module created");
-        break;
-      default:
-        moduleComponent = document.createElement("div");
-        moduleComponent.innerHTML = `
-          <div class="debug-section">
-            <h4>${module.name}</h4>
-            <p>${module.description}</p>
-            <p><em>This debug module is coming soon...</em></p>
-          </div>
-        `;
-        console.log(`📋 Placeholder module created for: ${moduleId}`);
-    }
-
-    if (moduleComponent) {
-      content.innerHTML = ""; // Clear loading message
-      content.appendChild(moduleComponent);
-      console.log("✅ Module component added to content area");
-    } else {
-      throw new Error("Module component was not created");
-    }
-  } catch (error) {
-    console.error("❌ Error creating module component:", error);
-    content.innerHTML = `
-      <div style="padding: 12px; color: #dc2626;">
-        <strong>Error loading module:</strong><br>
-        ${error.message}
+    <div style="padding: 16px;">
+      <div style="margin-bottom: 12px; font-size: 14px; color: #666;">
+        Extension 6: User Directory + Timezones
       </div>
-    `;
-  }
-
-  // Update active state
-  Object.values(DEBUG_MODULES).forEach((m) => (m.active = false));
-  module.active = true;
-
-  console.log(`🎯 Module ${moduleId} is now active`);
-};
-
-const setupDebugWindowHandlers = (window) => {
-  // Module selector
-  const selector = window.querySelector("#debug-module-selector");
-  selector?.addEventListener("change", (e) => {
-    loadDebugModule(e.target.value);
-  });
-
-  // Close button
-  window.querySelector("#debug-window-close")?.addEventListener("click", () => {
-    window.remove();
-  });
-
-  // Minimize button
-  let minimized = false;
-  window
-    .querySelector("#debug-window-minimize")
-    ?.addEventListener("click", () => {
-      const content = window.querySelector("#debug-window-content");
-      if (minimized) {
-        content.style.display = "block";
-        window.style.height = "auto";
-        minimized = false;
-      } else {
-        content.style.display = "none";
-        window.style.height = "48px";
-        minimized = true;
-      }
-    });
+      
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <button onclick="window.debugUserDirectory.runDiagnostics()" style="
+          background: #059669;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          padding: 8px 12px;
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 500;
+        ">
+          🔍 Run Full Diagnostics
+        </button>
+        
+        <button onclick="window.debugUserDirectory.createTestData()" style="
+          background: #d97706;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          padding: 8px 12px;
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 500;
+        ">
+          🧪 Create Test Data
+        </button>
+        
+        <button onclick="window.debugUserDirectory.testDirectoryModal()" style="
+          background: #7c3aed;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          padding: 8px 12px;
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 500;
+        ">
+          📋 Test Directory Modal
+        </button>
+        
+        <button onclick="window.debugUserDirectory.testNavigationButtons()" style="
+          background: #dc2626;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          padding: 8px 12px;
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 500;
+        ">
+          🧭 Test Navigation Buttons
+        </button>
+        
+        <button onclick="window.debugUserDirectory.inspectCurrentState()" style="
+          background: #374151;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          padding: 8px 12px;
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 500;
+        ">
+          🔍 Inspect Current State
+        </button>
+      </div>
+      
+      <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #666;">
+        💡 Open browser console (F12) to see debug output
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(debugInterface);
+  
+  // Make debugger globally accessible
+  window.debugUserDirectory = userDirectoryDebugger;
+  
+  // Register for cleanup
+  window._extensionRegistry.elements.push(debugInterface);
+  
+  console.log('🛠️ Extension 6 Debug Platform ready!');
 };
 
 // ===================================================================
-// 🚀 ROAM EXTENSION EXPORT - Debug Platform Integration
+// 🚀 ROAM EXTENSION EXPORT - Debug Platform
 // ===================================================================
 
 export default {
   onload: async ({ extensionAPI }) => {
-    console.log("🛠️ Debug Tools starting...");
-
-    // ✅ VERIFY FOUNDATION DEPENDENCY
+    console.log('🛠️ Extension 0: Debug Platform starting...');
+    
+    // ✅ VERIFY FOUNDATION
     if (!window.RoamExtensionSuite) {
-      console.error(
-        "❌ Foundation Registry not found! Please load Extension 1 first."
-      );
+      console.error('❌ Foundation Registry not found! Please load Extension 1 first.');
       return;
     }
-
-    // 📝 REGISTER COMMANDS
+    
+    // 🎯 CREATE DEBUG INTERFACE
+    setTimeout(createDebugInterface, 1000); // Small delay to ensure page is ready
+    
+    // 📝 REGISTER DEBUG COMMANDS
     const commands = [
       {
-        label: "Debug Tools: Open Debug Window",
-        callback: () => {
-          createDebugWindow();
-        },
+        label: 'Debug: Show Extension 6 Debug Platform',
+        callback: createDebugInterface
       },
       {
-        label: "Debug Tools: Settings Manager Focus",
-        callback: () => {
-          const window = createDebugWindow();
-          const selector = window.querySelector("#debug-module-selector");
-          if (selector) selector.value = "settings-manager";
-          loadDebugModule("settings-manager");
-        },
-      },
+        label: 'Debug: Run Extension 6 Diagnostics',
+        callback: async () => {
+          if (window.debugUserDirectory) {
+            await window.debugUserDirectory.runDiagnostics();
+          } else {
+            console.log('Debug platform not ready - run "Debug: Show Extension 6 Debug Platform" first');
+          }
+        }
+      }
     ];
-
-    // Add commands and register for cleanup
-    commands.forEach((cmd) => {
+    
+    commands.forEach(cmd => {
       window.roamAlphaAPI.ui.commandPalette.addCommand(cmd);
       window._extensionRegistry.commands.push(cmd.label);
     });
-
-    // 🎯 REGISTER SELF WITH PLATFORM
+    
+    // 🎯 REGISTER WITH PLATFORM
     const platform = window.RoamExtensionSuite;
-    platform.register(
-      "debug-tools",
-      {
-        openDebugWindow: createDebugWindow,
-        loadModule: loadDebugModule,
-        modules: DEBUG_MODULES,
-        version: "1.0.0",
-      },
-      {
-        name: "Debug Tools",
-        description: "Swappable debug modules for current development focus",
-        version: "1.0.0",
-        dependencies: ["foundation-registry"],
-      }
-    );
-
-    console.log("✅ Debug Tools loaded successfully!");
-    console.log('💡 Try: Cmd+P → "Debug Tools: Open Debug Window"');
-
-    // Auto-open debug window for development
-    setTimeout(() => {
-      console.log("🔄 Auto-opening debug window...");
-      const debugWindow = createDebugWindow();
-      console.log(
-        "✅ Debug window created:",
-        debugWindow ? "Success" : "Failed"
-      );
-
-      // Add fallback content if module loading fails
-      setTimeout(() => {
-        const content = document.getElementById("debug-window-content");
-        if (
-          content &&
-          (!content.innerHTML || content.innerHTML.includes("Loading module"))
-        ) {
-          console.log("⚠️ Module loading failed, adding fallback content...");
-          content.innerHTML = `
-            <div style="padding: 20px; text-align: center; color: #666;">
-              <h3>🛠️ Debug Tools</h3>
-              <p>Module loading issue detected. Using fallback interface.</p>
-              <button onclick="console.log('Debug test clicked')" style="
-                padding: 8px 16px; 
-                background: #137cbd; 
-                color: white; 
-                border: none; 
-                border-radius: 4px; 
-                cursor: pointer;
-              ">Test Debug Button</button>
-              <br><br>
-              <p><em>Check console for detailed loading logs.</em></p>
-            </div>
-          `;
-        }
-      }, 2000);
-    }, 1000);
+    platform.register('debug-platform', {
+      createDebugInterface: createDebugInterface,
+      debuggers: { userDirectory: createUserDirectoryDebugger },
+      version: '0.1.0'
+    }, {
+      name: 'Debug Platform',
+      description: 'Swappable debug tools focused on current development priorities',
+      version: '0.1.0',
+      dependencies: ['foundation-registry']
+    });
+    
+    console.log('✅ Extension 0: Debug Platform loaded!');
+    console.log('🛠️ Debug interface will appear in top-left corner');
+    console.log('💡 Also available via Cmd+P → "Debug: Show Extension 6 Debug Platform"');
   },
-
+  
   onunload: () => {
-    console.log("🛠️ Debug Tools unloading...");
-
-    // Remove debug window
-    const window = document.getElementById("roam-extension-debug-window");
-    if (window) window.remove();
-
-    console.log("✅ Debug Tools cleanup complete!");
-  },
+    console.log('🛠️ Extension 0: Debug Platform unloading...');
+    
+    // Clean up debug interface
+    const debugInterface = document.getElementById('extension-debug-interface');
+    if (debugInterface) debugInterface.remove();
+    
+    // Clean up global debugger
+    delete window.debugUserDirectory;
+    
+    console.log('✅ Extension 0: Debug Platform cleanup complete!');
+  }
 };
