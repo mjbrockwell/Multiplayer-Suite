@@ -537,7 +537,7 @@ const createShortcutsElement = (shortcuts) => {
   addCurrentButton.style.cssText = `
     width: 100%;
     padding: 8px 10px;
-    margin-bottom: 10px;
+    margin-top: 10px;
     background: linear-gradient(135deg, #f0f4ff, #e8f0fe);
     color: #4a5568;
     border: 2px solid #667eea;
@@ -657,16 +657,16 @@ const createShortcutsElement = (shortcuts) => {
       removeButton.style.cssText = `
         background: none;
         border: none;
-        color: #e53e3e;
+        color: #8a9ba8;
         cursor: pointer;
         font-size: 18px;
         font-weight: bold;
-        padding: 0 6px;
+        padding: 0 11px 0 6px;
         border-radius: 4px;
         opacity: 0.6;
         transition: all 0.15s ease;
         flex-shrink: 0;
-        width: 28px;
+        width: 33px;
         height: 28px;
         display: flex;
         align-items: center;
@@ -737,8 +737,9 @@ const createShortcutsElement = (shortcuts) => {
   });
 
   // Build the structure properly
-  scrollContainer.appendChild(addCurrentButton);
+
   scrollContainer.appendChild(list);
+  scrollContainer.appendChild(addCurrentButton);
   content.appendChild(scrollContainer);
 
   element.appendChild(header);
