@@ -1,7 +1,8 @@
 // ===================================================================
 // Extension 2: User Authentication - Professional User Management
+// UPDATED: Now manages [[roam/graph members]] directory as source of truth
 // Rewritten to leverage Extension 1.5 Utility Library
-// Focus: Authentication workflows, user sessions, and high-level user services
+// Focus: Authentication workflows, user sessions, and graph member directory
 // ===================================================================
 
 // ===================================================================
@@ -44,11 +45,85 @@ class UserSession {
       console.log(`   Multi-user graph: ${isMultiUser}`);
       console.log(`   Session ID: ${this.sessionId}`);
 
+      // 🎯 INITIALIZE GRAPH MEMBERS DIRECTORY - "Safety Net"
+      await this.initializeGraphMembersDirectory();
+
       return this;
     } catch (error) {
       console.error("Failed to initialize user session:", error);
       this.authState = "error";
       throw error;
+    }
+  }
+
+  /**
+   * Initialize [[roam/graph members]] directory and ensure current user is listed
+   * This is our "safety net" to maintain source of truth for active users
+   */
+  async initializeGraphMembersDirectory() {
+    try {
+      console.log("📋 Initializing graph members directory...");
+
+      const platform = window.RoamExtensionSuite;
+      const createPageIfNotExists = platform.getUtility(
+        "createPageIfNotExists"
+      );
+      const findDataValue = platform.getUtility("findDataValue");
+      const setDataValue = platform.getUtility("setDataValue");
+      const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
+
+      // Create the graph members page if it doesn't exist
+      const membersPageUid = await createPageIfNotExists("roam/graph members");
+      if (!membersPageUid) {
+        console.error("❌ Failed to create roam/graph members page");
+        return false;
+      }
+
+      // Check if Directory:: header exists
+      let currentMembers = findDataValue(membersPageUid, "Directory");
+
+      // If Directory:: doesn't exist, create it with current user
+      if (currentMembers === null) {
+        console.log("📋 Creating Directory:: header with initial member list");
+        await setDataValue(
+          membersPageUid,
+          "Directory",
+          [this.user.displayName],
+          true
+        ); // true = use attribute format
+        console.log(`✅ Created Directory:: with ${this.user.displayName}`);
+        return true;
+      }
+
+      // Ensure currentMembers is an array
+      if (!Array.isArray(currentMembers)) {
+        currentMembers = [currentMembers];
+      }
+
+      // Check if current user is in the list
+      if (!currentMembers.includes(this.user.displayName)) {
+        // Add current user to the list
+        const updatedMembers = [...currentMembers, this.user.displayName];
+        await setDataValue(membersPageUid, "Directory", updatedMembers, true); // true = use attribute format
+        console.log(
+          `✅ Added ${this.user.displayName} to graph members directory`
+        );
+      } else {
+        console.log(
+          `📋 ${this.user.displayName} already in graph members directory`
+        );
+      }
+
+      console.log(
+        `📊 Graph members directory: ${
+          currentMembers.length +
+          (currentMembers.includes(this.user.displayName) ? 0 : 1)
+        } members`
+      );
+      return true;
+    } catch (error) {
+      console.error("❌ Failed to initialize graph members directory:", error);
+      return false;
     }
   }
 
@@ -103,6 +178,154 @@ class UserSession {
 
 // Global session instance
 let userSession = null;
+
+// ===================================================================
+// 📋 GRAPH MEMBERS DIRECTORY SERVICES - Source of Truth Management
+// ===================================================================
+
+/**
+ * Get all members from the graph members directory
+ */
+const getGraphMembers = () => {
+  try {
+    const platform = window.RoamExtensionSuite;
+    const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
+    const findDataValue = platform.getUtility("findDataValue");
+
+    const membersPageUid = getPageUidByTitle("roam/graph members");
+    if (!membersPageUid) {
+      console.warn("📋 Graph members page not found");
+      return [];
+    }
+
+    const members = findDataValue(membersPageUid, "Directory");
+    if (members === null) {
+      console.warn("📋 Directory:: not found in graph members page");
+      return [];
+    }
+
+    // Ensure we return an array
+    const membersList = Array.isArray(members) ? members : [members];
+    console.log(`📊 Found ${membersList.length} graph members`);
+    return membersList;
+  } catch (error) {
+    console.error("❌ Failed to get graph members:", error);
+    return [];
+  }
+};
+
+/**
+ * Add a member to the graph members directory
+ */
+const addGraphMember = async (username) => {
+  try {
+    console.log(`📋 Adding ${username} to graph members directory...`);
+
+    const platform = window.RoamExtensionSuite;
+    const createPageIfNotExists = platform.getUtility("createPageIfNotExists");
+    const setDataValue = platform.getUtility("setDataValue");
+
+    // Ensure the page exists
+    const membersPageUid = await createPageIfNotExists("roam/graph members");
+    if (!membersPageUid) return false;
+
+    // Get current members
+    const currentMembers = getGraphMembers();
+
+    // Check if user is already in the list
+    if (currentMembers.includes(username)) {
+      console.log(`📋 ${username} already in graph members directory`);
+      return true;
+    }
+
+    // Add the new member
+    const updatedMembers = [...currentMembers, username];
+    const success = await setDataValue(
+      membersPageUid,
+      "Directory",
+      updatedMembers,
+      true
+    );
+
+    if (success) {
+      console.log(`✅ Added ${username} to graph members directory`);
+    } else {
+      console.error(`❌ Failed to add ${username} to graph members directory`);
+    }
+
+    return success;
+  } catch (error) {
+    console.error(`❌ Error adding ${username} to graph members:`, error);
+    return false;
+  }
+};
+
+/**
+ * Remove a member from the graph members directory
+ */
+const removeGraphMember = async (username) => {
+  try {
+    console.log(`📋 Removing ${username} from graph members directory...`);
+
+    const platform = window.RoamExtensionSuite;
+    const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
+    const setDataValue = platform.getUtility("setDataValue");
+
+    const membersPageUid = getPageUidByTitle("roam/graph members");
+    if (!membersPageUid) {
+      console.warn("📋 Graph members page not found");
+      return false;
+    }
+
+    // Get current members
+    const currentMembers = getGraphMembers();
+
+    // Check if user is in the list
+    if (!currentMembers.includes(username)) {
+      console.log(`📋 ${username} not found in graph members directory`);
+      return true;
+    }
+
+    // Remove the member
+    const updatedMembers = currentMembers.filter(
+      (member) => member !== username
+    );
+    const success = await setDataValue(
+      membersPageUid,
+      "Directory",
+      updatedMembers,
+      true
+    );
+
+    if (success) {
+      console.log(`✅ Removed ${username} from graph members directory`);
+    } else {
+      console.error(
+        `❌ Failed to remove ${username} from graph members directory`
+      );
+    }
+
+    return success;
+  } catch (error) {
+    console.error(`❌ Error removing ${username} from graph members:`, error);
+    return false;
+  }
+};
+
+/**
+ * Check if a user is a graph member
+ */
+const isGraphMember = (username) => {
+  const members = getGraphMembers();
+  return members.includes(username);
+};
+
+/**
+ * Get graph member count
+ */
+const getGraphMemberCount = () => {
+  return getGraphMembers().length;
+};
 
 // ===================================================================
 // 🛡️ AUTHENTICATION SERVICES - High-Level User Operations
@@ -350,8 +573,16 @@ const runAuthenticationTests = async () => {
     const sessionInfo = userSession?.getSessionInfo();
     console.log("  Session info:", sessionInfo);
 
-    // Test 3: Preferences
-    console.log("Test 3: User Preferences");
+    // Test 3: Graph Members Directory
+    console.log("Test 3: Graph Members Directory");
+    const members = getGraphMembers();
+    console.log(`  Graph members (${members.length}):`, members);
+    console.log(
+      `  Current user is member: ${isGraphMember(user?.displayName)}`
+    );
+
+    // Test 4: Preferences
+    console.log("Test 4: User Preferences");
     if (user) {
       const preferences = await getAllUserPreferences(user.displayName);
       console.log(
@@ -368,8 +599,8 @@ const runAuthenticationTests = async () => {
       console.log(`  Set test preference: ${testResult}`);
     }
 
-    // Test 4: Multi-user Detection
-    console.log("Test 4: Multi-user Graph Detection");
+    // Test 5: Multi-user Detection
+    console.log("Test 5: Multi-user Graph Detection");
     const platform = window.RoamExtensionSuite;
     const isMultiUserGraph = platform.getUtility("isMultiUserGraph");
     console.log(`  Multi-user graph: ${isMultiUserGraph()}`);
@@ -393,6 +624,7 @@ const showAuthenticationDashboard = () => {
 
   const sessionInfo = userSession.getSessionInfo();
   const durationMinutes = Math.round(sessionInfo.duration / (1000 * 60));
+  const members = getGraphMembers();
 
   console.group("🔐 Authentication Dashboard");
   console.log(`👤 User: ${sessionInfo.user.displayName}`);
@@ -405,6 +637,7 @@ const showAuthenticationDashboard = () => {
   console.log(
     `🖼️ Photo: ${sessionInfo.user.photoUrl ? "Available" : "Not available"}`
   );
+  console.log(`📋 Graph Members (${members.length}): ${members.join(", ")}`);
   console.groupEnd();
 };
 
@@ -453,6 +686,13 @@ export default {
       refreshUserSession: () => userSession?.refreshUser(),
       getSessionInfo: () => userSession?.getSessionInfo(),
 
+      // Graph members directory
+      getGraphMembers: getGraphMembers,
+      addGraphMember: addGraphMember,
+      removeGraphMember: removeGraphMember,
+      isGraphMember: isGraphMember,
+      getGraphMemberCount: getGraphMemberCount,
+
       // User preferences
       getUserPreference: getUserPreference,
       setUserPreference: setUserPreference,
@@ -478,6 +718,17 @@ export default {
       {
         label: "Auth: Run Authentication Tests",
         callback: runAuthenticationTests,
+      },
+      {
+        label: "Auth: Show Graph Members",
+        callback: () => {
+          const members = getGraphMembers();
+          console.group(`📋 Graph Members Directory (${members.length})`);
+          members.forEach((member, index) => {
+            console.log(`${index + 1}. ${member}`);
+          });
+          console.groupEnd();
+        },
       },
       {
         label: "Auth: Refresh User Session",
@@ -535,7 +786,7 @@ export default {
       {
         name: "User Authentication",
         description:
-          "Professional user session management and authentication workflows",
+          "Professional user session management and graph members directory",
         version: "2.0.0",
         dependencies: ["foundation-registry", "utility-library"],
       }
@@ -543,10 +794,12 @@ export default {
 
     // 🎉 STARTUP COMPLETE
     const user = getAuthenticatedUser();
+    const memberCount = getGraphMemberCount();
     console.log("✅ User Authentication loaded successfully!");
     console.log(
       `👤 Welcome ${user.displayName}! Authentication state: ${userSession.authState}`
     );
+    console.log(`📋 Graph has ${memberCount} registered members`);
     console.log('💡 Try: Cmd+P → "Auth: Show User Dashboard"');
 
     // Auto-initialize preferences for new users
