@@ -12,242 +12,299 @@
  * Comprehensive Extension 6 debugging dashboard
  */
 const createUserDirectoryDebugger = () => {
-  const debugger = {
-    name: 'User Directory Debugger',
-    description: 'Debug Extension 6: User Directory + Timezones data collection and UI',
-    
+  const directoryDebugger = {
+    name: "User Directory Debugger",
+    description:
+      "Debug Extension 6: User Directory + Timezones data collection and UI",
+
     async runDiagnostics() {
-      console.group('🔍 Extension 6: User Directory Debug Diagnostics');
-      
+      console.group("🔍 Extension 6: User Directory Debug Diagnostics");
+
       try {
         const platform = window.RoamExtensionSuite;
-        
+
         // Test 1: Platform Dependencies Check
-        console.log('=== DEPENDENCY CHECK ===');
-        const requiredDeps = ['foundation-registry', 'utility-library', 'user-authentication', 'configuration-manager', 'user-directory'];
-        requiredDeps.forEach(dep => {
-          const status = platform.has(dep) ? '✅' : '❌';
+        console.log("=== DEPENDENCY CHECK ===");
+        const requiredDeps = [
+          "foundation-registry",
+          "utility-library",
+          "user-authentication",
+          "configuration-manager",
+          "user-directory",
+        ];
+        requiredDeps.forEach((dep) => {
+          const status = platform.has(dep) ? "✅" : "❌";
           console.log(`${status} ${dep}: ${platform.has(dep)}`);
         });
-        
+
         // Test 2: Extension 2 Data Sources
-        console.log('\n=== EXTENSION 2 DATA SOURCES ===');
-        const getGraphMembers = platform.getUtility('getGraphMembers');
-        const getAuthenticatedUser = platform.getUtility('getAuthenticatedUser');
-        
+        console.log("\n=== EXTENSION 2 DATA SOURCES ===");
+        const getGraphMembers = platform.getUtility("getGraphMembers");
+        const getAuthenticatedUser = platform.getUtility(
+          "getAuthenticatedUser"
+        );
+
         if (getGraphMembers) {
           const members = getGraphMembers();
           console.log(`📋 Graph Members (${members.length}):`, members);
         } else {
-          console.log('❌ getGraphMembers utility not found');
+          console.log("❌ getGraphMembers utility not found");
         }
-        
+
         if (getAuthenticatedUser) {
           const user = getAuthenticatedUser();
-          console.log('👤 Current User:', user);
+          console.log("👤 Current User:", user);
         } else {
-          console.log('❌ getAuthenticatedUser utility not found');
+          console.log("❌ getAuthenticatedUser utility not found");
         }
-        
+
         // Test 3: Universal Parser Testing
-        console.log('\n=== UNIVERSAL PARSER TESTING ===');
-        const findDataValue = platform.getUtility('findDataValue');
-        const getPageUidByTitle = platform.getUtility('getPageUidByTitle');
-        
+        console.log("\n=== UNIVERSAL PARSER TESTING ===");
+        const findDataValue = platform.getUtility("findDataValue");
+        const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
+
         if (findDataValue && getPageUidByTitle) {
           // Test graph members page
-          const membersPageUid = getPageUidByTitle('roam/graph members');
+          const membersPageUid = getPageUidByTitle("roam/graph members");
           console.log(`📄 Members Page UID: ${membersPageUid}`);
-          
+
           if (membersPageUid) {
-            const directoryData = findDataValue(membersPageUid, 'Directory');
-            console.log('📋 Directory:: data:', directoryData);
+            const directoryData = findDataValue(membersPageUid, "Directory");
+            console.log("📋 Directory:: data:", directoryData);
           } else {
-            console.log('❌ roam/graph members page not found');
+            console.log("❌ roam/graph members page not found");
           }
-          
+
           // Test current user page
           const currentUser = getAuthenticatedUser();
           if (currentUser) {
             const userPageUid = getPageUidByTitle(currentUser.displayName);
-            console.log(`👤 User Page UID (${currentUser.displayName}): ${userPageUid}`);
-            
+            console.log(
+              `👤 User Page UID (${currentUser.displayName}): ${userPageUid}`
+            );
+
             if (userPageUid) {
-              const testFields = ['Avatar', 'Location', 'Role', 'Timezone', 'About Me'];
-              testFields.forEach(field => {
+              const testFields = [
+                "Avatar",
+                "Location",
+                "Role",
+                "Timezone",
+                "About Me",
+              ];
+              testFields.forEach((field) => {
                 const value = findDataValue(userPageUid, field);
-                console.log(`  ${field}: ${value || 'Not found'}`);
+                console.log(`  ${field}: ${value || "Not found"}`);
               });
             }
           }
         } else {
-          console.log('❌ Universal parser utilities not found');
+          console.log("❌ Universal parser utilities not found");
         }
-        
+
         // Test 4: Extension 6 Services
-        console.log('\n=== EXTENSION 6 SERVICES ===');
+        console.log("\n=== EXTENSION 6 SERVICES ===");
         const directoryServices = [
-          'getUserProfileData',
-          'getAllUserProfiles', 
-          'showUserDirectoryModal',
-          'checkProfileCompletion',
-          'timezoneManager'
+          "getUserProfileData",
+          "getAllUserProfiles",
+          "showUserDirectoryModal",
+          "checkProfileCompletion",
+          "timezoneManager",
         ];
-        
-        directoryServices.forEach(service => {
-          const available = platform.getUtility(service) ? '✅' : '❌';
+
+        directoryServices.forEach((service) => {
+          const available = platform.getUtility(service) ? "✅" : "❌";
           console.log(`${available} ${service}`);
         });
-        
+
         // Test 5: Live Data Collection
-        console.log('\n=== LIVE DATA COLLECTION TEST ===');
-        const getUserProfileData = platform.getUtility('getUserProfileData');
-        const getAllUserProfiles = platform.getUtility('getAllUserProfiles');
-        
+        console.log("\n=== LIVE DATA COLLECTION TEST ===");
+        const getUserProfileData = platform.getUtility("getUserProfileData");
+        const getAllUserProfiles = platform.getUtility("getAllUserProfiles");
+
         if (getUserProfileData && currentUser) {
-          console.log('Testing getUserProfileData...');
+          console.log("Testing getUserProfileData...");
           const profileData = await getUserProfileData(currentUser.displayName);
-          console.log('Profile Data:', profileData);
+          console.log("Profile Data:", profileData);
         }
-        
+
         if (getAllUserProfiles) {
-          console.log('Testing getAllUserProfiles...');
+          console.log("Testing getAllUserProfiles...");
           const allProfiles = await getAllUserProfiles();
           console.log(`All Profiles (${allProfiles.length}):`, allProfiles);
         }
-        
+
         // Test 6: Page Detection
-        console.log('\n=== PAGE DETECTION TEST ===');
-        const getCurrentPageTitle = platform.getUtility('getCurrentPageTitle');
-        const isGraphMember = platform.getUtility('isGraphMember');
-        
+        console.log("\n=== PAGE DETECTION TEST ===");
+        const getCurrentPageTitle = platform.getUtility("getCurrentPageTitle");
+        const isGraphMember = platform.getUtility("isGraphMember");
+
         if (getCurrentPageTitle) {
           const currentPage = getCurrentPageTitle();
           console.log(`📄 Current Page: ${currentPage}`);
-          
+
           if (currentPage && isGraphMember) {
             const isMember = isGraphMember(currentPage);
             console.log(`👥 Is Graph Member: ${isMember}`);
           }
         }
-        
-        console.log('✅ Diagnostics completed');
-        
+
+        console.log("✅ Diagnostics completed");
       } catch (error) {
-        console.error('❌ Diagnostic error:', error);
+        console.error("❌ Diagnostic error:", error);
       }
-      
+
       console.groupEnd();
     },
-    
+
     async createTestData() {
-      console.group('🧪 Creating Test Data for Extension 6');
-      
+      console.group("🧪 Creating Test Data for Extension 6");
+
       try {
         const platform = window.RoamExtensionSuite;
-        const createPageIfNotExists = platform.getUtility('createPageIfNotExists');
-        const setDataValue = platform.getUtility('setDataValue');
-        const getAuthenticatedUser = platform.getUtility('getAuthenticatedUser');
-        
+        const createPageIfNotExists = platform.getUtility(
+          "createPageIfNotExists"
+        );
+        const setDataValue = platform.getUtility("setDataValue");
+        const getAuthenticatedUser = platform.getUtility(
+          "getAuthenticatedUser"
+        );
+
         if (!createPageIfNotExists || !setDataValue) {
-          console.log('❌ Required utilities not found');
+          console.log("❌ Required utilities not found");
           return;
         }
-        
+
         const currentUser = getAuthenticatedUser();
         if (!currentUser) {
-          console.log('❌ Current user not found');
+          console.log("❌ Current user not found");
           return;
         }
-        
+
         // Create/ensure graph members page exists
-        console.log('📋 Creating/updating graph members directory...');
-        const membersPageUid = await createPageIfNotExists('roam/graph members');
-        
+        console.log("📋 Creating/updating graph members directory...");
+        const membersPageUid = await createPageIfNotExists(
+          "roam/graph members"
+        );
+
         if (membersPageUid) {
           // Add current user to directory
-          await setDataValue(membersPageUid, 'Directory', [currentUser.displayName], true);
+          await setDataValue(
+            membersPageUid,
+            "Directory",
+            [currentUser.displayName],
+            true
+          );
           console.log(`✅ Added ${currentUser.displayName} to graph members`);
         }
-        
+
         // Create/update user profile page
-        console.log('👤 Creating/updating user profile...');
-        const userPageUid = await createPageIfNotExists(currentUser.displayName);
-        
+        console.log("👤 Creating/updating user profile...");
+        const userPageUid = await createPageIfNotExists(
+          currentUser.displayName
+        );
+
         if (userPageUid) {
           // Add sample profile data
-          await setDataValue(userPageUid, 'Avatar', 'https://api.dicebear.com/7.x/initials/svg?seed=' + currentUser.displayName, true);
-          await setDataValue(userPageUid, 'Location', 'Oakland, California, US', true);
-          await setDataValue(userPageUid, 'Role', 'Extension Developer', true);
-          await setDataValue(userPageUid, 'Timezone', 'America/Los_Angeles', true);
-          await setDataValue(userPageUid, 'About Me', 'Building professional Roam extensions', true);
-          
-          console.log(`✅ Created sample profile data for ${currentUser.displayName}`);
+          await setDataValue(
+            userPageUid,
+            "Avatar",
+            "https://api.dicebear.com/7.x/initials/svg?seed=" +
+              currentUser.displayName,
+            true
+          );
+          await setDataValue(
+            userPageUid,
+            "Location",
+            "Oakland, California, US",
+            true
+          );
+          await setDataValue(userPageUid, "Role", "Extension Developer", true);
+          await setDataValue(
+            userPageUid,
+            "Timezone",
+            "America/Los_Angeles",
+            true
+          );
+          await setDataValue(
+            userPageUid,
+            "About Me",
+            "Building professional Roam extensions",
+            true
+          );
+
+          console.log(
+            `✅ Created sample profile data for ${currentUser.displayName}`
+          );
         }
-        
-        console.log('🎯 Test data creation completed!');
-        console.log('💡 Try running diagnostics again or opening the directory modal');
-        
+
+        console.log("🎯 Test data creation completed!");
+        console.log(
+          "💡 Try running diagnostics again or opening the directory modal"
+        );
       } catch (error) {
-        console.error('❌ Test data creation failed:', error);
+        console.error("❌ Test data creation failed:", error);
       }
-      
+
       console.groupEnd();
     },
-    
+
     async testDirectoryModal() {
-      console.log('🧪 Testing Directory Modal...');
-      
+      console.log("🧪 Testing Directory Modal...");
+
       const platform = window.RoamExtensionSuite;
-      const showUserDirectoryModal = platform.getUtility('showUserDirectoryModal');
-      
+      const showUserDirectoryModal = platform.getUtility(
+        "showUserDirectoryModal"
+      );
+
       if (showUserDirectoryModal) {
         await showUserDirectoryModal();
-        console.log('✅ Directory modal launched');
+        console.log("✅ Directory modal launched");
       } else {
-        console.log('❌ showUserDirectoryModal not found');
+        console.log("❌ showUserDirectoryModal not found");
       }
     },
-    
+
     async testNavigationButtons() {
-      console.log('🧪 Testing Navigation Buttons...');
-      
+      console.log("🧪 Testing Navigation Buttons...");
+
       const platform = window.RoamExtensionSuite;
-      const addNavigationButtons = platform.getUtility('addNavigationButtons');
-      
+      const addNavigationButtons = platform.getUtility("addNavigationButtons");
+
       if (addNavigationButtons) {
         addNavigationButtons();
-        console.log('✅ Navigation buttons triggered');
-        console.log('💡 Check top-right corner of page for buttons');
+        console.log("✅ Navigation buttons triggered");
+        console.log("💡 Check top-right corner of page for buttons");
       } else {
-        console.log('❌ addNavigationButtons not found');
+        console.log("❌ addNavigationButtons not found");
       }
     },
-    
+
     inspectCurrentState() {
-      console.group('🔍 Current State Inspection');
-      
+      console.group("🔍 Current State Inspection");
+
       // Check current page URL and title
-      console.log('URL:', window.location.href);
-      
+      console.log("URL:", window.location.href);
+
       // Check for existing navigation buttons
-      const existingButtons = document.querySelectorAll('.user-directory-nav-button');
+      const existingButtons = document.querySelectorAll(
+        ".user-directory-nav-button"
+      );
       console.log(`Existing nav buttons: ${existingButtons.length}`);
-      
+
       // Check for modal elements
-      const existingModal = document.getElementById('user-directory-modal');
+      const existingModal = document.getElementById("user-directory-modal");
       console.log(`Directory modal exists: ${!!existingModal}`);
-      
+
       // Check platform status
       if (window.RoamExtensionSuite) {
-        console.log('Platform status:', window.RoamExtensionSuite.getStatus());
+        console.log("Platform status:", window.RoamExtensionSuite.getStatus());
       }
-      
+
       console.groupEnd();
-    }
+    },
   };
-  
-  return debugger;
+
+  return directoryDebugger;
 };
 
 // ===================================================================
@@ -259,11 +316,11 @@ const createUserDirectoryDebugger = () => {
  */
 const createDebugInterface = () => {
   // Remove existing debug interface
-  const existing = document.getElementById('extension-debug-interface');
+  const existing = document.getElementById("extension-debug-interface");
   if (existing) existing.remove();
-  
-  const debugInterface = document.createElement('div');
-  debugInterface.id = 'extension-debug-interface';
+
+  const debugInterface = document.createElement("div");
+  debugInterface.id = "extension-debug-interface";
   debugInterface.style.cssText = `
     position: fixed;
     top: 20px;
@@ -276,9 +333,9 @@ const createDebugInterface = () => {
     z-index: 10000;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   `;
-  
+
   const userDirectoryDebugger = createUserDirectoryDebugger();
-  
+
   debugInterface.innerHTML = `
     <div style="
       background: #137cbd;
@@ -377,16 +434,16 @@ const createDebugInterface = () => {
       </div>
     </div>
   `;
-  
+
   document.body.appendChild(debugInterface);
-  
+
   // Make debugger globally accessible
   window.debugUserDirectory = userDirectoryDebugger;
-  
+
   // Register for cleanup
   window._extensionRegistry.elements.push(debugInterface);
-  
-  console.log('🛠️ Extension 6 Debug Platform ready!');
+
+  console.log("🛠️ Extension 6 Debug Platform ready!");
 };
 
 // ===================================================================
@@ -395,68 +452,79 @@ const createDebugInterface = () => {
 
 export default {
   onload: async ({ extensionAPI }) => {
-    console.log('🛠️ Extension 0: Debug Platform starting...');
-    
+    console.log("🛠️ Extension 0: Debug Platform starting...");
+
     // ✅ VERIFY FOUNDATION
     if (!window.RoamExtensionSuite) {
-      console.error('❌ Foundation Registry not found! Please load Extension 1 first.');
+      console.error(
+        "❌ Foundation Registry not found! Please load Extension 1 first."
+      );
       return;
     }
-    
+
     // 🎯 CREATE DEBUG INTERFACE
     setTimeout(createDebugInterface, 1000); // Small delay to ensure page is ready
-    
+
     // 📝 REGISTER DEBUG COMMANDS
     const commands = [
       {
-        label: 'Debug: Show Extension 6 Debug Platform',
-        callback: createDebugInterface
+        label: "Debug: Show Extension 6 Debug Platform",
+        callback: createDebugInterface,
       },
       {
-        label: 'Debug: Run Extension 6 Diagnostics',
+        label: "Debug: Run Extension 6 Diagnostics",
         callback: async () => {
           if (window.debugUserDirectory) {
             await window.debugUserDirectory.runDiagnostics();
           } else {
-            console.log('Debug platform not ready - run "Debug: Show Extension 6 Debug Platform" first');
+            console.log(
+              'Debug platform not ready - run "Debug: Show Extension 6 Debug Platform" first'
+            );
           }
-        }
-      }
+        },
+      },
     ];
-    
-    commands.forEach(cmd => {
+
+    commands.forEach((cmd) => {
       window.roamAlphaAPI.ui.commandPalette.addCommand(cmd);
       window._extensionRegistry.commands.push(cmd.label);
     });
-    
+
     // 🎯 REGISTER WITH PLATFORM
     const platform = window.RoamExtensionSuite;
-    platform.register('debug-platform', {
-      createDebugInterface: createDebugInterface,
-      debuggers: { userDirectory: createUserDirectoryDebugger },
-      version: '0.1.0'
-    }, {
-      name: 'Debug Platform',
-      description: 'Swappable debug tools focused on current development priorities',
-      version: '0.1.0',
-      dependencies: ['foundation-registry']
-    });
-    
-    console.log('✅ Extension 0: Debug Platform loaded!');
-    console.log('🛠️ Debug interface will appear in top-left corner');
-    console.log('💡 Also available via Cmd+P → "Debug: Show Extension 6 Debug Platform"');
+    platform.register(
+      "debug-platform",
+      {
+        createDebugInterface: createDebugInterface,
+        debuggers: { userDirectory: createUserDirectoryDebugger },
+        version: "0.1.0",
+      },
+      {
+        name: "Debug Platform",
+        description:
+          "Swappable debug tools focused on current development priorities",
+        version: "0.1.0",
+        dependencies: ["foundation-registry"],
+      }
+    );
+
+    console.log("✅ Extension 0: Debug Platform loaded!");
+    console.log("🛠️ Debug interface will appear in top-left corner");
+    console.log(
+      '💡 Also available via Cmd+P → "Debug: Show Extension 6 Debug Platform"'
+    );
   },
-  
+
   onunload: () => {
-    console.log('🛠️ Extension 0: Debug Platform unloading...');
-    
+    console.log("🛠️ Extension 0: Debug Platform unloading...");
+
     // Clean up debug interface
-    const debugInterface = document.getElementById('extension-debug-interface');
+    const debugInterface = document.getElementById("extension-debug-interface");
     if (debugInterface) debugInterface.remove();
-    
+
     // Clean up global debugger
     delete window.debugUserDirectory;
-    
-    console.log('✅ Extension 0: Debug Platform cleanup complete!');
-  }
+
+    console.log("✅ Extension 0: Debug Platform cleanup complete!");
+  },
 };
