@@ -65,10 +65,62 @@ const loadRemoteExtensionFixed = async (extensionConfig) => {
         );
         console.log(`📦 Module exports:`, Object.keys(module));
 
+        // Step 4: 🔥 CRITICAL: Actually execute the extension!
+        if (module.default && typeof module.default.onload === "function") {
+          console.log(
+            `🚀 Executing ${extensionConfig.name} onload function...`
+          );
+
+          // Create mock extensionAPI (basic version - can be enhanced)
+          const mockExtensionAPI = {
+            settings: {
+              get: (key) =>
+                localStorage.getItem(`ext-${extensionConfig.id}-${key}`),
+              set: (key, value) =>
+                localStorage.setItem(`ext-${extensionConfig.id}-${key}`, value),
+              panel: {
+                create: (config) =>
+                  console.log(
+                    `Settings panel created for ${extensionConfig.name}:`,
+                    config
+                  ),
+              },
+            },
+          };
+
+          try {
+            // 🎯 Actually call the extension's onload function!
+            await module.default.onload({ extensionAPI: mockExtensionAPI });
+            console.log(
+              `✅ ${extensionConfig.name} onload completed successfully`
+            );
+
+            // Store unload function for cleanup
+            if (typeof module.default.onunload === "function") {
+              window._loadedExtensions = window._loadedExtensions || [];
+              window._loadedExtensions.push({
+                name: extensionConfig.name,
+                onunload: module.default.onunload,
+              });
+            }
+          } catch (onloadError) {
+            console.error(
+              `❌ ${extensionConfig.name} onload failed:`,
+              onloadError
+            );
+            throw new Error(`Extension onload failed: ${onloadError.message}`);
+          }
+        } else {
+          console.warn(
+            `⚠️ ${extensionConfig.name} has no onload function - may not be a proper Roam extension`
+          );
+        }
+
         resolve({
           ...extensionConfig,
           module: module,
           loadMethod: "blob-url",
+          executed: true,
         });
       } catch (importError) {
         console.error(
@@ -85,20 +137,81 @@ const loadRemoteExtensionFixed = async (extensionConfig) => {
         );
 
         try {
-          // Create a function that returns the module
+          // Create a module execution context
+          const moduleContext = { exports: {} };
           const moduleFunction = new Function(
+            "module",
+            "exports",
             code + "\n//# sourceURL=" + extensionConfig.filename
           );
-          const result = moduleFunction();
+          moduleFunction(moduleContext, moduleContext.exports);
+
+          const moduleExports =
+            moduleContext.exports.default || moduleContext.exports;
 
           console.log(
             `✅ Successfully loaded ${extensionConfig.name} via eval fallback`
           );
 
+          // Execute the extension if it has onload
+          if (moduleExports && typeof moduleExports.onload === "function") {
+            console.log(
+              `🚀 Executing ${extensionConfig.name} onload function (eval method)...`
+            );
+
+            const mockExtensionAPI = {
+              settings: {
+                get: (key) =>
+                  localStorage.getItem(`ext-${extensionConfig.id}-${key}`),
+                set: (key, value) =>
+                  localStorage.setItem(
+                    `ext-${extensionConfig.id}-${key}`,
+                    value
+                  ),
+                panel: {
+                  create: (config) =>
+                    console.log(
+                      `Settings panel created for ${extensionConfig.name}:`,
+                      config
+                    ),
+                },
+              },
+            };
+
+            try {
+              await moduleExports.onload({ extensionAPI: mockExtensionAPI });
+              console.log(
+                `✅ ${extensionConfig.name} onload completed successfully (eval method)`
+              );
+
+              // Store unload function
+              if (typeof moduleExports.onunload === "function") {
+                window._loadedExtensions = window._loadedExtensions || [];
+                window._loadedExtensions.push({
+                  name: extensionConfig.name,
+                  onunload: moduleExports.onunload,
+                });
+              }
+            } catch (onloadError) {
+              console.error(
+                `❌ ${extensionConfig.name} onload failed (eval method):`,
+                onloadError
+              );
+              throw new Error(
+                `Extension onload failed: ${onloadError.message}`
+              );
+            }
+          } else {
+            console.warn(
+              `⚠️ ${extensionConfig.name} has no onload function (eval method)`
+            );
+          }
+
           resolve({
             ...extensionConfig,
-            module: result,
+            module: { default: moduleExports },
             loadMethod: "eval-fallback",
+            executed: true,
           });
         } catch (evalError) {
           console.error(
@@ -425,9 +538,9 @@ const updateDashboardWithDiscovery = (discoveredExtensions) => {
       }
     </div>
 
-    <div style="margin-top: 16px; display: flex; gap: 8px;">
+    <div style="margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap;">
       <button onclick="window.extensionAutoLoader.loadDiscoveredExtensions()" style="
-        flex: 1;
+        flex: 1; min-width: 120px;
         background: #059669;
         color: white;
         border: none;
@@ -437,7 +550,7 @@ const updateDashboardWithDiscovery = (discoveredExtensions) => {
         font-size: 12px;
         font-weight: 500;
       ">
-        🚀 Load All (Blob Method)
+        🚀 Load All (Execute)
       </button>
       
       <button onclick="window.extensionAutoLoader.testSingleLoad()" style="
@@ -464,6 +577,32 @@ const updateDashboardWithDiscovery = (discoveredExtensions) => {
         font-weight: 500;
       ">
         🔍 Re-scan
+      </button>
+      
+      <button onclick="window.extensionAutoLoader.checkLoadedExtensions()" style="
+        background: #0891b2;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 8px 12px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+      ">
+        📊 Status
+      </button>
+      
+      <button onclick="window.extensionAutoLoader.unloadAllExtensions()" style="
+        background: #dc2626;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 8px 12px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+      ">
+        🧹 Unload
       </button>
     </div>
   `;
@@ -504,7 +643,9 @@ window.extensionAutoLoader = {
     try {
       const result = await testSingleExtensionLoad(testExtension.name);
       console.log("✅ Single extension test successful!");
-      console.log("💡 All extensions should load successfully now.");
+      console.log(
+        "💡 All extensions should load and execute successfully now."
+      );
       return result;
     } catch (error) {
       console.error("❌ Single extension test failed:", error);
@@ -543,7 +684,11 @@ window.extensionAutoLoader = {
         const result = await loadRemoteExtensionFixed(extension);
         results.successful.push(result);
 
-        const delay = extension.critical ? 1000 : 500;
+        // Longer delay for critical extensions to ensure proper initialization
+        const delay = extension.critical ? 1500 : 800;
+        console.log(
+          `⏱️ Waiting ${delay}ms for ${extension.name} to initialize...`
+        );
         await new Promise((resolve) => setTimeout(resolve, delay));
       } catch (error) {
         console.error(`❌ Failed to load ${extension.name}:`, error.message);
@@ -565,7 +710,7 @@ window.extensionAutoLoader = {
 
     if (results.successful.length > 0) {
       console.log(
-        "✅ Successfully loaded:",
+        "✅ Successfully loaded and executed:",
         results.successful.map((e) => `${e.order}: ${e.name} (${e.loadMethod})`)
       );
     }
@@ -584,6 +729,9 @@ window.extensionAutoLoader = {
       console.log(
         "🎉 Extension suite loaded successfully using Blob URL method! All critical extensions operational."
       );
+      console.log(
+        "💡 Check for user directory buttons, navigation elements, etc."
+      );
     } else if (criticalFailed > 0) {
       console.warn(
         `⚠️ ${criticalFailed} critical extension(s) failed - suite may not function properly`
@@ -593,6 +741,62 @@ window.extensionAutoLoader = {
     console.groupEnd();
 
     return results;
+  },
+
+  // 🧹 Cleanup function for unloading extensions
+  unloadAllExtensions() {
+    console.log("🧹 Unloading all loaded extensions...");
+
+    if (window._loadedExtensions && window._loadedExtensions.length > 0) {
+      window._loadedExtensions.forEach((ext) => {
+        try {
+          console.log(`🧹 Unloading ${ext.name}...`);
+          ext.onunload();
+          console.log(`✅ ${ext.name} unloaded successfully`);
+        } catch (error) {
+          console.warn(`⚠️ Error unloading ${ext.name}:`, error);
+        }
+      });
+
+      window._loadedExtensions = [];
+      console.log("✅ All extensions unloaded");
+    } else {
+      console.log("ℹ️ No extensions to unload");
+    }
+  },
+
+  // 📊 Status check for loaded extensions
+  checkLoadedExtensions() {
+    const loaded = window._loadedExtensions || [];
+    console.group("📊 Loaded Extensions Status");
+    console.log(`Total loaded: ${loaded.length}`);
+
+    if (loaded.length > 0) {
+      loaded.forEach((ext, index) => {
+        console.log(`${index + 1}. ${ext.name}`);
+      });
+    } else {
+      console.log("No extensions currently loaded");
+    }
+
+    // Check for visible extension features
+    const features = {
+      "Directory Button": document.querySelector(".user-directory-nav-button"),
+      "Extension Registry": window.RoamExtensionSuite,
+      "Debug Interface": document.querySelector("#extension-debug-interface"),
+      "Auto-loader Dashboard": document.querySelector("#extension-auto-loader"),
+    };
+
+    console.log("\n🔍 Visible Extension Features:");
+    Object.entries(features).forEach(([name, element]) => {
+      console.log(
+        `${element ? "✅" : "❌"} ${name}: ${element ? "Present" : "Not found"}`
+      );
+    });
+
+    console.groupEnd();
+
+    return { loaded, features };
   },
 };
 
