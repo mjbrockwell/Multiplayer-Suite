@@ -329,7 +329,7 @@ const discoverExtensionFiles = async () => {
     const extensionDirs = srcContents.filter(
       (item) =>
         item.type === "dir" &&
-        /^\d+[-\w]+/.test(item.name) &&
+        /^\d+[.\-\w]+/.test(item.name) && // FIXED: Added dot to regex
         item.name !== "0.5-autoloader"
     );
 
