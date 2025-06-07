@@ -12,12 +12,12 @@
 const DEVELOPMENT_MODE = true; // ← Change this to switch branches
 const BRANCH = DEVELOPMENT_MODE ? "dev" : "main";
 
-// 🌐 GitHub Configuration
+// 🌐 GitHub Configuration - FIXED: Correct repo details
 const GITHUB_CONFIG = {
-  username: "mattbrockwell",
-  repository: "roam-extension-suite",
+  username: "mjbrockwell",
+  repository: "Multiplayer-Suite",
   branch: BRANCH,
-  baseUrl: `https://raw.githubusercontent.com/mattbrockwell/roam-extension-suite/${BRANCH}/`,
+  baseUrl: `https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/${BRANCH}/src/`,
 };
 
 // 📦 Extension Loading Order (CRITICAL: Maintain dependency order!)
@@ -292,14 +292,64 @@ const updateDashboard = (extensions, currentIndex, status = "loading") => {
         background: #fef2f2;
         border: 1px solid #f87171;
         border-radius: 6px;
-        text-align: center;
       ">
-        <div style="font-size: 14px; font-weight: 600; color: #dc2626; margin-bottom: 4px;">
+        <div style="font-size: 14px; font-weight: 600; color: #dc2626; margin-bottom: 8px;">
           ⚠️ Loading Issues Detected
         </div>
-        <div style="font-size: 12px; color: #dc2626;">
-          Some extensions may not have loaded properly. Check console for details.
+        <div style="font-size: 12px; color: #dc2626; margin-bottom: 8px;">
+          Some extensions may not have loaded properly. Check debug info below.
         </div>
+        
+        <details style="margin-top: 8px;">
+          <summary style="cursor: pointer; font-size: 12px; font-weight: 600; color: #dc2626;">
+            🔍 Debug Information (Click to expand)
+          </summary>
+          <div style="margin-top: 8px; padding: 8px; background: white; border-radius: 4px; font-family: 'SF Mono', Monaco, monospace; font-size: 11px;">
+            <div style="margin-bottom: 8px;">
+              <strong>GitHub Configuration:</strong><br>
+              Username: ${GITHUB_CONFIG.username}<br>
+              Repository: ${GITHUB_CONFIG.repository}<br>
+              Branch: ${GITHUB_CONFIG.branch}<br>
+              Base URL: ${GITHUB_CONFIG.baseUrl}
+            </div>
+            
+            <div style="margin-bottom: 8px;">
+              <strong>Extension URLs Being Attempted:</strong>
+            </div>
+            
+            ${extensions
+              .map(
+                (ext) => `
+              <div style="margin-bottom: 4px; padding: 4px; background: #f8f9fa; border-radius: 2px;">
+                <div style="font-weight: 600; color: #374151;">${ext.name}:</div>
+                <div style="color: #6b7280; word-break: break-all;">
+                  ${GITHUB_CONFIG.baseUrl}${ext.filename}
+                </div>
+              </div>
+            `
+              )
+              .join("")}
+            
+            <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;">
+              <button onclick="navigator.clipboard.writeText(\`${extensions
+                .map((ext) => GITHUB_CONFIG.baseUrl + ext.filename)
+                .join("\\n")}\`)" style="
+                background: #137cbd;
+                color: white;
+                border: none;
+                border-radius: 3px;
+                padding: 4px 8px;
+                cursor: pointer;
+                font-size: 11px;
+              ">
+                📋 Copy All URLs
+              </button>
+              <span style="margin-left: 8px; font-size: 10px; color: #666;">
+                Copy URLs to test manually in browser
+              </span>
+            </div>
+          </div>
+        </details>
       </div>
     `
         : ""
@@ -539,24 +589,54 @@ const validateConfiguration = () => {
 };
 
 /**
- * Test GitHub connectivity
+ * Quick diagnostic function to test GitHub configuration
  */
-const testGitHubConnectivity = async () => {
+const runGitHubDiagnostics = async () => {
+  console.group("🔍 GitHub Configuration Diagnostics");
+
+  console.log("📋 Configuration:");
+  console.log(`  Username: ${GITHUB_CONFIG.username}`);
+  console.log(`  Repository: ${GITHUB_CONFIG.repository}`);
+  console.log(`  Branch: ${GITHUB_CONFIG.branch}`);
+  console.log(`  Base URL: ${GITHUB_CONFIG.baseUrl}`);
+
+  console.log("\n📦 Extension URLs:");
+  EXTENSION_SUITE.forEach((ext) => {
+    const fullUrl = GITHUB_CONFIG.baseUrl + ext.filename;
+    console.log(`  ${ext.name}: ${fullUrl}`);
+  });
+
+  console.log("\n🧪 Testing first extension URL...");
   try {
-    const testUrl = GITHUB_CONFIG.baseUrl + "README.md"; // Or any file you know exists
+    const testUrl = GITHUB_CONFIG.baseUrl + EXTENSION_SUITE[0].filename;
     const response = await fetch(testUrl, { method: "HEAD" });
 
     if (response.ok) {
-      console.log("✅ GitHub connectivity test passed");
-      return true;
+      console.log("✅ First extension URL is accessible");
+      console.log("💡 GitHub configuration appears correct");
     } else {
-      console.warn(`⚠️ GitHub connectivity test failed: ${response.status}`);
-      return false;
+      console.log(
+        `❌ First extension URL returned: ${response.status} ${response.statusText}`
+      );
+      console.log("💡 Check repository name, branch, and file paths");
     }
   } catch (error) {
-    console.error("❌ GitHub connectivity test failed:", error);
-    return false;
+    console.log(`❌ Network error: ${error.message}`);
+    console.log("💡 Check internet connection and repository access");
   }
+
+  console.log("\n📋 Copy URLs for manual testing:");
+  const allUrls = EXTENSION_SUITE.map(
+    (ext) => GITHUB_CONFIG.baseUrl + ext.filename
+  ).join("\n");
+  console.log(allUrls);
+
+  console.groupEnd();
+
+  return {
+    config: GITHUB_CONFIG,
+    urls: EXTENSION_SUITE.map((ext) => GITHUB_CONFIG.baseUrl + ext.filename),
+  };
 };
 
 /**
@@ -600,8 +680,9 @@ export default {
         return;
       }
 
-      // Test connectivity (optional - don't fail if this doesn't work)
-      await testGitHubConnectivity();
+      // Test connectivity and configuration
+      console.log("🔍 Running GitHub diagnostics...");
+      await runGitHubDiagnostics();
 
       // Wait a moment for Roam to settle
       console.log("⏳ Waiting for Roam to settle before loading extensions...");
@@ -637,6 +718,17 @@ export default {
     // Clean up dashboard
     const dashboard = document.getElementById("extension-auto-loader");
     if (dashboard) dashboard.remove();
+
+    // Clean up commands
+    if (window._extensionRegistry && window._extensionRegistry.commands) {
+      window._extensionRegistry.commands.forEach((label) => {
+        try {
+          window.roamAlphaAPI.ui.commandPalette.removeCommand({ label });
+        } catch (error) {
+          console.warn(`Failed to remove command "${label}":`, error);
+        }
+      });
+    }
 
     // Note: We don't unload the other extensions here since they manage their own lifecycle
     // The auto-loader's job is just to load them, not manage them ongoing
