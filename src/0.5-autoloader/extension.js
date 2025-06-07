@@ -20,46 +20,9 @@ const GITHUB_CONFIG = {
   baseUrl: `https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/${BRANCH}/`,
 };
 
-// 📦 Extension Loading Order - FIXED: Correct file paths
-// Based on your actual repository structure
-const EXTENSION_SUITE = [
-  {
-    id: "foundation-registry",
-    name: "Foundation Registry",
-    filename:
-      "Extension 1: Foundation Registry - Professional Architecture.txt",
-    description: "Professional lifecycle management and cleanup registry",
-    critical: true,
-  },
-  {
-    id: "utility-library",
-    name: "Enhanced Utility Library",
-    filename: "extension.js", // This should be the 1.5 utilities file
-    description: "Cross-cutting utilities with universal data parsing",
-    critical: true,
-  },
-  {
-    id: "user-authentication",
-    name: "User Authentication",
-    filename: "extension.js", // This should be the user auth file
-    description: "Professional user session management",
-    critical: true,
-  },
-  {
-    id: "configuration-manager",
-    name: "Configuration Manager",
-    filename: "extension.js", // This should be the config manager file
-    description: "Professional settings with validation workflows",
-    critical: false,
-  },
-  {
-    id: "user-directory",
-    name: "User Directory + Timezones",
-    filename: "extension.js", // This should be the user directory file
-    description: "Enhanced user profiles with timezone intelligence",
-    critical: false,
-  },
-];
+// 📦 Extension Loading Order - DYNAMIC: Will be discovered from src/ directory
+// Extensions will be loaded in numerical order: 1, 1.5, 2, 3, etc.
+const EXTENSION_SUITE = []; // Will be populated by discovery
 
 // ===================================================================
 // 🔍 ENHANCED GITHUB DIAGNOSTICS - Better Debugging
@@ -201,56 +164,88 @@ const runEnhancedGitHubDiagnostics = async () => {
 // ===================================================================
 
 /**
- * Discover actual extension files in the repository
+ * Discover extension files in the src/ directory structure
  */
 const discoverExtensionFiles = async () => {
-  console.log("🔍 Discovering actual extension files in repository...");
+  console.log("🔍 Discovering extension files in src/ directory...");
 
   try {
-    const contentsUrl = `https://api.github.com/repos/${GITHUB_CONFIG.username}/${GITHUB_CONFIG.repository}/contents?ref=${GITHUB_CONFIG.branch}`;
-    const response = await fetch(contentsUrl);
+    // First, get contents of src/ directory
+    const srcUrl = `https://api.github.com/repos/${GITHUB_CONFIG.username}/${GITHUB_CONFIG.repository}/contents/src?ref=${GITHUB_CONFIG.branch}`;
+    const srcResponse = await fetch(srcUrl);
 
-    if (!response.ok) {
-      throw new Error(
-        `Failed to fetch repository contents: ${response.status}`
-      );
+    if (!srcResponse.ok) {
+      throw new Error(`Failed to fetch src/ directory: ${srcResponse.status}`);
     }
 
-    const contents = await response.json();
+    const srcContents = await srcResponse.json();
 
-    // Look for extension files
-    const extensionFiles = contents.filter(
+    // Look for numbered extension directories (like 1-core-infrastructure, 2-user-authentication, etc.)
+    const extensionDirs = srcContents.filter(
       (item) =>
-        (item.name.toLowerCase().includes("extension") &&
-          item.name.endsWith(".js")) ||
-        (item.name.toLowerCase().includes("extension") &&
-          item.name.endsWith(".txt"))
+        item.type === "dir" &&
+        /^\d+[-\w]+/.test(item.name) && // Starts with number and has descriptive name
+        item.name !== "0.5-autoloader" // Skip the autoloader itself
     );
 
-    console.log(`📦 Found ${extensionFiles.length} potential extension files:`);
-    extensionFiles.forEach((file, index) => {
-      console.log(`   ${index + 1}. ${file.name} (${file.size} bytes)`);
+    console.log(
+      `📁 Found ${extensionDirs.length} extension directories in src/:`
+    );
+    extensionDirs.forEach((dir, index) => {
+      console.log(`   ${index + 1}. ${dir.name}/`);
     });
 
-    // Create updated extension suite based on actual files
-    const discoveredExtensions = extensionFiles.map((file, index) => {
-      const name = file.name
-        .replace(/\.js$|\.txt$/, "")
-        .replace(/extension/gi, "")
-        .trim();
-      const isCritical =
-        name.toLowerCase().includes("foundation") ||
-        name.toLowerCase().includes("registry") ||
-        name.toLowerCase().includes("utility");
+    // Check each directory for extension.js
+    const discoveredExtensions = [];
 
-      return {
-        id: `extension-${index + 1}`,
-        name: name || `Extension ${index + 1}`,
-        filename: file.name,
-        description: `Auto-discovered: ${file.name}`,
-        critical: isCritical,
-      };
-    });
+    for (const dir of extensionDirs) {
+      try {
+        // Check if extension.js exists in this directory
+        const dirUrl = `https://api.github.com/repos/${GITHUB_CONFIG.username}/${GITHUB_CONFIG.repository}/contents/src/${dir.name}?ref=${GITHUB_CONFIG.branch}`;
+        const dirResponse = await fetch(dirUrl);
+
+        if (dirResponse.ok) {
+          const dirContents = await dirResponse.json();
+          const extensionFile = dirContents.find(
+            (file) => file.name === "extension.js"
+          );
+
+          if (extensionFile) {
+            // Parse directory name to create nice extension info
+            const dirParts = dir.name.split("-");
+            const extensionNumber = dirParts[0];
+            const extensionName = dirParts
+              .slice(1)
+              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(" ");
+
+            const isCritical = ["1", "1.5", "2"].includes(extensionNumber); // Core infrastructure is critical
+
+            discoveredExtensions.push({
+              id: dir.name,
+              name: `Extension ${extensionNumber}: ${extensionName}`,
+              filename: `src/${dir.name}/extension.js`,
+              description: `${extensionName} (from ${dir.name}/)`,
+              critical: isCritical,
+              order: parseFloat(extensionNumber), // For sorting
+            });
+
+            console.log(`   ✅ Found extension.js in ${dir.name}/`);
+          } else {
+            console.log(`   ⚠️  No extension.js in ${dir.name}/`);
+          }
+        }
+      } catch (error) {
+        console.warn(`   ❌ Error checking ${dir.name}/: ${error.message}`);
+      }
+    }
+
+    // Sort by extension number for proper loading order
+    discoveredExtensions.sort((a, b) => a.order - b.order);
+
+    console.log(
+      `🎯 Successfully discovered ${discoveredExtensions.length} extensions with proper loading order`
+    );
 
     return discoveredExtensions;
   } catch (error) {
@@ -355,34 +350,52 @@ const updateDashboardWithDiscovery = (discoveredExtensions) => {
     </div>
 
     <div style="max-height: 300px; overflow-y: auto;">
-      ${discoveredExtensions
-        .map(
-          (ext, index) => `
+      ${
+        discoveredExtensions.length === 0
+          ? `
+        <div style="text-align: center; padding: 20px; color: #666;">
+          <div style="font-size: 14px; margin-bottom: 8px;">📂 No extensions found</div>
+          <div style="font-size: 12px;">
+            Looking for numbered directories in src/ with extension.js files
+          </div>
+        </div>
+      `
+          : discoveredExtensions
+              .map(
+                (ext, index) => `
         <div style="
           display: flex;
           align-items: center;
           gap: 10px;
-          padding: 8px 0;
+          padding: 8px 12px;
           border-bottom: 1px solid #f1f5f9;
+          ${ext.critical ? "background: #fef3c7;" : ""}
         ">
-          <span style="font-size: 14px;">${ext.critical ? "🔥" : "📄"}</span>
+          <span style="
+            font-size: 16px; 
+            min-width: 24px; 
+            text-align: center;
+            font-weight: bold;
+            color: ${ext.critical ? "#92400e" : "#374151"};
+          ">${ext.order}</span>
           <div style="flex: 1;">
             <div style="font-size: 13px; font-weight: 500; color: #374151;">
               ${ext.name}
             </div>
             <div style="font-size: 11px; color: #666; margin-top: 2px;">
-              ${ext.filename}
+              📁 ${ext.filename}
             </div>
           </div>
           ${
             ext.critical
-              ? '<span style="font-size: 10px; background: #fef3c7; color: #92400e; padding: 2px 6px; border-radius: 8px; font-weight: 500;">CRITICAL</span>'
+              ? '<span style="font-size: 10px; background: #92400e; color: white; padding: 2px 6px; border-radius: 8px; font-weight: 500;">CRITICAL</span>'
               : ""
           }
         </div>
       `
-        )
-        .join("")}
+              )
+              .join("")
+      }
     </div>
 
     <div style="margin-top: 16px; display: flex; gap: 8px;">
@@ -506,7 +519,11 @@ window.extensionAutoLoader = {
     }
 
     console.log(
-      `🚀 Loading ${this.discoveredExtensions.length} discovered extensions...`
+      `🚀 Loading ${this.discoveredExtensions.length} discovered extensions in proper order...`
+    );
+    console.log(
+      "📊 Loading order:",
+      this.discoveredExtensions.map((e) => `${e.order}: ${e.name}`)
     );
 
     const results = {
@@ -514,16 +531,32 @@ window.extensionAutoLoader = {
       failed: [],
     };
 
-    for (const extension of this.discoveredExtensions) {
+    // Load extensions in order (already sorted by discovery function)
+    for (let i = 0; i < this.discoveredExtensions.length; i++) {
+      const extension = this.discoveredExtensions[i];
+
       try {
+        console.log(
+          `🔄 [${i + 1}/${this.discoveredExtensions.length}] Loading ${
+            extension.name
+          }...`
+        );
         await loadRemoteExtension(extension);
         results.successful.push(extension);
 
-        // Small delay between extensions
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        // Longer delay for critical extensions to ensure proper initialization
+        const delay = extension.critical ? 1000 : 500;
+        await new Promise((resolve) => setTimeout(resolve, delay));
       } catch (error) {
         console.error(`❌ Failed to load ${extension.name}:`, error.message);
         results.failed.push({ extension, error: error.message });
+
+        // For critical extensions, this could break the chain
+        if (extension.critical) {
+          console.warn(
+            `💥 CRITICAL EXTENSION FAILED: ${extension.name} - other extensions may not work properly`
+          );
+        }
       }
     }
 
@@ -536,14 +569,28 @@ window.extensionAutoLoader = {
     if (results.successful.length > 0) {
       console.log(
         "✅ Successfully loaded:",
-        results.successful.map((e) => e.name)
+        results.successful.map((e) => `${e.order}: ${e.name}`)
       );
     }
 
     if (results.failed.length > 0) {
       console.log(
         "❌ Failed to load:",
-        results.failed.map((f) => f.extension.name)
+        results.failed.map((f) => `${f.extension.order}: ${f.extension.name}`)
+      );
+    }
+
+    // Show final status
+    const criticalFailed = results.failed.filter(
+      (f) => f.extension.critical
+    ).length;
+    if (criticalFailed === 0 && results.successful.length > 0) {
+      console.log(
+        "🎉 Extension suite loaded successfully! All critical extensions operational."
+      );
+    } else if (criticalFailed > 0) {
+      console.warn(
+        `⚠️ ${criticalFailed} critical extension(s) failed - suite may not function properly`
       );
     }
 
