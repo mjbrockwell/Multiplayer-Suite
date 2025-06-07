@@ -154,8 +154,8 @@ const timezoneManager = new TimezoneManager();
 // ===================================================================
 
 /**
- * 🔍 CORE FUNCTION: Analyze My Info:: structure completeness
- * (Integrated from auto-completion sandbox)
+ * 🔍 CORE FUNCTION: Analyze My Info:: structure completeness with LOGIC GATES
+ * Enhanced to prevent duplicate field creation
  */
 const analyzeMyInfoStructure = (username) => {
   try {
@@ -199,7 +199,6 @@ const analyzeMyInfoStructure = (username) => {
     }
 
     const myInfoBlockUid = myInfoBlock[0];
-    console.log(`✅ Found My Info:: block: ${myInfoBlockUid}`);
 
     // Define expected field categories
     const expectedFields = [
@@ -210,7 +209,7 @@ const analyzeMyInfoStructure = (username) => {
       "About Me::",
     ];
 
-    // Get all children of My Info:: block
+    // 🚪 LOGIC GATE: Get ALL children and detect duplicates
     const myInfoChildren = window.roamAlphaAPI.data
       .q(
         `
@@ -225,30 +224,48 @@ const analyzeMyInfoStructure = (username) => {
       )
       .sort((a, b) => a[2] - b[2]); // Sort by order
 
-    console.log(`📊 Found ${myInfoChildren.length} children under My Info::`);
+    // 🚪 LOGIC GATE: Create field occurrence map to detect duplicates
+    const fieldOccurrences = {};
+    expectedFields.forEach((field) => {
+      fieldOccurrences[field] = myInfoChildren.filter(
+        ([uid, text]) => text.trim() === field
+      );
+    });
 
-    // Analyze each expected field
+    // 🚪 LOGIC GATE: Analyze each expected field (only first occurrence)
     const fieldAnalysis = {};
     const missingFields = [];
     const emptyFields = [];
+    const duplicateFields = [];
 
     expectedFields.forEach((fieldName) => {
-      const fieldBlock = myInfoChildren.find(
-        ([uid, text]) => text.trim() === fieldName
-      );
+      const occurrences = fieldOccurrences[fieldName];
 
-      if (!fieldBlock) {
+      if (occurrences.length === 0) {
+        // Field is completely missing
         missingFields.push(fieldName);
         fieldAnalysis[fieldName] = {
           exists: false,
           hasChildren: false,
           children: [],
           status: "missing",
+          duplicates: 0,
         };
       } else {
-        const fieldBlockUid = fieldBlock[0];
+        // Field exists - use FIRST occurrence only
+        const firstOccurrence = occurrences[0];
+        const fieldBlockUid = firstOccurrence[0];
 
-        // Check if field has children (default values)
+        // Track duplicates
+        if (occurrences.length > 1) {
+          duplicateFields.push({
+            fieldName,
+            count: occurrences.length,
+            duplicateUids: occurrences.slice(1).map(([uid]) => uid),
+          });
+        }
+
+        // Check if field has children (values)
         const fieldChildren = window.roamAlphaAPI.data.q(`
           [:find ?grandchildUid ?grandchildString
            :where 
@@ -264,7 +281,7 @@ const analyzeMyInfoStructure = (username) => {
           emptyFields.push({
             fieldName,
             fieldBlockUid,
-            fieldOrder: fieldBlock[2],
+            fieldOrder: firstOccurrence[2],
           });
         }
 
@@ -274,6 +291,7 @@ const analyzeMyInfoStructure = (username) => {
           children: fieldChildren.map(([uid, text]) => text),
           blockUid: fieldBlockUid,
           status: hasChildren ? "complete" : "empty",
+          duplicates: occurrences.length - 1,
         };
       }
     });
@@ -284,6 +302,15 @@ const analyzeMyInfoStructure = (username) => {
         100
     );
 
+    // 🚪 LOGIC GATE: Only need healing if truly missing/empty AND no duplicates causing issues
+    const hasDuplicates = duplicateFields.length > 0;
+    const needsAutoCompletion =
+      (missingFields.length > 0 || emptyFields.length > 0) && !hasDuplicates;
+
+    if (hasDuplicates) {
+      console.warn(`⚠️ Duplicates detected for ${username}:`, duplicateFields);
+    }
+
     return {
       username,
       userPageExists: true,
@@ -292,9 +319,11 @@ const analyzeMyInfoStructure = (username) => {
       fieldAnalysis,
       missingFields,
       emptyFields,
+      duplicateFields,
       completenessScore,
-      needsAutoCompletion: missingFields.length > 0 || emptyFields.length > 0,
-      analysis: `${emptyFields.length} empty fields, ${missingFields.length} missing fields, ${completenessScore}% complete`,
+      needsAutoCompletion,
+      hasDuplicates,
+      analysis: `${emptyFields.length} empty fields, ${missingFields.length} missing fields, ${duplicateFields.length} duplicate field sets, ${completenessScore}% complete`,
     };
   } catch (error) {
     console.error(`❌ Error analyzing My Info:: for ${username}:`, error);
@@ -339,8 +368,8 @@ const generateSelfHealingDefaults = (username, currentUser) => {
 };
 
 /**
- * 🛠️ SELF-HEALING CORE: Auto-complete missing My Info:: fields
- * (Enhanced from auto-completion sandbox)
+ * 🛠️ SELF-HEALING CORE: Auto-complete missing My Info:: fields with LOGIC GATES
+ * Enhanced with duplicate prevention and proper healing logic
  */
 const performSelfHealing = async (username, options = {}) => {
   try {
@@ -348,8 +377,23 @@ const performSelfHealing = async (username, options = {}) => {
 
     const { dryRun = false, force = false } = options;
 
-    // Analyze current structure
+    // 🚪 LOGIC GATE: Analyze current structure with duplicate detection
     const analysis = analyzeMyInfoStructure(username);
+
+    // 🚪 LOGIC GATE: Don't heal if duplicates exist (prevent making it worse)
+    if (analysis.hasDuplicates && !force) {
+      console.warn(
+        `⚠️ Skipping healing for ${username} - duplicates detected:`,
+        analysis.duplicateFields
+      );
+      return {
+        success: false,
+        action: "skipped_due_to_duplicates",
+        duplicateFields: analysis.duplicateFields,
+        analysis: analysis,
+        message: "Healing skipped to prevent creating more duplicates",
+      };
+    }
 
     // Handle full creation if My Info:: doesn't exist
     if (analysis.needsFullCreation) {
@@ -373,7 +417,7 @@ const performSelfHealing = async (username, options = {}) => {
       }
     }
 
-    // Check if auto-completion is needed
+    // 🚪 LOGIC GATE: Check if auto-completion is actually needed
     if (!analysis.needsAutoCompletion && !force) {
       console.log(
         `✅ No self-healing needed for ${username} (${analysis.completenessScore}% complete)`
@@ -389,13 +433,18 @@ const performSelfHealing = async (username, options = {}) => {
     const currentUser = platform.getUtility("getAuthenticatedUser")();
     const defaultValues = generateSelfHealingDefaults(username, currentUser);
 
-    // Filter to only empty/missing fields
+    // 🚪 LOGIC GATE: Only heal truly missing or empty fields
     const fieldsToHeal = [
       ...analysis.missingFields.map((fieldName) => ({
         fieldName,
         status: "missing",
+        safe: true, // Missing fields are always safe to create
       })),
-      ...analysis.emptyFields.map((field) => ({ ...field, status: "empty" })),
+      ...analysis.emptyFields.map((field) => ({
+        ...field,
+        status: "empty",
+        safe: true, // Empty fields are safe to fill
+      })),
     ];
 
     if (fieldsToHeal.length === 0) {
@@ -416,7 +465,9 @@ const performSelfHealing = async (username, options = {}) => {
       console.log("🧪 DRY RUN - Would heal these fields:");
       fieldsToHeal.forEach((field) => {
         console.log(
-          `  ${field.fieldName} → "${defaultValues[field.fieldName]}"`
+          `  ${field.fieldName} (${field.status}) → "${
+            defaultValues[field.fieldName]
+          }"`
         );
       });
 
@@ -430,33 +481,61 @@ const performSelfHealing = async (username, options = {}) => {
       };
     }
 
-    // Perform actual self-healing
+    // 🚪 LOGIC GATE: Perform actual self-healing only for safe fields
     const healingResults = [];
 
     for (const field of fieldsToHeal) {
+      if (!field.safe) {
+        console.warn(`⚠️ Skipping unsafe field: ${field.fieldName}`);
+        continue;
+      }
+
       try {
         const defaultValue = defaultValues[field.fieldName];
         let success = false;
 
         if (field.status === "missing") {
-          // Create missing field completely
-          success = await createMyInfoField(
-            analysis.myInfoBlockUid,
-            field.fieldName,
-            defaultValue
+          // 🚪 LOGIC GATE: Double-check field doesn't exist before creating
+          const doubleCheckAnalysis = analyzeMyInfoStructure(username);
+          const stillMissing = doubleCheckAnalysis.missingFields.includes(
+            field.fieldName
           );
-          console.log(
-            `🔧 Created missing field ${field.fieldName}: "${defaultValue}"`
-          );
+
+          if (stillMissing) {
+            success = await createMyInfoField(
+              analysis.myInfoBlockUid,
+              field.fieldName,
+              defaultValue
+            );
+            console.log(
+              `🔧 Created missing field ${field.fieldName}: "${defaultValue}"`
+            );
+          } else {
+            console.log(`⏭️ Skipping ${field.fieldName} - no longer missing`);
+            success = true; // Consider this a success since field now exists
+          }
         } else if (field.status === "empty") {
-          // Add value to existing empty field
-          success = await addValueToEmptyField(
-            field.fieldBlockUid,
-            defaultValue
-          );
-          console.log(
-            `🔧 Healed empty field ${field.fieldName}: "${defaultValue}"`
-          );
+          // 🚪 LOGIC GATE: Verify field is still empty before adding value
+          const fieldChildren = window.roamAlphaAPI.data.q(`
+            [:find ?grandchildString
+             :where 
+             [?parent :block/uid "${field.fieldBlockUid}"]
+             [?parent :block/children ?grandchild]
+             [?grandchild :block/string ?grandchildString]]
+          `);
+
+          if (fieldChildren.length === 0) {
+            success = await addValueToEmptyField(
+              field.fieldBlockUid,
+              defaultValue
+            );
+            console.log(
+              `🔧 Healed empty field ${field.fieldName}: "${defaultValue}"`
+            );
+          } else {
+            console.log(`⏭️ Skipping ${field.fieldName} - no longer empty`);
+            success = true; // Consider this a success since field now has content
+          }
         }
 
         healingResults.push({
@@ -466,8 +545,8 @@ const performSelfHealing = async (username, options = {}) => {
           action: field.status === "missing" ? "created" : "healed",
         });
 
-        // Small delay between operations
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        // Small delay between operations to prevent race conditions
+        await new Promise((resolve) => setTimeout(resolve, 150));
       } catch (error) {
         console.error(`❌ Error healing ${field.fieldName}:`, error);
         healingResults.push({
@@ -641,29 +720,35 @@ const getUserProfileData = async (username, options = {}) => {
       };
     }
 
-    // 🧠 SELF-HEALING CHECK: Analyze structure
+    // 🧠 LOGIC GATE: Self-healing check with duplicate protection
     const analysis = analyzeMyInfoStructure(username);
 
     if (
-      analysis.needsFullCreation ||
-      (analysis.needsAutoCompletion && autoHeal)
+      (analysis.needsFullCreation ||
+        (analysis.needsAutoCompletion && autoHeal)) &&
+      !analysis.hasDuplicates
     ) {
-      console.log(`🛠️ Self-healing triggered for ${username}...`);
+      console.log(`🛠️ Auto-completion triggered for ${username}...`);
       const healingResult = await performSelfHealing(username);
 
       if (healingResult.success) {
-        console.log(`✅ Self-healing completed for ${username}`);
+        console.log(`✅ Auto-completion completed for ${username}`);
         // Re-analyze after healing
         const newAnalysis = analyzeMyInfoStructure(username);
         console.log(
-          `📊 Post-healing: ${newAnalysis.completenessScore}% complete`
+          `📊 Post-completion: ${newAnalysis.completenessScore}% complete`
         );
       } else {
         console.warn(
-          `⚠️ Self-healing failed for ${username}:`,
-          healingResult.error
+          `⚠️ Auto-completion result for ${username}:`,
+          healingResult.action,
+          healingResult.message || healingResult.error
         );
       }
+    } else if (analysis.hasDuplicates) {
+      console.warn(
+        `⚠️ Skipping auto-completion for ${username} - duplicates detected`
+      );
     }
 
     // Get My Info data (after potential self-healing)
@@ -882,8 +967,8 @@ const showUserDirectoryModal = async () => {
 
     content.innerHTML = `
       <div style="padding: 40px; text-align: center;">
-        <div style="font-size: 16px; color: #666;">Loading self-healing user directory...</div>
-        <div style="margin-top: 10px; font-size: 14px; color: #999;">🛠️ Auto-completing missing My Info:: fields</div>
+        <div style="font-size: 16px; color: #666;">Loading user directory...</div>
+        <div style="margin-top: 10px; font-size: 14px; color: #999;">Enhanced My Info:: processing</div>
       </div>
     `;
 
@@ -921,11 +1006,11 @@ const showUserDirectoryModal = async () => {
       ">
         <div>
           <h2 style="margin: 0; font-size: 20px; font-weight: 600; color: #1a202c;">
-            🛠️ Self-Healing User Directory
+            👥 User Directory
           </h2>
           <div style="margin-top: 4px; font-size: 14px; color: #666;">
             ${profiles.length} graph members • ${
-      healedCount > 0 ? `${healedCount} profiles auto-healed • ` : ""
+      healedCount > 0 ? `${healedCount} profiles auto-completed • ` : ""
     }Updated ${new Date().toLocaleTimeString()}
           </div>
         </div>
@@ -985,7 +1070,7 @@ const showUserDirectoryModal = async () => {
         color: #666;
         text-align: center;
       ">
-        🛠️ Self-Healing: Auto-completes missing My Info:: fields • Uses Roam's user images • "__this field is not yet filled__" boilerplate • Real-time timezone updates
+        💡 Enhanced: Auto-completes missing My Info:: fields • Uses Roam user images • Real-time timezone updates
       </div>
     `;
 
@@ -1184,36 +1269,35 @@ const addNavigationButtons = () => {
 
     const directoryButton = document.createElement("button");
     directoryButton.className = "user-directory-nav-button";
-    directoryButton.textContent = "🛠️ Self-Healing Directory";
+    directoryButton.textContent = "👥 Show Directory";
     directoryButton.style.cssText = `
       position: absolute;
       top: 10px;
       left: 10px;
       z-index: 9999;
-      background: linear-gradient(135deg, #ecfdf5 0%, #10b981 100%);
-      color: #065f46;
-      border: 1px solid #10b981;
+      background: linear-gradient(135deg, #fef3c7 0%, #fbbf24 100%);
+      color: #92400e;
+      border: 1px solid #f59e0b;
       border-radius: 8px;
       padding: 10px 16px;
       cursor: pointer;
       font-size: 14px;
       font-weight: 600;
-      box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
+      box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);
       transition: all 0.2s ease;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     `;
 
     directoryButton.addEventListener("click", showUserDirectoryModal);
 
     directoryButton.addEventListener("mouseenter", () => {
       directoryButton.style.background =
-        "linear-gradient(135deg, #d1fae5 0%, #059669 100%)";
+        "linear-gradient(135deg, #fde68a 0%, #f59e0b 100%)";
       directoryButton.style.transform = "translateY(-1px)";
     });
 
     directoryButton.addEventListener("mouseleave", () => {
       directoryButton.style.background =
-        "linear-gradient(135deg, #ecfdf5 0%, #10b981 100%)";
+        "linear-gradient(135deg, #fef3c7 0%, #fbbf24 100%)";
       directoryButton.style.transform = "translateY(0)";
     });
 
@@ -1421,7 +1505,7 @@ const showSelfHealingStatus = async () => {
 
 export default {
   onload: async ({ extensionAPI }) => {
-    console.log("🛠️ Self-Healing User Directory + Timezones starting...");
+    console.log("👥 Enhanced User Directory + Timezones starting...");
 
     if (!window.RoamExtensionSuite) {
       console.error(
@@ -1492,66 +1576,66 @@ export default {
       platform.registerUtility(name, service);
     });
 
-    // 📝 REGISTER SELF-HEALING COMMANDS
+    // 📝 REGISTER ENHANCED COMMANDS
     const commands = [
       {
-        label: "Self-Healing: Show Directory",
+        label: "Directory: Show User Directory",
         callback: showUserDirectoryModal,
       },
       {
-        label: "Self-Healing: Heal My Profile",
+        label: "Directory: Auto-Complete My Profile",
         callback: async () => {
           const currentUser = platform.getUtility("getAuthenticatedUser")();
           if (currentUser) {
-            console.log(`🛠️ Self-healing ${currentUser.displayName}...`);
+            console.log(`🛠️ Auto-completing ${currentUser.displayName}...`);
             const result = await performSelfHealing(currentUser.displayName);
             if (result.success) {
               console.log(
-                `✅ Self-healing completed: ${
+                `✅ Auto-completion completed: ${
                   result.successCount || 0
-                } fields healed`
+                } fields completed`
               );
             } else {
               console.log(
-                `❌ Self-healing failed: ${result.error || result.action}`
+                `ℹ️ Auto-completion result: ${result.action} ${
+                  result.message || result.error || ""
+                }`
               );
             }
           }
         },
       },
       {
-        label: "Self-Healing: Analyze My Profile",
+        label: "Directory: Analyze My Profile Completeness",
         callback: () => {
           const currentUser = platform.getUtility("getAuthenticatedUser")();
           if (currentUser) {
             const analysis = analyzeMyInfoStructure(currentUser.displayName);
-            console.group(
-              `🔍 Self-Healing Analysis: ${currentUser.displayName}`
-            );
+            console.group(`🔍 Profile Analysis: ${currentUser.displayName}`);
             console.log("Analysis result:", analysis);
             console.groupEnd();
           }
         },
       },
       {
-        label: "Self-Healing: Force Heal All Users",
+        label: "Directory: Auto-Complete All Users",
         callback: async () => {
           const confirmed = confirm(
-            "⚠️ This will force self-healing for ALL graph members. Continue?"
+            "⚠️ This will auto-complete My Info:: for ALL graph members. Continue?"
           );
           if (confirmed) {
-            console.log("🛠️ Force self-healing all users...");
+            console.log("🛠️ Auto-completing all users...");
             await getAllUserProfiles({ autoHeal: true });
-            console.log("✅ Batch self-healing completed!");
+            console.log("✅ Batch auto-completion completed!");
           }
         },
       },
       {
-        label: "Self-Healing: Run System Tests",
+        label: "Directory: Run System Tests",
         callback: runSelfHealingTests,
       },
       {
-        label: "Self-Healing: Show System Status",
+        label: "Directory: Show System Status",
         callback: showSelfHealingStatus,
       },
     ];
@@ -1594,13 +1678,13 @@ export default {
       {
         services: selfHealingServices,
         timezoneManager: timezoneManager,
-        version: "6.3.0",
+        version: "6.3.1",
       },
       {
-        name: "Self-Healing User Directory + Timezones",
+        name: "Enhanced User Directory + Timezones",
         description:
-          "Auto-completing My Info:: structures with intelligent defaults and boilerplate handling",
-        version: "6.3.0",
+          "Auto-completing My Info:: structures with intelligent defaults and logic gates",
+        version: "6.3.1",
         dependencies: requiredDependencies,
       }
     );
@@ -1609,33 +1693,25 @@ export default {
     const currentUser = platform.getUtility("getAuthenticatedUser")();
     const memberCount = platform.getUtility("getGraphMemberCount")();
 
-    console.log(
-      "✅ Self-Healing User Directory + Timezones loaded successfully!"
-    );
-    console.log("🛠️ NEW: Auto-completion sandbox integration");
-    console.log("🛠️ NEW: Self-healing My Info:: structures");
-    console.log(
-      "🛠️ NEW: Boilerplate '__this field is not yet filled__' handling"
-    );
-    console.log("🛠️ NEW: Roam user image integration for avatars");
-    console.log("🛠️ NEW: Page navigation self-healing triggers");
-    console.log(
-      `🫂 Self-healing directory ready for ${memberCount} graph members`
-    );
+    console.log("✅ Enhanced User Directory + Timezones loaded successfully!");
+    console.log("🔧 FIXED: Logic gates prevent duplicate creation");
+    console.log("🔧 FIXED: Button styling restored to warm yellow");
+    console.log("🔧 FIXED: Uses standard Roam font");
+    console.log(`👥 Directory ready for ${memberCount} graph members`);
     console.log(
       `🕐 Timezone support: ${
         timezoneManager.getCommonTimezones().length
       } common timezones`
     );
-    console.log('💡 Try: Cmd+P → "Self-Healing: Show Directory"');
+    console.log('💡 Try: Cmd+P → "Directory: Show User Directory"');
 
     console.log(
-      `🛠️ Current user: ${currentUser.displayName} (auto-healing will trigger as needed)`
+      `👤 Current user: ${currentUser.displayName} (auto-completion available as needed)`
     );
   },
 
   onunload: () => {
-    console.log("🛠️ Self-Healing User Directory + Timezones unloading...");
+    console.log("👥 Enhanced User Directory + Timezones unloading...");
 
     // Clean up navigation buttons
     document
@@ -1648,6 +1724,6 @@ export default {
     );
     modals.forEach((modal) => modal.remove());
 
-    console.log("✅ Self-Healing User Directory + Timezones cleanup complete!");
+    console.log("✅ Enhanced User Directory + Timezones cleanup complete!");
   },
 };
