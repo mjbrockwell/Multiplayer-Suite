@@ -1,8 +1,7 @@
 // ===================================================================
-// Extension 6: User Directory + Timezones - SYNTAX FIXED
-// FIXED: All template literal syntax errors resolved
-// FIXED: Button placement using sandbox-confirmed multi-selector approach
-// FIXED: Enhanced My Info:: auto-completion with all 5 fields
+// Extension 6: User Directory + Timezones - SELF-HEALING EDITION
+// ENHANCED: Auto-completion sandbox integration for self-healing profiles
+// Auto-completes missing "My Info::" fields with intelligent defaults
 // ===================================================================
 
 // ===================================================================
@@ -151,14 +150,477 @@ class TimezoneManager {
 const timezoneManager = new TimezoneManager();
 
 // ===================================================================
-// 👥 ENHANCED USER PROFILE DATA COLLECTION - FIXED My Info:: Processing
+// 🧠 SELF-HEALING PROFILE ANALYSIS - From Auto-Completion Sandbox
 // ===================================================================
 
 /**
- * 🔧 FIXED: Enhanced getUserProfileData with flexible field name handling
+ * 🔍 CORE FUNCTION: Analyze My Info:: structure completeness
+ * (Integrated from auto-completion sandbox)
  */
-const getUserProfileData = async (username) => {
+const analyzeMyInfoStructure = (username) => {
   try {
+    console.log(`🔍 Analyzing My Info:: structure for ${username}...`);
+
+    const platform = window.RoamExtensionSuite;
+    const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
+
+    const userPageUid = getPageUidByTitle(username);
+    if (!userPageUid) {
+      return {
+        username,
+        userPageExists: false,
+        myInfoExists: false,
+        analysis: `User page "${username}" not found`,
+      };
+    }
+
+    // Find My Info:: parent block
+    const myInfoQuery = window.roamAlphaAPI.data.q(`
+      [:find ?uid ?string
+       :where 
+       [?parent :block/uid "${userPageUid}"]
+       [?parent :block/children ?child]
+       [?child :block/uid ?uid]
+       [?child :block/string ?string]]
+    `);
+
+    const myInfoBlock = myInfoQuery.find(
+      ([uid, text]) => text.trim() === "My Info::"
+    );
+
+    if (!myInfoBlock) {
+      return {
+        username,
+        userPageExists: true,
+        myInfoExists: false,
+        analysis: "My Info:: parent block not found",
+        needsFullCreation: true,
+      };
+    }
+
+    const myInfoBlockUid = myInfoBlock[0];
+    console.log(`✅ Found My Info:: block: ${myInfoBlockUid}`);
+
+    // Define expected field categories
+    const expectedFields = [
+      "Avatar::",
+      "Location::",
+      "Role::",
+      "Timezone::",
+      "About Me::",
+    ];
+
+    // Get all children of My Info:: block
+    const myInfoChildren = window.roamAlphaAPI.data
+      .q(
+        `
+      [:find ?childUid ?childString ?childOrder
+       :where 
+       [?parent :block/uid "${myInfoBlockUid}"]
+       [?parent :block/children ?child]
+       [?child :block/uid ?childUid]
+       [?child :block/string ?childString]
+       [?child :block/order ?childOrder]]
+    `
+      )
+      .sort((a, b) => a[2] - b[2]); // Sort by order
+
+    console.log(`📊 Found ${myInfoChildren.length} children under My Info::`);
+
+    // Analyze each expected field
+    const fieldAnalysis = {};
+    const missingFields = [];
+    const emptyFields = [];
+
+    expectedFields.forEach((fieldName) => {
+      const fieldBlock = myInfoChildren.find(
+        ([uid, text]) => text.trim() === fieldName
+      );
+
+      if (!fieldBlock) {
+        missingFields.push(fieldName);
+        fieldAnalysis[fieldName] = {
+          exists: false,
+          hasChildren: false,
+          children: [],
+          status: "missing",
+        };
+      } else {
+        const fieldBlockUid = fieldBlock[0];
+
+        // Check if field has children (default values)
+        const fieldChildren = window.roamAlphaAPI.data.q(`
+          [:find ?grandchildUid ?grandchildString
+           :where 
+           [?parent :block/uid "${fieldBlockUid}"]
+           [?parent :block/children ?grandchild]
+           [?grandchild :block/uid ?grandchildUid]
+           [?grandchild :block/string ?grandchildString]]
+        `);
+
+        const hasChildren = fieldChildren.length > 0;
+
+        if (!hasChildren) {
+          emptyFields.push({
+            fieldName,
+            fieldBlockUid,
+            fieldOrder: fieldBlock[2],
+          });
+        }
+
+        fieldAnalysis[fieldName] = {
+          exists: true,
+          hasChildren: hasChildren,
+          children: fieldChildren.map(([uid, text]) => text),
+          blockUid: fieldBlockUid,
+          status: hasChildren ? "complete" : "empty",
+        };
+      }
+    });
+
+    const completenessScore = Math.round(
+      (Object.values(fieldAnalysis).filter((f) => f.hasChildren).length /
+        expectedFields.length) *
+        100
+    );
+
+    return {
+      username,
+      userPageExists: true,
+      myInfoExists: true,
+      myInfoBlockUid,
+      fieldAnalysis,
+      missingFields,
+      emptyFields,
+      completenessScore,
+      needsAutoCompletion: missingFields.length > 0 || emptyFields.length > 0,
+      analysis: `${emptyFields.length} empty fields, ${missingFields.length} missing fields, ${completenessScore}% complete`,
+    };
+  } catch (error) {
+    console.error(`❌ Error analyzing My Info:: for ${username}:`, error);
+    return {
+      username,
+      error: error.message,
+      analysis: "Analysis failed due to error",
+    };
+  }
+};
+
+/**
+ * 🎯 SELF-HEALING: Generate intelligent defaults with boilerplate patterns
+ */
+const generateSelfHealingDefaults = (username, currentUser) => {
+  const isCurrentUser = username === currentUser.displayName;
+
+  return {
+    "Avatar::":
+      isCurrentUser && currentUser.photoUrl
+        ? currentUser.photoUrl
+        : `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
+            username
+          )}`,
+
+    "Location::": isCurrentUser
+      ? "Oakland, California, US" // Default location
+      : "__this field is not yet filled__",
+
+    "Role::": isCurrentUser
+      ? "Extension Developer"
+      : "__this field is not yet filled__",
+
+    "Timezone::": isCurrentUser
+      ? "America/Los_Angeles" // Default timezone
+      : "__this field is not yet filled__",
+
+    "About Me::": isCurrentUser
+      ? "Building professional Roam extensions"
+      : "__this field is not yet filled__",
+  };
+};
+
+/**
+ * 🛠️ SELF-HEALING CORE: Auto-complete missing My Info:: fields
+ * (Enhanced from auto-completion sandbox)
+ */
+const performSelfHealing = async (username, options = {}) => {
+  try {
+    console.log(`🛠️ Self-healing My Info:: for ${username}...`);
+
+    const { dryRun = false, force = false } = options;
+
+    // Analyze current structure
+    const analysis = analyzeMyInfoStructure(username);
+
+    // Handle full creation if My Info:: doesn't exist
+    if (analysis.needsFullCreation) {
+      console.log(
+        `🎯 Creating complete My Info:: structure for ${username}...`
+      );
+      if (!dryRun) {
+        const success = await createCompleteMyInfoStructure(username);
+        return {
+          success: success,
+          action: "full_creation",
+          analysis: analysis,
+        };
+      } else {
+        return {
+          success: true,
+          dryRun: true,
+          action: "would_create_full_structure",
+          analysis: analysis,
+        };
+      }
+    }
+
+    // Check if auto-completion is needed
+    if (!analysis.needsAutoCompletion && !force) {
+      console.log(
+        `✅ No self-healing needed for ${username} (${analysis.completenessScore}% complete)`
+      );
+      return {
+        success: true,
+        action: "no_healing_needed",
+        analysis: analysis,
+      };
+    }
+
+    const platform = window.RoamExtensionSuite;
+    const currentUser = platform.getUtility("getAuthenticatedUser")();
+    const defaultValues = generateSelfHealingDefaults(username, currentUser);
+
+    // Filter to only empty/missing fields
+    const fieldsToHeal = [
+      ...analysis.missingFields.map((fieldName) => ({
+        fieldName,
+        status: "missing",
+      })),
+      ...analysis.emptyFields.map((field) => ({ ...field, status: "empty" })),
+    ];
+
+    if (fieldsToHeal.length === 0) {
+      console.log(`✅ All fields complete for ${username}`);
+      return {
+        success: true,
+        action: "already_complete",
+        analysis: analysis,
+      };
+    }
+
+    console.log(
+      `🎯 Self-healing ${fieldsToHeal.length} fields for ${username}:`,
+      fieldsToHeal.map((f) => f.fieldName)
+    );
+
+    if (dryRun) {
+      console.log("🧪 DRY RUN - Would heal these fields:");
+      fieldsToHeal.forEach((field) => {
+        console.log(
+          `  ${field.fieldName} → "${defaultValues[field.fieldName]}"`
+        );
+      });
+
+      return {
+        success: true,
+        dryRun: true,
+        action: "dry_run_healing",
+        fieldsToHeal: fieldsToHeal,
+        defaultValues: defaultValues,
+        analysis: analysis,
+      };
+    }
+
+    // Perform actual self-healing
+    const healingResults = [];
+
+    for (const field of fieldsToHeal) {
+      try {
+        const defaultValue = defaultValues[field.fieldName];
+        let success = false;
+
+        if (field.status === "missing") {
+          // Create missing field completely
+          success = await createMyInfoField(
+            analysis.myInfoBlockUid,
+            field.fieldName,
+            defaultValue
+          );
+          console.log(
+            `🔧 Created missing field ${field.fieldName}: "${defaultValue}"`
+          );
+        } else if (field.status === "empty") {
+          // Add value to existing empty field
+          success = await addValueToEmptyField(
+            field.fieldBlockUid,
+            defaultValue
+          );
+          console.log(
+            `🔧 Healed empty field ${field.fieldName}: "${defaultValue}"`
+          );
+        }
+
+        healingResults.push({
+          fieldName: field.fieldName,
+          defaultValue: defaultValue,
+          success: success,
+          action: field.status === "missing" ? "created" : "healed",
+        });
+
+        // Small delay between operations
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      } catch (error) {
+        console.error(`❌ Error healing ${field.fieldName}:`, error);
+        healingResults.push({
+          fieldName: field.fieldName,
+          defaultValue: defaultValues[field.fieldName],
+          success: false,
+          error: error.message,
+          action: "failed",
+        });
+      }
+    }
+
+    const successCount = healingResults.filter((r) => r.success).length;
+    const totalFields = healingResults.length;
+
+    console.log(
+      `📊 Self-healing results: ${successCount}/${totalFields} fields healed`
+    );
+
+    return {
+      success: successCount > 0,
+      action: "self_healing_completed",
+      fieldsProcessed: totalFields,
+      successCount: successCount,
+      results: healingResults,
+      analysis: analysis,
+    };
+  } catch (error) {
+    console.error(`❌ Self-healing failed for ${username}:`, error);
+    return {
+      success: false,
+      action: "healing_error",
+      error: error.message,
+    };
+  }
+};
+
+/**
+ * 🏗️ Create complete My Info:: structure from scratch
+ */
+const createCompleteMyInfoStructure = async (username) => {
+  try {
+    console.log(`🏗️ Creating complete My Info:: structure for ${username}...`);
+
+    const platform = window.RoamExtensionSuite;
+    const createPageIfNotExists = platform.getUtility("createPageIfNotExists");
+    const currentUser = platform.getUtility("getAuthenticatedUser")();
+
+    // Ensure user page exists
+    const userPageUid = await createPageIfNotExists(username);
+    if (!userPageUid) {
+      console.error(`❌ Failed to create page for ${username}`);
+      return false;
+    }
+
+    // Create My Info:: parent block
+    const myInfoBlockUid = await window.roamAlphaAPI.data.block.create({
+      location: { "parent-uid": userPageUid, order: "last" },
+      block: { string: "My Info::" },
+    });
+
+    if (!myInfoBlockUid) {
+      console.error(`❌ Failed to create My Info:: parent block`);
+      return false;
+    }
+
+    // Generate defaults and create all fields
+    const defaultValues = generateSelfHealingDefaults(username, currentUser);
+    let successCount = 0;
+
+    for (const [fieldName, defaultValue] of Object.entries(defaultValues)) {
+      try {
+        const success = await createMyInfoField(
+          myInfoBlockUid,
+          fieldName,
+          defaultValue
+        );
+        if (success) {
+          successCount++;
+          console.log(`✅ Created ${fieldName}: ${defaultValue}`);
+        } else {
+          console.error(`❌ Failed to create ${fieldName}`);
+        }
+      } catch (error) {
+        console.error(`❌ Error creating ${fieldName}:`, error);
+      }
+    }
+
+    const success = successCount === Object.keys(defaultValues).length;
+    console.log(
+      `🎯 Complete structure creation: ${successCount}/5 fields for ${username}`
+    );
+
+    return success;
+  } catch (error) {
+    console.error(`Error creating complete My Info:: for ${username}:`, error);
+    return false;
+  }
+};
+
+/**
+ * 🔧 Helper: Create individual My Info:: field with value
+ */
+const createMyInfoField = async (parentBlockUid, fieldName, fieldValue) => {
+  try {
+    // Create field header block
+    const fieldBlockUid = await window.roamAlphaAPI.data.block.create({
+      location: { "parent-uid": parentBlockUid, order: "last" },
+      block: { string: fieldName },
+    });
+
+    if (!fieldBlockUid) return false;
+
+    // Create value block as child
+    await window.roamAlphaAPI.data.block.create({
+      location: { "parent-uid": fieldBlockUid, order: 0 },
+      block: { string: fieldValue },
+    });
+
+    return true;
+  } catch (error) {
+    console.error(`Error creating field ${fieldName}:`, error);
+    return false;
+  }
+};
+
+/**
+ * 🔧 Helper: Add value to existing empty field
+ */
+const addValueToEmptyField = async (fieldBlockUid, value) => {
+  try {
+    await window.roamAlphaAPI.data.block.create({
+      location: { "parent-uid": fieldBlockUid, order: 0 },
+      block: { string: value },
+    });
+    return true;
+  } catch (error) {
+    console.error(`Error adding value to empty field:`, error);
+    return false;
+  }
+};
+
+// ===================================================================
+// 👥 ENHANCED USER PROFILE DATA COLLECTION - With Self-Healing
+// ===================================================================
+
+/**
+ * 🔧 Enhanced getUserProfileData with self-healing integration
+ */
+const getUserProfileData = async (username, options = {}) => {
+  try {
+    const { autoHeal = true } = options;
+
     const platform = window.RoamExtensionSuite;
     const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
     const findNestedDataValues = platform.getUtility("findNestedDataValues");
@@ -175,9 +637,36 @@ const getUserProfileData = async (username) => {
         aboutMe: null,
         completeness: 0,
         missingFields: ["Avatar", "Location", "Role", "Timezone", "About Me"],
+        needsSelfHealing: true,
       };
     }
 
+    // 🧠 SELF-HEALING CHECK: Analyze structure
+    const analysis = analyzeMyInfoStructure(username);
+
+    if (
+      analysis.needsFullCreation ||
+      (analysis.needsAutoCompletion && autoHeal)
+    ) {
+      console.log(`🛠️ Self-healing triggered for ${username}...`);
+      const healingResult = await performSelfHealing(username);
+
+      if (healingResult.success) {
+        console.log(`✅ Self-healing completed for ${username}`);
+        // Re-analyze after healing
+        const newAnalysis = analyzeMyInfoStructure(username);
+        console.log(
+          `📊 Post-healing: ${newAnalysis.completenessScore}% complete`
+        );
+      } else {
+        console.warn(
+          `⚠️ Self-healing failed for ${username}:`,
+          healingResult.error
+        );
+      }
+    }
+
+    // Get My Info data (after potential self-healing)
     const myInfoData = findNestedDataValues(userPageUid, "My Info");
 
     if (!myInfoData || Object.keys(myInfoData).length === 0) {
@@ -191,7 +680,7 @@ const getUserProfileData = async (username) => {
         aboutMe: null,
         completeness: 0,
         missingFields: ["Avatar", "Location", "Role", "Timezone", "About Me"],
-        needsMyInfoCreation: true,
+        needsSelfHealing: true,
       };
     }
 
@@ -206,7 +695,8 @@ const getUserProfileData = async (username) => {
     const requiredFields = ["Avatar", "Location", "Role", "Timezone"];
     const fieldValues = [avatar, location, role, timezone];
     const completedFields = fieldValues.filter(
-      (value) => value !== null
+      (value) =>
+        value !== null && !value.includes("__this field is not yet filled__")
     ).length;
     const completeness = Math.round(
       (completedFields / requiredFields.length) * 100
@@ -214,17 +704,21 @@ const getUserProfileData = async (username) => {
 
     // Get timezone information
     let timezoneInfo = null;
-    if (timezone) {
+    if (timezone && !timezone.includes("__this field is not yet filled__")) {
       timezoneInfo = timezoneManager.getCurrentTimeForUser(timezone);
     }
 
     // Identify missing fields
     const missingFields = [];
     if (!avatar) missingFields.push("Avatar");
-    if (!location) missingFields.push("Location");
-    if (!role) missingFields.push("Role");
-    if (!timezone) missingFields.push("Timezone");
-    if (!aboutMe) missingFields.push("About Me");
+    if (!location || location.includes("__this field is not yet filled__"))
+      missingFields.push("Location");
+    if (!role || role.includes("__this field is not yet filled__"))
+      missingFields.push("Role");
+    if (!timezone || timezone.includes("__this field is not yet filled__"))
+      missingFields.push("Timezone");
+    if (!aboutMe || aboutMe.includes("__this field is not yet filled__"))
+      missingFields.push("About Me");
 
     return {
       username,
@@ -238,6 +732,7 @@ const getUserProfileData = async (username) => {
       timezoneInfo,
       missingFields,
       myInfoData,
+      selfHealed: analysis.needsAutoCompletion || analysis.needsFullCreation,
     };
   } catch (error) {
     console.error(`Failed to get profile data for ${username}:`, error);
@@ -247,12 +742,13 @@ const getUserProfileData = async (username) => {
       error: error.message,
       completeness: 0,
       missingFields: ["Avatar", "Location", "Role", "Timezone", "About Me"],
+      needsSelfHealing: true,
     };
   }
 };
 
 /**
- * Helper to get clean field values with placeholder detection
+ * Helper to get clean field values with enhanced placeholder detection
  */
 const getCleanFieldValue = (dataObject, fieldNames) => {
   for (const fieldName of fieldNames) {
@@ -260,6 +756,7 @@ const getCleanFieldValue = (dataObject, fieldNames) => {
     if (value && typeof value === "string") {
       const trimmed = value.trim();
 
+      // Enhanced placeholder detection
       const placeholders = [
         "not set",
         "location not set",
@@ -267,6 +764,7 @@ const getCleanFieldValue = (dataObject, fieldNames) => {
         "role not set",
         "team member",
         "graph member",
+        "__this field is not yet filled__",
         "",
       ];
 
@@ -283,148 +781,24 @@ const getCleanFieldValue = (dataObject, fieldNames) => {
 };
 
 /**
- * Enhanced My Info:: structure initialization with individual field creation
+ * Get all user profiles with integrated self-healing
  */
-const initializeMyInfoStructure = async (username) => {
+const getAllUserProfiles = async (options = {}) => {
   try {
-    console.log(
-      `🎯 Initializing enhanced My Info:: structure for ${username}...`
-    );
+    const { autoHeal = true } = options;
 
-    const platform = window.RoamExtensionSuite;
-    const createPageIfNotExists = platform.getUtility("createPageIfNotExists");
-    const setDataValue = platform.getUtility("setDataValue");
-    const getCurrentUser = platform.getUtility("getCurrentUser");
-
-    const userPageUid = await createPageIfNotExists(username);
-    if (!userPageUid) {
-      console.error(`❌ Failed to create page for ${username}`);
-      return false;
-    }
-
-    const currentUser = getCurrentUser();
-    const isCurrentUser = username === currentUser.displayName;
-
-    console.log(`📋 Creating My Info:: parent structure...`);
-
-    await setDataValue(userPageUid, "My Info", [], true);
-
-    const defaultValues = {
-      Avatar:
-        isCurrentUser && currentUser.photoUrl
-          ? currentUser.photoUrl
-          : `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
-              username
-            )}`,
-      Location: isCurrentUser
-        ? "Oakland, California, US"
-        : "San Francisco, California, US",
-      Role: isCurrentUser ? "Extension Developer" : "Team Member",
-      Timezone: isCurrentUser ? "America/Los_Angeles" : "America/New_York",
-      "About Me": isCurrentUser
-        ? "Building professional Roam extensions"
-        : `Graph member since ${new Date().getFullYear()}`,
-    };
-
-    let successCount = 0;
-
-    for (const [fieldName, defaultValue] of Object.entries(defaultValues)) {
-      try {
-        const myInfoSuccess = await addFieldToMyInfo(
-          userPageUid,
-          fieldName,
-          defaultValue
-        );
-        if (myInfoSuccess) {
-          successCount++;
-          console.log(`✅ ${fieldName}: ${defaultValue}`);
-        } else {
-          console.error(`❌ Failed to create ${fieldName}`);
-        }
-      } catch (error) {
-        console.error(`❌ Error creating ${fieldName}:`, error);
-      }
-    }
-
-    const success = successCount === Object.keys(defaultValues).length;
-
-    if (success) {
-      console.log(
-        `✅ Complete My Info:: structure created for ${username} (${successCount}/5 fields)`
-      );
-    } else {
-      console.error(
-        `⚠️ Partial My Info:: creation: ${successCount}/5 fields for ${username}`
-      );
-    }
-
-    return success;
-  } catch (error) {
-    console.error(`Error initializing My Info:: for ${username}:`, error);
-    return false;
-  }
-};
-
-/**
- * Helper to add individual field to My Info:: structure
- */
-const addFieldToMyInfo = async (userPageUid, fieldName, fieldValue) => {
-  try {
-    const platform = window.RoamExtensionSuite;
-
-    const myInfoParentQuery = window.roamAlphaAPI.data.q(`
-      [:find ?uid .
-       :where 
-       [?parent :block/uid "${userPageUid}"]
-       [?parent :block/children ?child]
-       [?child :block/uid ?uid]
-       [?child :block/string "My Info::"]]
-    `);
-
-    if (!myInfoParentQuery) {
-      console.error(`❌ My Info:: parent block not found for ${fieldName}`);
-      return false;
-    }
-
-    const fieldBlockUid = await window.roamAlphaAPI.data.block.create({
-      location: { "parent-uid": myInfoParentQuery, order: "last" },
-      block: { string: `${fieldName}::` },
-    });
-
-    if (!fieldBlockUid) {
-      console.error(`❌ Failed to create field block for ${fieldName}`);
-      return false;
-    }
-
-    await window.roamAlphaAPI.data.block.create({
-      location: { "parent-uid": fieldBlockUid, order: 0 },
-      block: { string: fieldValue },
-    });
-
-    return true;
-  } catch (error) {
-    console.error(`Error adding field ${fieldName} to My Info::`, error);
-    return false;
-  }
-};
-
-/**
- * Get all user profiles for directory with enhanced error handling
- */
-const getAllUserProfiles = async () => {
-  try {
     const platform = window.RoamExtensionSuite;
     const getGraphMembers = platform.getUtility("getGraphMembers");
 
     const members = getGraphMembers();
     console.log(
-      `📊 Collecting My Info:: profiles for ${members.length} graph members...`
+      `📊 Collecting profiles for ${members.length} graph members (self-healing: ${autoHeal})...`
     );
 
     const profiles = await Promise.all(
       members.map(async (username) => {
         try {
-          return await getUserProfileData(username);
+          return await getUserProfileData(username, { autoHeal });
         } catch (error) {
           console.warn(`⚠️ Failed to get profile for ${username}:`, error);
           return {
@@ -439,6 +813,7 @@ const getAllUserProfiles = async () => {
               "Timezone",
               "About Me",
             ],
+            needsSelfHealing: true,
           };
         }
       })
@@ -446,57 +821,14 @@ const getAllUserProfiles = async () => {
 
     profiles.sort((a, b) => a.username.localeCompare(b.username));
 
-    const missingProfiles = profiles.filter((p) => p.needsMyInfoCreation);
-    if (missingProfiles.length > 0) {
-      console.log(
-        `🎯 Auto-initializing My Info:: for ${missingProfiles.length} users...`
-      );
-
-      for (const profile of missingProfiles) {
-        try {
-          await initializeMyInfoStructure(profile.username);
-        } catch (error) {
-          console.warn(`⚠️ Failed to initialize ${profile.username}:`, error);
-        }
-      }
-
-      const updatedProfiles = await Promise.all(
-        members.map(async (username) => {
-          try {
-            return await getUserProfileData(username);
-          } catch (error) {
-            console.warn(
-              `⚠️ Failed to get updated profile for ${username}:`,
-              error
-            );
-            return (
-              profiles.find((p) => p.username === username) || {
-                username,
-                exists: false,
-                error: error.message,
-                completeness: 0,
-                missingFields: [
-                  "Avatar",
-                  "Location",
-                  "Role",
-                  "Timezone",
-                  "About Me",
-                ],
-              }
-            );
-          }
-        })
-      );
-
-      console.log(
-        `✅ Collected ${updatedProfiles.length} user profiles with My Info:: structures`
-      );
-      return updatedProfiles.sort((a, b) =>
-        a.username.localeCompare(b.username)
-      );
+    const healedProfiles = profiles.filter((p) => p.selfHealed).length;
+    if (healedProfiles > 0) {
+      console.log(`🛠️ Self-healing completed for ${healedProfiles} profiles`);
     }
 
-    console.log(`✅ Collected ${profiles.length} user profiles`);
+    console.log(
+      `✅ Collected ${profiles.length} user profiles with self-healing`
+    );
     return profiles;
   } catch (error) {
     console.error("Failed to collect user profiles:", error);
@@ -505,15 +837,15 @@ const getAllUserProfiles = async () => {
 };
 
 // ===================================================================
-// 🎨 USER DIRECTORY MODAL - Professional Interface
+// 🎨 USER DIRECTORY MODAL - Enhanced with Self-Healing Status
 // ===================================================================
 
 /**
- * Create and display professional user directory modal
+ * Create and display professional user directory modal with self-healing indicators
  */
 const showUserDirectoryModal = async () => {
   try {
-    console.log("📋 Opening User Directory with enhanced My Info:: data...");
+    console.log("📋 Opening Self-Healing User Directory...");
 
     const existingModal = document.getElementById("user-directory-modal");
     if (existingModal) {
@@ -550,8 +882,8 @@ const showUserDirectoryModal = async () => {
 
     content.innerHTML = `
       <div style="padding: 40px; text-align: center;">
-        <div style="font-size: 16px; color: #666;">Loading user directory...</div>
-        <div style="margin-top: 10px; font-size: 14px; color: #999;">Enhanced My Info:: processing with auto-completion</div>
+        <div style="font-size: 16px; color: #666;">Loading self-healing user directory...</div>
+        <div style="margin-top: 10px; font-size: 14px; color: #999;">🛠️ Auto-completing missing My Info:: fields</div>
       </div>
     `;
 
@@ -572,9 +904,12 @@ const showUserDirectoryModal = async () => {
       if (e.key === "Escape") closeModal();
     });
 
-    const profiles = await getAllUserProfiles();
+    // Load profiles with self-healing
+    const profiles = await getAllUserProfiles({ autoHeal: true });
     const platform = window.RoamExtensionSuite;
     const currentUser = platform.getUtility("getAuthenticatedUser")();
+
+    const healedCount = profiles.filter((p) => p.selfHealed).length;
 
     content.innerHTML = `
       <div style="
@@ -586,12 +921,12 @@ const showUserDirectoryModal = async () => {
       ">
         <div>
           <h2 style="margin: 0; font-size: 20px; font-weight: 600; color: #1a202c;">
-            🫂 User Directory
+            🛠️ Self-Healing User Directory
           </h2>
           <div style="margin-top: 4px; font-size: 14px; color: #666;">
-            ${
-              profiles.length
-            } graph members • Enhanced My Info:: • Updated ${new Date().toLocaleTimeString()}
+            ${profiles.length} graph members • ${
+      healedCount > 0 ? `${healedCount} profiles auto-healed • ` : ""
+    }Updated ${new Date().toLocaleTimeString()}
           </div>
         </div>
         <button 
@@ -635,7 +970,7 @@ const showUserDirectoryModal = async () => {
           <tbody>
             ${profiles
               .map((profile, index) =>
-                createUserDirectoryRow(profile, currentUser, index)
+                createSelfHealingUserRow(profile, currentUser, index)
               )
               .join("")}
           </tbody>
@@ -650,22 +985,22 @@ const showUserDirectoryModal = async () => {
         color: #666;
         text-align: center;
       ">
-        💡 Enhanced: Auto-completion creates all 5 My Info:: fields • Real-time timezone updates • Intelligent defaults • Fixed button placement
+        🛠️ Self-Healing: Auto-completes missing My Info:: fields • Uses Roam's user images • "__this field is not yet filled__" boilerplate • Real-time timezone updates
       </div>
     `;
 
     startRealtimeClockUpdates(modal);
 
-    console.log("✅ Enhanced User Directory modal opened");
+    console.log("✅ Self-Healing User Directory modal opened");
   } catch (error) {
     console.error("Failed to show user directory:", error);
   }
 };
 
 /**
- * Create individual user row for directory table
+ * Create individual user row for directory table with self-healing indicators
  */
-const createUserDirectoryRow = (profile, currentUser, index) => {
+const createSelfHealingUserRow = (profile, currentUser, index) => {
   const isCurrentUser = profile.username === currentUser?.displayName;
   const rowClass = isCurrentUser ? "current-user-row" : "user-row";
 
@@ -686,9 +1021,21 @@ const createUserDirectoryRow = (profile, currentUser, index) => {
       ? "#d97706"
       : "#dc2626";
 
+  // Display boilerplate text for unfilled fields
+  const displayValue = (value) => {
+    if (!value || value.includes("__this field is not yet filled__")) {
+      return '<span style="color: #9ca3af; font-style: italic;">not yet filled</span>';
+    }
+    return value;
+  };
+
   const actionButton = isCurrentUser
     ? `<button onclick="navigateToUserPage('${profile.username}')" style="background: #137cbd; color: white; border: none; border-radius: 3px; padding: 6px 12px; cursor: pointer; font-size: 12px; font-weight: 500;">Edit My Info</button>`
     : `<button onclick="navigateToUserPage('${profile.username}')" style="background: #f8f9fa; color: #374151; border: 1px solid #d1d5db; border-radius: 3px; padding: 6px 12px; cursor: pointer; font-size: 12px;">View Page</button>`;
+
+  const selfHealedIndicator = profile.selfHealed
+    ? '<span style="margin-left: 4px; color: #059669; font-size: 12px;" title="Profile was auto-healed">🛠️</span>'
+    : "";
 
   return `
     <tr class="${rowClass}" style="border-bottom: 1px solid #f1f5f9; ${
@@ -708,20 +1055,21 @@ const createUserDirectoryRow = (profile, currentUser, index) => {
           <div style="width: 8px; height: 8px; border-radius: 50%; background: ${completenessColor}; opacity: 0.7;" title="${
     profile.completeness
   }% complete"></div>
+          ${selfHealedIndicator}
         </div>
       </td>
-      <td style="padding: 12px 16px; vertical-align: middle; color: #4b5563;">${
-        profile.aboutMe || '<span style="color: #9ca3af;">—</span>'
-      }</td>
-      <td style="padding: 12px 16px; vertical-align: middle; color: #4b5563;">${
-        profile.location || '<span style="color: #9ca3af;">—</span>'
-      }</td>
-      <td style="padding: 12px 16px; vertical-align: middle; color: #4b5563;">${
-        profile.role || '<span style="color: #9ca3af;">—</span>'
-      }</td>
-      <td style="padding: 12px 16px; vertical-align: middle; color: #4b5563;">${
-        profile.timezone || '<span style="color: #9ca3af;">—</span>'
-      }</td>
+      <td style="padding: 12px 16px; vertical-align: middle; color: #4b5563;">${displayValue(
+        profile.aboutMe
+      )}</td>
+      <td style="padding: 12px 16px; vertical-align: middle; color: #4b5563;">${displayValue(
+        profile.location
+      )}</td>
+      <td style="padding: 12px 16px; vertical-align: middle; color: #4b5563;">${displayValue(
+        profile.role
+      )}</td>
+      <td style="padding: 12px 16px; vertical-align: middle; color: #4b5563;">${displayValue(
+        profile.timezone
+      )}</td>
       <td style="padding: 12px 16px; vertical-align: middle;">${timeDisplay}</td>
       <td style="padding: 12px 16px; vertical-align: middle;">${actionButton}</td>
     </tr>
@@ -736,7 +1084,7 @@ const startRealtimeClockUpdates = (modal) => {
     const timeElements = modal.querySelectorAll(".timezone-time");
     timeElements.forEach((element) => {
       const timezone = element.getAttribute("data-timezone");
-      if (timezone) {
+      if (timezone && !timezone.includes("__this field is not yet filled__")) {
         const timeInfo = timezoneManager.getCurrentTimeForUser(timezone);
         if (timeInfo.isValid) {
           element.textContent = timeInfo.timeString;
@@ -773,11 +1121,11 @@ window.navigateToUserPage = (username) => {
 };
 
 // ===================================================================
-// 🔧 FIXED: NAVIGATION INTEGRATION - Sandbox-Confirmed Button Placement
+// 🧭 NAVIGATION INTEGRATION - With Self-Healing Triggers
 // ===================================================================
 
 /**
- * Add navigation buttons using EXACT sandbox-confirmed approach
+ * Add navigation buttons with self-healing integration
  */
 const addNavigationButtons = () => {
   try {
@@ -786,7 +1134,7 @@ const addNavigationButtons = () => {
       .forEach((btn) => btn.remove());
 
     console.log(
-      "🎯 Attempting to place buttons using sandbox-confirmed approach..."
+      "🎯 Adding navigation buttons with self-healing integration..."
     );
 
     const platform = window.RoamExtensionSuite;
@@ -817,20 +1165,11 @@ const addNavigationButtons = () => {
       if (element) {
         targetElement = element;
         selectorUsed = selector;
-        console.log(`✅ Found target using: ${selector}`);
         break;
       }
     }
 
     if (!targetElement) {
-      console.error("❌ Could not find suitable target element");
-      console.log("Available elements:", {
-        body: !!document.body,
-        app: !!document.querySelector("#app"),
-        roamArticle: !!document.querySelector(".roam-article"),
-        roamMain: !!document.querySelector(".roam-main"),
-      });
-
       targetElement = document.body;
       selectorUsed = "body (fallback)";
     }
@@ -838,7 +1177,6 @@ const addNavigationButtons = () => {
     const computedStyle = getComputedStyle(targetElement);
     if (computedStyle.position === "static") {
       targetElement.style.position = "relative";
-      console.log(`🔧 Set ${selectorUsed} to position: relative`);
     }
 
     const isUserPage = isGraphMember(currentPageTitle);
@@ -846,21 +1184,21 @@ const addNavigationButtons = () => {
 
     const directoryButton = document.createElement("button");
     directoryButton.className = "user-directory-nav-button";
-    directoryButton.textContent = "🫂 Show Directory";
+    directoryButton.textContent = "🛠️ Self-Healing Directory";
     directoryButton.style.cssText = `
       position: absolute;
       top: 10px;
       left: 10px;
       z-index: 9999;
-      background: linear-gradient(135deg, #fef3c7 0%, #fbbf24 100%);
-      color: #92400e;
-      border: 1px solid #f59e0b;
+      background: linear-gradient(135deg, #ecfdf5 0%, #10b981 100%);
+      color: #065f46;
+      border: 1px solid #10b981;
       border-radius: 8px;
       padding: 10px 16px;
       cursor: pointer;
       font-size: 14px;
       font-weight: 600;
-      box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);
+      box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
       transition: all 0.2s ease;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     `;
@@ -869,46 +1207,42 @@ const addNavigationButtons = () => {
 
     directoryButton.addEventListener("mouseenter", () => {
       directoryButton.style.background =
-        "linear-gradient(135deg, #fde68a 0%, #f59e0b 100%)";
+        "linear-gradient(135deg, #d1fae5 0%, #059669 100%)";
       directoryButton.style.transform = "translateY(-1px)";
     });
 
     directoryButton.addEventListener("mouseleave", () => {
       directoryButton.style.background =
-        "linear-gradient(135deg, #fef3c7 0%, #fbbf24 100%)";
+        "linear-gradient(135deg, #ecfdf5 0%, #10b981 100%)";
       directoryButton.style.transform = "translateY(0)";
     });
 
     targetElement.appendChild(directoryButton);
     window._extensionRegistry.elements.push(directoryButton);
 
-    console.log(`✅ Directory button added to: ${selectorUsed}`);
-    console.log(
-      `📍 Button position: ${directoryButton.style.position} at top: 10px, left: 10px`
-    );
+    // 🛠️ TRIGGER SELF-HEALING: If on current user's page, check for healing
+    if (isOwnPage) {
+      setTimeout(async () => {
+        const analysis = analyzeMyInfoStructure(currentUser.displayName);
+        if (analysis.needsAutoCompletion || analysis.needsFullCreation) {
+          console.log(
+            `🛠️ Self-healing triggered for ${currentUser.displayName} (on own page)`
+          );
+          await performSelfHealing(currentUser.displayName);
+        }
+      }, 2000);
+    }
 
-    const rect = targetElement.getBoundingClientRect();
-    console.log(`📐 Target dimensions:`, {
-      selector: selectorUsed,
-      width: rect.width,
-      height: rect.height,
-      top: rect.top,
-      left: rect.left,
-      position: computedStyle.position,
-    });
-
-    console.log(
-      `✅ Navigation buttons added using sandbox-confirmed approach (user page: ${isUserPage}, own page: ${isOwnPage})`
-    );
+    console.log(`✅ Self-healing navigation buttons added to: ${selectorUsed}`);
   } catch (error) {
     console.error("❌ Error adding navigation buttons:", error);
   }
 };
 
 /**
- * Monitor page changes and update navigation buttons
+ * Monitor page changes and trigger self-healing
  */
-const startNavigationMonitoring = () => {
+const startSelfHealingMonitoring = () => {
   setTimeout(addNavigationButtons, 1000);
 
   let lastUrl = window.location.href;
@@ -916,343 +1250,178 @@ const startNavigationMonitoring = () => {
     if (window.location.href !== lastUrl) {
       lastUrl = window.location.href;
       setTimeout(addNavigationButtons, 500);
+
+      // 🛠️ TRIGGER SELF-HEALING: On page navigation
+      setTimeout(async () => {
+        const platform = window.RoamExtensionSuite;
+        const getCurrentPageTitle = platform.getUtility("getCurrentPageTitle");
+        const getAuthenticatedUser = platform.getUtility(
+          "getAuthenticatedUser"
+        );
+        const isGraphMember = platform.getUtility("isGraphMember");
+
+        const currentPageTitle = getCurrentPageTitle();
+        const currentUser = getAuthenticatedUser();
+
+        if (
+          currentPageTitle &&
+          currentUser &&
+          isGraphMember(currentPageTitle)
+        ) {
+          const analysis = analyzeMyInfoStructure(currentPageTitle);
+          if (analysis.needsAutoCompletion || analysis.needsFullCreation) {
+            console.log(
+              `🛠️ Self-healing triggered for ${currentPageTitle} (page navigation)`
+            );
+            await performSelfHealing(currentPageTitle);
+          }
+        }
+      }, 1500);
     }
     setTimeout(checkUrlChange, 1000);
   };
 
   checkUrlChange();
 
-  console.log(
-    "📡 Navigation monitoring started with sandbox-confirmed placement"
-  );
+  console.log("📡 Self-healing monitoring started");
 };
 
 // ===================================================================
-// 📝 PROFILE COMPLETION SYSTEM - Enhanced Detection and Nudging
+// 🧪 TESTING AND VALIDATION - Self-Healing Tests
 // ===================================================================
 
 /**
- * Check if current user needs profile completion nudging
+ * Run comprehensive self-healing system tests
  */
-const checkProfileCompletion = async () => {
+const runSelfHealingTests = async () => {
+  console.group("🧪 Self-Healing User Directory System Tests");
+
   try {
     const platform = window.RoamExtensionSuite;
     const currentUser = platform.getUtility("getAuthenticatedUser")();
 
-    if (!currentUser) return false;
+    // Test 1: Self-Healing Analysis
+    console.log("Test 1: Self-Healing Analysis");
+    const analysis = analyzeMyInfoStructure(currentUser.displayName);
+    console.log(`  Analysis result:`, {
+      myInfoExists: analysis.myInfoExists,
+      needsAutoCompletion: analysis.needsAutoCompletion,
+      completenessScore: analysis.completenessScore + "%",
+      emptyFields: analysis.emptyFields?.length || 0,
+      missingFields: analysis.missingFields?.length || 0,
+    });
 
-    const profile = await getUserProfileData(currentUser.displayName);
+    // Test 2: Default Value Generation
+    console.log("Test 2: Self-Healing Default Generation");
+    const defaults = generateSelfHealingDefaults(
+      currentUser.displayName,
+      currentUser
+    );
+    console.log("  Generated defaults:", defaults);
 
-    if (profile.needsMyInfoCreation) {
-      return {
-        shouldNudge: true,
-        profile: profile,
-        missingFields: ["My Info:: structure needs creation"],
-        needsInitialization: true,
-      };
-    }
+    // Test 3: Dry Run Self-Healing
+    console.log("Test 3: Dry Run Self-Healing");
+    const dryRunResult = await performSelfHealing(currentUser.displayName, {
+      dryRun: true,
+    });
+    console.log("  Dry run result:", {
+      success: dryRunResult.success,
+      action: dryRunResult.action,
+      fieldsToHeal: dryRunResult.fieldsToHeal?.length || 0,
+    });
 
-    if (
-      profile.exists &&
-      profile.completeness < 75 &&
-      profile.missingFields.length > 0
-    ) {
-      return {
-        shouldNudge: true,
-        profile: profile,
-        missingFields: profile.missingFields,
-        needsInitialization: false,
-      };
-    }
+    // Test 4: Profile Data with Self-Healing
+    console.log("Test 4: Profile Data Collection with Self-Healing");
+    const profile = await getUserProfileData(currentUser.displayName, {
+      autoHeal: false,
+    }); // Disable for test
+    console.log("  Profile result:", {
+      exists: profile.exists,
+      completeness: profile.completeness + "%",
+      selfHealed: profile.selfHealed,
+      missingFields: profile.missingFields.length,
+    });
 
-    return { shouldNudge: false };
+    // Test 5: Boilerplate Detection
+    console.log("Test 5: Boilerplate Field Detection");
+    const testValues = {
+      filled: "Real content",
+      boilerplate: "__this field is not yet filled__",
+      empty: "",
+      placeholder: "not set",
+    };
+
+    Object.entries(testValues).forEach(([key, value]) => {
+      const cleanValue = getCleanFieldValue({ test: value }, ["test"]);
+      console.log(`  ${key} ("${value}") → ${cleanValue || "null"}`);
+    });
+
+    console.log("✅ Self-Healing System Tests completed successfully");
   } catch (error) {
-    console.error("Failed to check profile completion:", error);
-    return { shouldNudge: false };
-  }
-};
-
-/**
- * Show profile completion nudge modal
- */
-const showCompletionNudgeModal = async (profileData) => {
-  try {
-    console.log("💡 Showing enhanced My Info:: completion nudge...");
-
-    const existingModal = document.getElementById("completion-nudge-modal");
-    if (existingModal) {
-      existingModal.remove();
-    }
-
-    const modal = document.createElement("div");
-    modal.id = "completion-nudge-modal";
-    modal.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.4);
-      z-index: 10001;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    `;
-
-    const content = document.createElement("div");
-    content.style.cssText = `
-      background: white;
-      border-radius: 8px;
-      max-width: 500px;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-      overflow: hidden;
-    `;
-
-    const completenessColor =
-      profileData.profile.completeness >= 50 ? "#d97706" : "#dc2626";
-    const modalTitle = profileData.needsInitialization
-      ? "Set Up Your Profile"
-      : "Complete Your Profile";
-    const modalMessage = profileData.needsInitialization
-      ? "Enhanced My Info:: structure will be auto-created with all 5 fields"
-      : `Your profile is ${profileData.profile.completeness}% complete`;
-
-    content.innerHTML = `
-      <div style="padding: 24px; text-align: center;">
-        <div style="font-size: 48px; margin-bottom: 16px;">🫂</div>
-        <h2 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 600; color: #1a202c;">
-          ${modalTitle}
-        </h2>
-        <div style="font-size: 14px; color: #666; margin-bottom: 20px;">
-          ${modalMessage}
-        </div>
-        
-        <div style="background: #f8f9fa; border-radius: 6px; padding: 16px; margin-bottom: 20px; text-align: left;">
-          <div style="font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 12px;">
-            ${
-              profileData.needsInitialization
-                ? "Will Create All Fields:"
-                : "Missing Information:"
-            }
-          </div>
-          ${profileData.missingFields
-            .map(
-              (field) => `
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-              <div style="width: 6px; height: 6px; border-radius: 50%; background: ${completenessColor};"></div>
-              <span style="font-size: 13px; color: #4b5563;">${field}</span>
-            </div>
-          `
-            )
-            .join("")}
-        </div>
-        
-        <div style="display: flex; gap: 12px; justify-content: center;">
-          <button onclick="window.navigateToUserPage('${
-            profileData.profile.username
-          }'); this.closest('#completion-nudge-modal').remove();" style="background: #137cbd; color: white; border: none; border-radius: 4px; padding: 10px 20px; cursor: pointer; font-size: 14px; font-weight: 500;">
-            ${
-              profileData.needsInitialization
-                ? "Set Up Profile"
-                : "Complete Profile"
-            }
-          </button>
-          <button onclick="this.closest('#completion-nudge-modal').remove();" style="background: #f8f9fa; color: #374151; border: 1px solid #d1d5db; border-radius: 4px; padding: 10px 20px; cursor: pointer; font-size: 14px;">
-            Maybe Later
-          </button>
-        </div>
-        
-        <div style="margin-top: 16px; font-size: 12px; color: #999; text-align: center;">
-          Enhanced: Individual field creation • Intelligent defaults • Placeholder detection
-        </div>
-      </div>
-    `;
-
-    modal.appendChild(content);
-    document.body.appendChild(modal);
-
-    window._extensionRegistry.elements.push(modal);
-
-    modal.addEventListener("click", (e) => {
-      if (e.target === modal) modal.remove();
-    });
-
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") modal.remove();
-    });
-
-    console.log("✅ Enhanced My Info:: completion nudge displayed");
-  } catch (error) {
-    console.error("Failed to show completion nudge:", error);
-  }
-};
-
-// ===================================================================
-// 🧪 TESTING AND VALIDATION - Enhanced for Fixed Features
-// ===================================================================
-
-/**
- * Run comprehensive directory system tests
- */
-const runDirectoryTests = async () => {
-  console.group("🧪 Enhanced User Directory System Tests (FIXED)");
-
-  try {
-    // Test 1: Sandbox-Confirmed Button Placement
-    console.log("Test 1: Sandbox-Confirmed Button Placement");
-    const possibleTargets = [
-      ".roam-article",
-      ".roam-main",
-      ".rm-article-wrapper",
-      ".roam-center-panel",
-      ".flex-h-box > div:nth-child(2)",
-      "#app > div > div > div:nth-child(2)",
-      '.bp3-tab-panel[aria-hidden="false"]',
-    ];
-
-    let targetFound = null;
-    for (const selector of possibleTargets) {
-      const element = document.querySelector(selector);
-      if (element) {
-        targetFound = selector;
-        const style = getComputedStyle(element);
-        console.log(
-          `  ✅ ${selector}: position=${
-            style.position
-          }, dimensions=${Math.round(
-            element.getBoundingClientRect().width
-          )}x${Math.round(element.getBoundingClientRect().height)}`
-        );
-        break;
-      } else {
-        console.log(`  ❌ ${selector}: Not found`);
-      }
-    }
-    console.log(`  Target selected: ${targetFound || "None found"}`);
-
-    // Test 2: Enhanced Profile Data
-    console.log("Test 2: Enhanced My Info:: Profile Data");
-    const platform = window.RoamExtensionSuite;
-    const currentUser = platform.getUtility("getAuthenticatedUser")();
-    const profile = await getUserProfileData(currentUser.displayName);
-    console.log(`  Profile completeness: ${profile.completeness}%`);
-    console.log(
-      `  Missing fields: ${profile.missingFields.join(", ") || "None"}`
-    );
-    console.log(
-      `  Has My Info:: data: ${profile.myInfoData ? "✅ Yes" : "❌ No"}`
-    );
-
-    // Test 3: Field Name Handling
-    console.log("Test 3: Field Name Variation Handling");
-    const testFields = ["Timezone", "Time Zone"];
-    testFields.forEach((field) => {
-      const value = profile.myInfoData && profile.myInfoData[field];
-      console.log(`  ${field}: ${value || "Not found"}`);
-    });
-
-    // Test 4: Enhanced Structure Creation
-    console.log("Test 4: Enhanced My Info:: Structure Creation");
-    if (profile.needsMyInfoCreation) {
-      console.log(
-        "  🎯 Testing enhanced auto-creation with individual fields..."
-      );
-      const success = await initializeMyInfoStructure(currentUser.displayName);
-      console.log(
-        `  Enhanced creation: ${success ? "✅ Success" : "❌ Failed"}`
-      );
-    } else {
-      console.log("  ✅ My Info:: structure already exists");
-    }
-
-    // Test 5: Timezone Management
-    console.log("Test 5: Timezone Management");
-    const testTimezones = ["EST", "America/New_York", "PST", "GMT+1"];
-    testTimezones.forEach((tz) => {
-      const timeInfo = timezoneManager.getCurrentTimeForUser(tz);
-      console.log(
-        `  ${tz}: ${timeInfo.timeString} (${
-          timeInfo.isValid ? "valid" : "invalid"
-        })`
-      );
-    });
-
-    // Test 6: Navigation Buttons
-    console.log("Test 6: Navigation Button Placement");
-    addNavigationButtons();
-    const buttons = document.querySelectorAll(".user-directory-nav-button");
-    console.log(
-      `  Buttons added: ${buttons.length} (Directory: ${
-        buttons.length > 0 ? "✅" : "❌"
-      })`
-    );
-
-    console.log(
-      "✅ Enhanced User Directory System Tests (FIXED) completed successfully"
-    );
-  } catch (error) {
-    console.error("❌ Enhanced directory test failed:", error);
+    console.error("❌ Self-healing test failed:", error);
   }
 
   console.groupEnd();
 };
 
 /**
- * Display enhanced directory system status
+ * Display self-healing system status
  */
-const showDirectoryStatus = async () => {
+const showSelfHealingStatus = async () => {
   try {
     const platform = window.RoamExtensionSuite;
     const getGraphMembers = platform.getUtility("getGraphMembers");
     const currentUser = platform.getUtility("getAuthenticatedUser")();
 
     const members = getGraphMembers();
-    const profiles = await getAllUserProfiles();
-    const averageCompleteness = Math.round(
-      profiles.reduce((sum, p) => sum + p.completeness, 0) / profiles.length
-    );
-
-    const profilesWithMyInfo = profiles.filter(
-      (p) => !p.needsMyInfoCreation
-    ).length;
-
-    console.group("📊 Enhanced User Directory System Status (FIXED)");
+    console.group("🛠️ Self-Healing User Directory System Status");
     console.log(`🫂 Graph Members: ${members.length}`);
     console.log(`👤 Current User: ${currentUser.displayName}`);
-    console.log(
-      `📊 Profiles with My Info::: ${profilesWithMyInfo}/${profiles.length}`
+
+    // Quick analysis of all members
+    const analyses = [];
+    for (const member of members.slice(0, 5)) {
+      // Limit to first 5 for performance
+      const analysis = analyzeMyInfoStructure(member);
+      analyses.push({
+        username: member,
+        needsHealing:
+          analysis.needsAutoCompletion || analysis.needsFullCreation,
+        completeness: analysis.completenessScore || 0,
+      });
+    }
+
+    const needsHealingCount = analyses.filter((a) => a.needsHealing).length;
+    const avgCompleteness = Math.round(
+      analyses.reduce((sum, a) => sum + a.completeness, 0) / analyses.length
     );
-    console.log(`📊 Average Profile Completeness: ${averageCompleteness}%`);
+
     console.log(
-      `🕐 Timezone Manager: ${
-        timezoneManager.getCommonTimezones().length
-      } supported timezones`
+      `🛠️ Members needing self-healing: ${needsHealingCount}/${analyses.length}`
     );
-    console.log("🔧 FIXED Features:");
+    console.log(`📊 Average profile completeness: ${avgCompleteness}%`);
+    console.log("🔧 Self-Healing Features:");
+    console.log("  ✅ Auto-detection of incomplete My Info:: structures");
+    console.log("  ✅ Intelligent default generation with Roam user images");
     console.log(
-      "  ✅ Button Placement (sandbox-confirmed multi-selector approach)"
+      "  ✅ Boilerplate '__this field is not yet filled__' for missing data"
     );
-    console.log("  ✅ Enhanced My Info:: Auto-Creation (all 5 fields)");
-    console.log("  ✅ Field Name Variation Handling (Timezone/Time Zone)");
-    console.log("  ✅ Placeholder Detection and Replacement");
-    console.log("  ✅ Individual Field Creation Method");
-    console.log("  ✅ Professional Error Handling");
+    console.log("  ✅ Page navigation triggers for self-healing");
+    console.log("  ✅ Directory modal integration with healing indicators");
+
     console.groupEnd();
   } catch (error) {
-    console.error("Failed to show directory status:", error);
+    console.error("Failed to show self-healing status:", error);
   }
 };
 
 // ===================================================================
-// 🚀 ROAM EXTENSION EXPORT - Professional Integration (Enhanced)
+// 🚀 ROAM EXTENSION EXPORT - Self-Healing Integration
 // ===================================================================
 
 export default {
   onload: async ({ extensionAPI }) => {
-    console.log(
-      "🫂 Enhanced User Directory + Timezones starting (SYNTAX FIXED)..."
-    );
+    console.log("🛠️ Self-Healing User Directory + Timezones starting...");
 
     if (!window.RoamExtensionSuite) {
       console.error(
@@ -1286,84 +1455,104 @@ export default {
       return;
     }
 
-    const directoryServices = {
+    // 🛠️ REGISTER SELF-HEALING SERVICES
+    const selfHealingServices = {
+      // Core self-healing functions
+      analyzeMyInfoStructure: analyzeMyInfoStructure,
+      performSelfHealing: performSelfHealing,
+      generateSelfHealingDefaults: generateSelfHealingDefaults,
+      createCompleteMyInfoStructure: createCompleteMyInfoStructure,
+      createMyInfoField: createMyInfoField,
+      addValueToEmptyField: addValueToEmptyField,
+
+      // Enhanced user profile functions
       getUserProfileData: getUserProfileData,
       getAllUserProfiles: getAllUserProfiles,
-      initializeMyInfoStructure: initializeMyInfoStructure,
-      addFieldToMyInfo: addFieldToMyInfo,
       getCleanFieldValue: getCleanFieldValue,
+
+      // UI functions
       showUserDirectoryModal: showUserDirectoryModal,
-      showCompletionNudgeModal: showCompletionNudgeModal,
-      checkProfileCompletion: checkProfileCompletion,
+      createSelfHealingUserRow: createSelfHealingUserRow,
+
+      // Timezone functions
       timezoneManager: timezoneManager,
       getCurrentTimeForUser: (tz) => timezoneManager.getCurrentTimeForUser(tz),
       validateTimezone: (tz) => timezoneManager.validateTimezone(tz),
       getCommonTimezones: () => timezoneManager.getCommonTimezones(),
+
+      // Navigation functions
       addNavigationButtons: addNavigationButtons,
-      runDirectoryTests: runDirectoryTests,
-      showDirectoryStatus: showDirectoryStatus,
+
+      // Testing functions
+      runSelfHealingTests: runSelfHealingTests,
+      showSelfHealingStatus: showSelfHealingStatus,
     };
 
-    Object.entries(directoryServices).forEach(([name, service]) => {
+    Object.entries(selfHealingServices).forEach(([name, service]) => {
       platform.registerUtility(name, service);
     });
 
+    // 📝 REGISTER SELF-HEALING COMMANDS
     const commands = [
       {
-        label: "Directory: Show Enhanced User Directory",
+        label: "Self-Healing: Show Directory",
         callback: showUserDirectoryModal,
       },
       {
-        label: "Directory: Check My Profile (Enhanced)",
-        callback: async () => {
-          const check = await checkProfileCompletion();
-          if (check.shouldNudge) {
-            console.log(
-              check.needsInitialization
-                ? "🎯 Enhanced My Info:: structure needs initialization"
-                : `📊 Profile ${
-                    check.profile.completeness
-                  }% complete. Missing: ${check.missingFields.join(", ")}`
-            );
-            showCompletionNudgeModal(check);
-          } else {
-            console.log("✅ Enhanced My Info:: profile appears complete!");
-          }
-        },
-      },
-      {
-        label: "Directory: Initialize Enhanced My Info",
+        label: "Self-Healing: Heal My Profile",
         callback: async () => {
           const currentUser = platform.getUtility("getAuthenticatedUser")();
           if (currentUser) {
-            const success = await initializeMyInfoStructure(
-              currentUser.displayName
-            );
-            console.log(
-              `🎯 Enhanced My Info:: initialization ${
-                success ? "successful" : "failed"
-              }`
-            );
+            console.log(`🛠️ Self-healing ${currentUser.displayName}...`);
+            const result = await performSelfHealing(currentUser.displayName);
+            if (result.success) {
+              console.log(
+                `✅ Self-healing completed: ${
+                  result.successCount || 0
+                } fields healed`
+              );
+            } else {
+              console.log(
+                `❌ Self-healing failed: ${result.error || result.action}`
+              );
+            }
           }
         },
       },
       {
-        label: "Directory: Test Sandbox-Confirmed Button Placement",
+        label: "Self-Healing: Analyze My Profile",
         callback: () => {
-          console.log("🧪 Testing sandbox-confirmed button placement...");
-          addNavigationButtons();
-          console.log(
-            "✅ Buttons should appear using multi-selector sandbox approach"
-          );
+          const currentUser = platform.getUtility("getAuthenticatedUser")();
+          if (currentUser) {
+            const analysis = analyzeMyInfoStructure(currentUser.displayName);
+            console.group(
+              `🔍 Self-Healing Analysis: ${currentUser.displayName}`
+            );
+            console.log("Analysis result:", analysis);
+            console.groupEnd();
+          }
         },
       },
       {
-        label: "Directory: Show Enhanced System Status",
-        callback: showDirectoryStatus,
+        label: "Self-Healing: Force Heal All Users",
+        callback: async () => {
+          const confirmed = confirm(
+            "⚠️ This will force self-healing for ALL graph members. Continue?"
+          );
+          if (confirmed) {
+            console.log("🛠️ Force self-healing all users...");
+            await getAllUserProfiles({ autoHeal: true });
+            console.log("✅ Batch self-healing completed!");
+          }
+        },
       },
       {
-        label: "Directory: Run Enhanced System Tests",
-        callback: runDirectoryTests,
+        label: "Self-Healing: Run System Tests",
+        callback: runSelfHealingTests,
+      },
+      {
+        label: "Self-Healing: Show System Status",
+        callback: showSelfHealingStatus,
       },
     ];
 
@@ -1372,77 +1561,93 @@ export default {
       window._extensionRegistry.commands.push(cmd.label);
     });
 
-    startNavigationMonitoring();
+    // 🛠️ START SELF-HEALING MONITORING
+    startSelfHealingMonitoring();
 
+    // 🛠️ INITIAL SELF-HEALING CHECK
     setTimeout(async () => {
-      const completionCheck = await checkProfileCompletion();
-      if (completionCheck.shouldNudge) {
+      const currentUser = platform.getUtility("getAuthenticatedUser")();
+      const analysis = analyzeMyInfoStructure(currentUser.displayName);
+
+      if (analysis.needsAutoCompletion || analysis.needsFullCreation) {
         console.log(
-          completionCheck.needsInitialization
-            ? '🎯 Enhanced My Info:: needs initialization - use "Directory: Initialize Enhanced My Info"'
-            : '💡 Enhanced profile completion available - use "Directory: Check My Profile (Enhanced)"'
+          `🛠️ Initial self-healing triggered for ${currentUser.displayName}...`
+        );
+        const result = await performSelfHealing(currentUser.displayName);
+        if (result.success) {
+          console.log(
+            `✅ Initial self-healing completed: ${
+              result.successCount || 0
+            } fields healed`
+          );
+        }
+      } else {
+        console.log(
+          `✅ ${currentUser.displayName} profile is complete (${analysis.completenessScore}%)`
         );
       }
     }, 3000);
 
+    // 🎯 REGISTER SELF WITH PLATFORM
     platform.register(
       "user-directory",
       {
-        services: directoryServices,
+        services: selfHealingServices,
         timezoneManager: timezoneManager,
-        version: "6.2.1",
+        version: "6.3.0",
       },
       {
-        name: "Enhanced User Directory + Timezones (SYNTAX FIXED)",
+        name: "Self-Healing User Directory + Timezones",
         description:
-          "SYNTAX FIXED: Button placement (sandbox-confirmed) + Enhanced My Info:: auto-completion",
-        version: "6.2.1",
+          "Auto-completing My Info:: structures with intelligent defaults and boilerplate handling",
+        version: "6.3.0",
         dependencies: requiredDependencies,
       }
     );
 
+    // 🎉 STARTUP COMPLETE
     const currentUser = platform.getUtility("getAuthenticatedUser")();
     const memberCount = platform.getUtility("getGraphMemberCount")();
 
-    console.log("✅ Enhanced User Directory + Timezones loaded successfully!");
-    console.log("🔧 SYNTAX FIXED: All template literal errors resolved");
     console.log(
-      "🔧 FIXED: Button placement using sandbox-confirmed multi-selector approach"
+      "✅ Self-Healing User Directory + Timezones loaded successfully!"
     );
+    console.log("🛠️ NEW: Auto-completion sandbox integration");
+    console.log("🛠️ NEW: Self-healing My Info:: structures");
     console.log(
-      "🔧 FIXED: Enhanced My Info:: auto-completion with all 5 fields"
+      "🛠️ NEW: Boilerplate '__this field is not yet filled__' handling"
     );
-    console.log("🔧 FIXED: Field name consistency and placeholder detection");
-    console.log(`🫂 Enhanced directory ready for ${memberCount} graph members`);
+    console.log("🛠️ NEW: Roam user image integration for avatars");
+    console.log("🛠️ NEW: Page navigation self-healing triggers");
+    console.log(
+      `🫂 Self-healing directory ready for ${memberCount} graph members`
+    );
     console.log(
       `🕐 Timezone support: ${
         timezoneManager.getCommonTimezones().length
       } common timezones`
     );
-    console.log('💡 Try: Cmd+P → "Directory: Show Enhanced User Directory"');
+    console.log('💡 Try: Cmd+P → "Self-Healing: Show Directory"');
 
-    setTimeout(async () => {
-      const profile = await getUserProfileData(currentUser.displayName);
-      console.log(
-        profile.needsMyInfoCreation
-          ? "🎯 Enhanced My Info:: structure will be auto-created when needed"
-          : `📊 Your enhanced My Info:: profile: ${profile.completeness}% complete`
-      );
-    }, 1000);
+    console.log(
+      `🛠️ Current user: ${currentUser.displayName} (auto-healing will trigger as needed)`
+    );
   },
 
   onunload: () => {
-    console.log("🫂 Enhanced User Directory + Timezones unloading...");
+    console.log("🛠️ Self-Healing User Directory + Timezones unloading...");
 
+    // Clean up navigation buttons
     document
       .querySelectorAll(".user-directory-nav-button")
       .forEach((btn) => btn.remove());
 
+    // Clean up modals
     const modals = document.querySelectorAll(
       "#user-directory-modal, #completion-nudge-modal"
     );
     modals.forEach((modal) => modal.remove());
 
-    console.log("✅ Enhanced User Directory + Timezones cleanup complete!");
+    console.log("✅ Self-Healing User Directory + Timezones cleanup complete!");
   },
 };
