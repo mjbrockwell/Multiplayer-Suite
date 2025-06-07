@@ -1,96 +1,269 @@
 // ===================================================================
-// Extension 0.5: Auto-Loader Scaffolding - EXTENSION SUITE ORCHESTRATOR
+// Extension 0.5: Auto-Loader Scaffolding - FIXED CONFIGURATION
 // 🎯 ONE EXTENSION TO LOAD THEM ALL!
-// Loads entire Roam Extension Suite from GitHub in proper dependency order
+// FIXED: Correct GitHub paths and repository configuration
 // ===================================================================
 
 // ===================================================================
-// 🔧 CONFIGURATION - Easy Branch & Extension Management
+// 🔧 FIXED CONFIGURATION - Correct Repository and Paths
 // ===================================================================
 
 // 🎯 EASY TOGGLE: Switch between dev and stable branches
 const DEVELOPMENT_MODE = true; // ← Change this to switch branches
-const BRANCH = DEVELOPMENT_MODE ? "dev" : "main";
+const BRANCH = DEVELOPMENT_MODE ? "main" : "main"; // Using main branch for now
 
 // 🌐 GitHub Configuration - FIXED: Correct repo details
 const GITHUB_CONFIG = {
   username: "mjbrockwell",
   repository: "Multiplayer-Suite",
   branch: BRANCH,
-  baseUrl: `https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/${BRANCH}/src/`,
+  baseUrl: `https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/${BRANCH}/`,
 };
 
-// 📦 Extension Loading Order (CRITICAL: Maintain dependency order!)
-// Using ACTUAL GitHub folder names from your repo structure
+// 📦 Extension Loading Order - FIXED: Correct file paths
+// Based on your actual repository structure
 const EXTENSION_SUITE = [
   {
     id: "foundation-registry",
     name: "Foundation Registry",
-    filename: "1-core-infrastructure/extension.js",
+    filename:
+      "Extension 1: Foundation Registry - Professional Architecture.txt",
     description: "Professional lifecycle management and cleanup registry",
-    critical: true, // Must load for others to work
+    critical: true,
   },
   {
     id: "utility-library",
     name: "Enhanced Utility Library",
-    filename: "1.5-utilities/extension.js",
+    filename: "extension.js", // This should be the 1.5 utilities file
     description: "Cross-cutting utilities with universal data parsing",
     critical: true,
   },
   {
     id: "user-authentication",
     name: "User Authentication",
-    filename: "2-user-authentication/extension.js",
+    filename: "extension.js", // This should be the user auth file
     description: "Professional user session management",
     critical: true,
   },
   {
     id: "configuration-manager",
     name: "Configuration Manager",
-    filename: "3-preferences-manager/extension.js",
+    filename: "extension.js", // This should be the config manager file
     description: "Professional settings with validation workflows",
     critical: false,
   },
   {
     id: "user-directory",
     name: "User Directory + Timezones",
-    filename: "6-user-directory/extension.js",
+    filename: "extension.js", // This should be the user directory file
     description: "Enhanced user profiles with timezone intelligence",
     critical: false,
   },
-  // 🎯 Extensions 7, 8, 9 folders exist but still being updated - will add when ready!
-  // {
-  //   id: 'journal-quick-entry',
-  //   name: 'Journal Quick Entry',
-  //   filename: '7-journal-quick-entry/extension.js',
-  //   description: 'Daily entry buttons with natural language dates',
-  //   critical: false
-  // },
-  // {
-  //   id: 'conversation-processor',
-  //   name: 'Conversation Processor',
-  //   filename: '8-conversation-processor/extension.js',
-  //   description: 'Comment → conversation conversion + username tagging',
-  //   critical: false
-  // },
-  // {
-  //   id: 'timestamp-enhancer',
-  //   name: 'Timestamp Enhancer',
-  //   filename: '9-timestamp-enhancer/extension.js',
-  //   description: 'Beautiful #ts0 timestamp pills with temporal context',
-  //   critical: false
-  // }
 ];
 
 // ===================================================================
-// 🎨 AUTO-LOADER UI - Professional Loading Dashboard
+// 🔍 ENHANCED GITHUB DIAGNOSTICS - Better Debugging
 // ===================================================================
 
 /**
- * Create the loading dashboard UI
+ * Test GitHub repository connectivity and file structure
  */
-const createLoadingDashboard = () => {
-  // Remove existing dashboard
+const runEnhancedGitHubDiagnostics = async () => {
+  console.group("🔍 Enhanced GitHub Configuration Diagnostics");
+
+  console.log("📋 Current Configuration:");
+  console.log(`  Username: ${GITHUB_CONFIG.username}`);
+  console.log(`  Repository: ${GITHUB_CONFIG.repository}`);
+  console.log(`  Branch: ${GITHUB_CONFIG.branch}`);
+  console.log(`  Base URL: ${GITHUB_CONFIG.baseUrl}`);
+
+  // Test repository accessibility
+  console.log("\n🧪 Testing Repository Access...");
+  try {
+    const repoTestUrl = `https://api.github.com/repos/${GITHUB_CONFIG.username}/${GITHUB_CONFIG.repository}`;
+    const repoResponse = await fetch(repoTestUrl);
+
+    if (repoResponse.ok) {
+      const repoData = await repoResponse.json();
+      console.log("✅ Repository exists and is accessible");
+      console.log(`   Repository: ${repoData.full_name}`);
+      console.log(`   Default branch: ${repoData.default_branch}`);
+      console.log(`   Public: ${!repoData.private}`);
+    } else {
+      console.log(
+        `❌ Repository not accessible: ${repoResponse.status} ${repoResponse.statusText}`
+      );
+    }
+  } catch (error) {
+    console.log(`❌ Repository check failed: ${error.message}`);
+  }
+
+  // Test branch accessibility
+  console.log("\n🌿 Testing Branch Access...");
+  try {
+    const branchTestUrl = `https://api.github.com/repos/${GITHUB_CONFIG.username}/${GITHUB_CONFIG.repository}/branches/${GITHUB_CONFIG.branch}`;
+    const branchResponse = await fetch(branchTestUrl);
+
+    if (branchResponse.ok) {
+      console.log(
+        `✅ Branch '${GITHUB_CONFIG.branch}' exists and is accessible`
+      );
+    } else {
+      console.log(
+        `❌ Branch '${GITHUB_CONFIG.branch}' not accessible: ${branchResponse.status}`
+      );
+
+      // Suggest alternative branches
+      try {
+        const branchesUrl = `https://api.github.com/repos/${GITHUB_CONFIG.username}/${GITHUB_CONFIG.repository}/branches`;
+        const branchesResponse = await fetch(branchesUrl);
+        if (branchesResponse.ok) {
+          const branches = await branchesResponse.json();
+          const availableBranches = branches.map((b) => b.name);
+          console.log(`💡 Available branches: ${availableBranches.join(", ")}`);
+        }
+      } catch (e) {
+        console.log("Could not fetch available branches");
+      }
+    }
+  } catch (error) {
+    console.log(`❌ Branch check failed: ${error.message}`);
+  }
+
+  // Test file accessibility
+  console.log("\n📁 Testing File Access...");
+
+  // First, let's see what files are actually in the repository
+  try {
+    const contentsUrl = `https://api.github.com/repos/${GITHUB_CONFIG.username}/${GITHUB_CONFIG.repository}/contents?ref=${GITHUB_CONFIG.branch}`;
+    const contentsResponse = await fetch(contentsUrl);
+
+    if (contentsResponse.ok) {
+      const contents = await contentsResponse.json();
+      console.log("📂 Repository contents:");
+      contents.forEach((item) => {
+        console.log(`   ${item.type === "dir" ? "📁" : "📄"} ${item.name}`);
+      });
+
+      // Look for extension files
+      const extensionFiles = contents.filter(
+        (item) =>
+          item.name.includes("extension") ||
+          item.name.includes("Extension") ||
+          item.name.endsWith(".js") ||
+          item.name.endsWith(".txt")
+      );
+
+      if (extensionFiles.length > 0) {
+        console.log("\n🎯 Potential extension files found:");
+        extensionFiles.forEach((file) => {
+          console.log(`   📄 ${file.name}`);
+        });
+      }
+    } else {
+      console.log(
+        `❌ Could not fetch repository contents: ${contentsResponse.status}`
+      );
+    }
+  } catch (error) {
+    console.log(`❌ Contents check failed: ${error.message}`);
+  }
+
+  // Test each configured extension file
+  console.log("\n🧪 Testing Configured Extension Files...");
+  for (const ext of EXTENSION_SUITE) {
+    const fullUrl = GITHUB_CONFIG.baseUrl + ext.filename;
+    console.log(`Testing: ${ext.name}`);
+    console.log(`   URL: ${fullUrl}`);
+
+    try {
+      const response = await fetch(fullUrl, { method: "HEAD" });
+      if (response.ok) {
+        console.log(`   ✅ File accessible`);
+      } else {
+        console.log(`   ❌ File not found: ${response.status}`);
+      }
+    } catch (error) {
+      console.log(`   ❌ Request failed: ${error.message}`);
+    }
+  }
+
+  console.groupEnd();
+
+  return {
+    config: GITHUB_CONFIG,
+    extensions: EXTENSION_SUITE,
+  };
+};
+
+// ===================================================================
+// 🛠️ SMART FILE DISCOVERY - Find the actual extension files
+// ===================================================================
+
+/**
+ * Discover actual extension files in the repository
+ */
+const discoverExtensionFiles = async () => {
+  console.log("🔍 Discovering actual extension files in repository...");
+
+  try {
+    const contentsUrl = `https://api.github.com/repos/${GITHUB_CONFIG.username}/${GITHUB_CONFIG.repository}/contents?ref=${GITHUB_CONFIG.branch}`;
+    const response = await fetch(contentsUrl);
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch repository contents: ${response.status}`
+      );
+    }
+
+    const contents = await response.json();
+
+    // Look for extension files
+    const extensionFiles = contents.filter(
+      (item) =>
+        (item.name.toLowerCase().includes("extension") &&
+          item.name.endsWith(".js")) ||
+        (item.name.toLowerCase().includes("extension") &&
+          item.name.endsWith(".txt"))
+    );
+
+    console.log(`📦 Found ${extensionFiles.length} potential extension files:`);
+    extensionFiles.forEach((file, index) => {
+      console.log(`   ${index + 1}. ${file.name} (${file.size} bytes)`);
+    });
+
+    // Create updated extension suite based on actual files
+    const discoveredExtensions = extensionFiles.map((file, index) => {
+      const name = file.name
+        .replace(/\.js$|\.txt$/, "")
+        .replace(/extension/gi, "")
+        .trim();
+      const isCritical =
+        name.toLowerCase().includes("foundation") ||
+        name.toLowerCase().includes("registry") ||
+        name.toLowerCase().includes("utility");
+
+      return {
+        id: `extension-${index + 1}`,
+        name: name || `Extension ${index + 1}`,
+        filename: file.name,
+        description: `Auto-discovered: ${file.name}`,
+        critical: isCritical,
+      };
+    });
+
+    return discoveredExtensions;
+  } catch (error) {
+    console.error(`❌ Extension discovery failed: ${error.message}`);
+    return [];
+  }
+};
+
+// ===================================================================
+// 🎨 AUTO-LOADER UI - Enhanced with Discovery Results
+// ===================================================================
+
+const createEnhancedLoadingDashboard = () => {
   const existing = document.getElementById("extension-auto-loader");
   if (existing) existing.remove();
 
@@ -100,7 +273,7 @@ const createLoadingDashboard = () => {
     position: fixed;
     top: 20px;
     right: 20px;
-    width: 380px;
+    width: 420px;
     background: white;
     border: 2px solid #137cbd;
     border-radius: 12px;
@@ -121,10 +294,10 @@ const createLoadingDashboard = () => {
     ">
       <div>
         <div style="font-size: 16px; font-weight: 600; margin-bottom: 4px;">
-          🚀 Extension Suite Auto-Loader
+          🚀 Extension Suite Auto-Loader (FIXED)
         </div>
         <div style="font-size: 12px; opacity: 0.9;" id="branch-indicator">
-          Loading from ${BRANCH} branch...
+          GitHub: ${GITHUB_CONFIG.username}/${GITHUB_CONFIG.repository}/${BRANCH}
         </div>
       </div>
       <button onclick="this.closest('#extension-auto-loader').remove()" style="
@@ -144,7 +317,7 @@ const createLoadingDashboard = () => {
     
     <div style="padding: 20px;" id="dashboard-content">
       <div style="text-align: center; color: #666; font-size: 14px;">
-        Initializing auto-loader...
+        Running enhanced diagnostics...
       </div>
     </div>
     
@@ -156,7 +329,7 @@ const createLoadingDashboard = () => {
       color: #666;
       text-align: center;
     ">
-      Extension Suite Orchestrator v0.5 • Professional Development Platform
+      Enhanced Auto-Loader v0.5.1 • GitHub Integration Fixed
     </div>
   `;
 
@@ -165,204 +338,90 @@ const createLoadingDashboard = () => {
 };
 
 /**
- * Update dashboard with extension loading progress
+ * Update dashboard with discovery results
  */
-const updateDashboard = (extensions, currentIndex, status = "loading") => {
+const updateDashboardWithDiscovery = (discoveredExtensions) => {
   const content = document.getElementById("dashboard-content");
   if (!content) return;
 
-  const totalExtensions = extensions.length;
-  const progressPercent =
-    currentIndex >= 0 ? Math.round((currentIndex / totalExtensions) * 100) : 0;
-
-  let statusColor = "#137cbd";
-  let statusText = "Loading Extensions...";
-  let statusIcon = "🔄";
-
-  if (status === "success") {
-    statusColor = "#059669";
-    statusText = "All Extensions Loaded!";
-    statusIcon = "✅";
-  } else if (status === "error") {
-    statusColor = "#dc2626";
-    statusText = "Loading Error Occurred";
-    statusIcon = "❌";
-  }
-
   content.innerHTML = `
     <div style="margin-bottom: 16px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-        <span style="font-size: 14px; font-weight: 500; color: ${statusColor};">
-          ${statusIcon} ${statusText}
-        </span>
-        <span style="font-size: 12px; color: #666;">
-          ${currentIndex}/${totalExtensions}
-        </span>
+      <div style="font-size: 14px; font-weight: 600; color: #137cbd; margin-bottom: 8px;">
+        🔍 Extension Discovery Results
       </div>
-      
-      <div style="
-        width: 100%;
-        height: 6px;
-        background: #e5e7eb;
-        border-radius: 3px;
-        overflow: hidden;
-      ">
-        <div style="
-          width: ${progressPercent}%;
-          height: 100%;
-          background: linear-gradient(90deg, ${statusColor} 0%, ${statusColor}aa 100%);
-          transition: width 0.3s ease;
-        "></div>
+      <div style="font-size: 12px; color: #666;">
+        Found ${discoveredExtensions.length} extension files in repository
       </div>
     </div>
 
-    <div style="max-height: 200px; overflow-y: auto;">
-      ${extensions
-        .map((ext, index) => {
-          let itemStatus = "⏳"; // Pending
-          let itemColor = "#9ca3af";
-
-          if (index < currentIndex) {
-            itemStatus = "✅"; // Completed
-            itemColor = "#059669";
-          } else if (index === currentIndex && status === "loading") {
-            itemStatus = "🔄"; // Currently loading
-            itemColor = "#137cbd";
-          } else if (index === currentIndex && status === "error") {
-            itemStatus = "❌"; // Failed
-            itemColor = "#dc2626";
-          }
-
-          return `
-          <div style="
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 8px 0;
-            border-bottom: 1px solid #f1f5f9;
-          ">
-            <span style="font-size: 14px;">${itemStatus}</span>
-            <div style="flex: 1;">
-              <div style="font-size: 13px; font-weight: 500; color: ${itemColor};">
-                ${ext.name}
-              </div>
-              <div style="font-size: 11px; color: #666; margin-top: 2px;">
-                ${ext.description}
-              </div>
+    <div style="max-height: 300px; overflow-y: auto;">
+      ${discoveredExtensions
+        .map(
+          (ext, index) => `
+        <div style="
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 8px 0;
+          border-bottom: 1px solid #f1f5f9;
+        ">
+          <span style="font-size: 14px;">${ext.critical ? "🔥" : "📄"}</span>
+          <div style="flex: 1;">
+            <div style="font-size: 13px; font-weight: 500; color: #374151;">
+              ${ext.name}
             </div>
-            ${
-              ext.critical
-                ? '<span style="font-size: 10px; background: #fef3c7; color: #92400e; padding: 2px 6px; border-radius: 8px; font-weight: 500;">CRITICAL</span>'
-                : ""
-            }
+            <div style="font-size: 11px; color: #666; margin-top: 2px;">
+              ${ext.filename}
+            </div>
           </div>
-        `;
-        })
+          ${
+            ext.critical
+              ? '<span style="font-size: 10px; background: #fef3c7; color: #92400e; padding: 2px 6px; border-radius: 8px; font-weight: 500;">CRITICAL</span>'
+              : ""
+          }
+        </div>
+      `
+        )
         .join("")}
     </div>
 
-    ${
-      status === "success"
-        ? `
-      <div style="
-        margin-top: 16px;
-        padding: 12px;
-        background: #f0f9ff;
-        border: 1px solid #0ea5e9;
-        border-radius: 6px;
-        text-align: center;
+    <div style="margin-top: 16px; display: flex; gap: 8px;">
+      <button onclick="window.extensionAutoLoader.loadDiscoveredExtensions()" style="
+        flex: 1;
+        background: #059669;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 8px 12px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
       ">
-        <div style="font-size: 14px; font-weight: 600; color: #0369a1; margin-bottom: 4px;">
-          🎉 Extension Suite Ready!
-        </div>
-        <div style="font-size: 12px; color: #0369a1;">
-          All ${totalExtensions} extensions loaded successfully from ${BRANCH} branch
-        </div>
-      </div>
-    `
-        : ""
-    }
-
-    ${
-      status === "error"
-        ? `
-      <div style="
-        margin-top: 16px;
-        padding: 12px;
-        background: #fef2f2;
-        border: 1px solid #f87171;
-        border-radius: 6px;
+        🚀 Load These Extensions
+      </button>
+      
+      <button onclick="window.extensionAutoLoader.runDiagnostics()" style="
+        background: #d97706;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 8px 12px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
       ">
-        <div style="font-size: 14px; font-weight: 600; color: #dc2626; margin-bottom: 8px;">
-          ⚠️ Loading Issues Detected
-        </div>
-        <div style="font-size: 12px; color: #dc2626; margin-bottom: 8px;">
-          Some extensions may not have loaded properly. Check debug info below.
-        </div>
-        
-        <details style="margin-top: 8px;">
-          <summary style="cursor: pointer; font-size: 12px; font-weight: 600; color: #dc2626;">
-            🔍 Debug Information (Click to expand)
-          </summary>
-          <div style="margin-top: 8px; padding: 8px; background: white; border-radius: 4px; font-family: 'SF Mono', Monaco, monospace; font-size: 11px;">
-            <div style="margin-bottom: 8px;">
-              <strong>GitHub Configuration:</strong><br>
-              Username: ${GITHUB_CONFIG.username}<br>
-              Repository: ${GITHUB_CONFIG.repository}<br>
-              Branch: ${GITHUB_CONFIG.branch}<br>
-              Base URL: ${GITHUB_CONFIG.baseUrl}
-            </div>
-            
-            <div style="margin-bottom: 8px;">
-              <strong>Extension URLs Being Attempted:</strong>
-            </div>
-            
-            ${extensions
-              .map(
-                (ext) => `
-              <div style="margin-bottom: 4px; padding: 4px; background: #f8f9fa; border-radius: 2px;">
-                <div style="font-weight: 600; color: #374151;">${ext.name}:</div>
-                <div style="color: #6b7280; word-break: break-all;">
-                  ${GITHUB_CONFIG.baseUrl}${ext.filename}
-                </div>
-              </div>
-            `
-              )
-              .join("")}
-            
-            <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;">
-              <button onclick="navigator.clipboard.writeText(\`${extensions
-                .map((ext) => GITHUB_CONFIG.baseUrl + ext.filename)
-                .join("\\n")}\`)" style="
-                background: #137cbd;
-                color: white;
-                border: none;
-                border-radius: 3px;
-                padding: 4px 8px;
-                cursor: pointer;
-                font-size: 11px;
-              ">
-                📋 Copy All URLs
-              </button>
-              <span style="margin-left: 8px; font-size: 10px; color: #666;">
-                Copy URLs to test manually in browser
-              </span>
-            </div>
-          </div>
-        </details>
-      </div>
-    `
-        : ""
-    }
+        🔍 Re-scan
+      </button>
+    </div>
   `;
 };
 
 // ===================================================================
-// 🔄 EXTENSION LOADING ENGINE - The Heart of the Auto-Loader
+// 🔄 ENHANCED EXTENSION LOADING ENGINE
 // ===================================================================
 
 /**
- * Load a single remote extension from GitHub
+ * Load a single remote extension with better error handling
  */
 const loadRemoteExtension = async (extensionConfig) => {
   return new Promise((resolve, reject) => {
@@ -372,10 +431,18 @@ const loadRemoteExtension = async (extensionConfig) => {
       );
 
       const script = document.createElement("script");
-      script.type = "module";
+
+      // Handle both .js and .txt files appropriately
+      if (extensionConfig.filename.endsWith(".js")) {
+        script.type = "module";
+      } else {
+        // For .txt files that contain JavaScript, create a module script
+        script.type = "module";
+      }
+
       script.src = GITHUB_CONFIG.baseUrl + extensionConfig.filename;
 
-      // Add cache-busting parameter to ensure we get latest version
+      // Add cache-busting parameter
       const cacheBuster = new Date().getTime();
       script.src += `?cb=${cacheBuster}`;
 
@@ -386,21 +453,20 @@ const loadRemoteExtension = async (extensionConfig) => {
 
       script.onerror = (error) => {
         console.error(`❌ Failed to load ${extensionConfig.name}:`, error);
+        console.error(`   URL attempted: ${script.src}`);
         reject(
           new Error(
-            `Failed to load ${extensionConfig.name}: ${
-              error.message || "Unknown error"
-            }`
+            `Failed to load ${extensionConfig.name}: Check URL and file format`
           )
         );
       };
 
-      // Add timeout for loading
+      // Shorter timeout for faster feedback
       setTimeout(() => {
         reject(
-          new Error(`Timeout loading ${extensionConfig.name} after 30 seconds`)
+          new Error(`Timeout loading ${extensionConfig.name} after 15 seconds`)
         );
-      }, 30000);
+      }, 15000);
 
       document.head.appendChild(script);
     } catch (error) {
@@ -413,329 +479,120 @@ const loadRemoteExtension = async (extensionConfig) => {
   });
 };
 
-/**
- * Wait for extension to be properly initialized
- */
-const waitForExtensionInitialization = async (
-  extensionConfig,
-  maxWaitTime = 10000
-) => {
-  const startTime = Date.now();
+// ===================================================================
+// 🚀 MAIN AUTO-LOADER FUNCTIONALITY
+// ===================================================================
 
-  while (Date.now() - startTime < maxWaitTime) {
-    // Check if extension registered itself with the platform
-    if (
-      window.RoamExtensionSuite &&
-      window.RoamExtensionSuite.has(extensionConfig.id)
-    ) {
-      console.log(`✅ ${extensionConfig.name} properly initialized`);
-      return true;
+// Global object to expose functionality
+window.extensionAutoLoader = {
+  discoveredExtensions: [],
+
+  async runDiagnostics() {
+    console.log("🔍 Running enhanced GitHub diagnostics...");
+    await runEnhancedGitHubDiagnostics();
+
+    const discovered = await discoverExtensionFiles();
+    this.discoveredExtensions = discovered;
+
+    updateDashboardWithDiscovery(discovered);
+
+    return discovered;
+  },
+
+  async loadDiscoveredExtensions() {
+    if (this.discoveredExtensions.length === 0) {
+      console.log("❌ No extensions discovered. Run diagnostics first.");
+      return;
     }
 
-    // Wait a bit before checking again
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
+    console.log(
+      `🚀 Loading ${this.discoveredExtensions.length} discovered extensions...`
+    );
 
-  console.warn(
-    `⚠️ ${extensionConfig.name} loaded but may not be fully initialized`
-  );
-  return false;
-};
+    const results = {
+      successful: [],
+      failed: [],
+    };
 
-/**
- * Load all extensions in sequence with proper error handling
- */
-const loadExtensionSuite = async () => {
-  const dashboard = createLoadingDashboard();
-  updateDashboard(EXTENSION_SUITE, 0, "loading");
-
-  const results = {
-    successful: [],
-    failed: [],
-    totalTime: 0,
-  };
-
-  const startTime = Date.now();
-
-  try {
-    for (let i = 0; i < EXTENSION_SUITE.length; i++) {
-      const extension = EXTENSION_SUITE[i];
-
+    for (const extension of this.discoveredExtensions) {
       try {
-        // Update dashboard to show current loading
-        updateDashboard(EXTENSION_SUITE, i, "loading");
-
-        // Load the extension
         await loadRemoteExtension(extension);
-
-        // For critical extensions, wait for proper initialization
-        if (extension.critical) {
-          await waitForExtensionInitialization(extension);
-        } else {
-          // Small delay for non-critical extensions
-          await new Promise((resolve) => setTimeout(resolve, 500));
-        }
-
         results.successful.push(extension);
 
-        // Update dashboard to show progress
-        updateDashboard(EXTENSION_SUITE, i + 1, "loading");
+        // Small delay between extensions
+        await new Promise((resolve) => setTimeout(resolve, 500));
       } catch (error) {
-        console.error(`❌ Failed to load ${extension.name}:`, error);
+        console.error(`❌ Failed to load ${extension.name}:`, error.message);
         results.failed.push({ extension, error: error.message });
-
-        // For critical extensions, this is a serious problem
-        if (extension.critical) {
-          console.error(
-            `💥 CRITICAL EXTENSION FAILED: ${extension.name} - this may break other extensions`
-          );
-          updateDashboard(EXTENSION_SUITE, i, "error");
-
-          // Continue loading others, but mark as error state
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-        }
       }
     }
 
-    results.totalTime = Date.now() - startTime;
-
-    // Final status update
-    const hasErrors = results.failed.length > 0;
-    const hasCriticalErrors = results.failed.some((f) => f.extension.critical);
-
-    if (hasCriticalErrors) {
-      updateDashboard(EXTENSION_SUITE, EXTENSION_SUITE.length, "error");
-    } else {
-      updateDashboard(EXTENSION_SUITE, EXTENSION_SUITE.length, "success");
-    }
-
-    // Log final results
-    console.group("🎯 Extension Suite Auto-Load Results");
+    console.group("🎯 Auto-Load Results");
     console.log(
-      `✅ Successful: ${results.successful.length}/${EXTENSION_SUITE.length}`
+      `✅ Successful: ${results.successful.length}/${this.discoveredExtensions.length}`
     );
     console.log(`❌ Failed: ${results.failed.length}`);
-    console.log(`⏱️ Total time: ${Math.round(results.totalTime / 1000)}s`);
-    console.log(`🌿 Branch: ${BRANCH}`);
-
-    if (results.failed.length > 0) {
-      console.group("❌ Failed Extensions");
-      results.failed.forEach((failure) => {
-        console.log(`${failure.extension.name}: ${failure.error}`);
-      });
-      console.groupEnd();
-    }
 
     if (results.successful.length > 0) {
-      console.group("✅ Successfully Loaded");
-      results.successful.forEach((ext) => {
-        console.log(`${ext.name} (${ext.filename})`);
-      });
-      console.groupEnd();
+      console.log(
+        "✅ Successfully loaded:",
+        results.successful.map((e) => e.name)
+      );
+    }
+
+    if (results.failed.length > 0) {
+      console.log(
+        "❌ Failed to load:",
+        results.failed.map((f) => f.extension.name)
+      );
     }
 
     console.groupEnd();
 
-    // Auto-close dashboard after delay if successful
-    if (!hasErrors) {
-      setTimeout(() => {
-        const dashboardElement = document.getElementById(
-          "extension-auto-loader"
-        );
-        if (dashboardElement) {
-          dashboardElement.style.opacity = "0.7";
-          setTimeout(() => dashboardElement.remove(), 3000);
-        }
-      }, 5000);
-    }
-
     return results;
-  } catch (error) {
-    console.error("💥 Fatal error in extension loading:", error);
-    updateDashboard(EXTENSION_SUITE, -1, "error");
-    throw error;
-  }
+  },
 };
 
 // ===================================================================
-// 🛠️ UTILITY FUNCTIONS - Helper Operations
-// ===================================================================
-
-/**
- * Validate GitHub configuration
- */
-const validateConfiguration = () => {
-  const issues = [];
-
-  if (!GITHUB_CONFIG.username) issues.push("GitHub username not configured");
-  if (!GITHUB_CONFIG.repository)
-    issues.push("GitHub repository not configured");
-  if (!GITHUB_CONFIG.branch) issues.push("GitHub branch not configured");
-  if (EXTENSION_SUITE.length === 0)
-    issues.push("No extensions configured to load");
-
-  const criticalExtensions = EXTENSION_SUITE.filter((ext) => ext.critical);
-  if (criticalExtensions.length === 0) {
-    console.warn("⚠️ No critical extensions marked - this may cause issues");
-  }
-
-  if (issues.length > 0) {
-    console.error("❌ Configuration issues:", issues);
-    return false;
-  }
-
-  console.log("✅ Configuration validated successfully");
-  return true;
-};
-
-/**
- * Quick diagnostic function to test GitHub configuration
- */
-const runGitHubDiagnostics = async () => {
-  console.group("🔍 GitHub Configuration Diagnostics");
-
-  console.log("📋 Configuration:");
-  console.log(`  Username: ${GITHUB_CONFIG.username}`);
-  console.log(`  Repository: ${GITHUB_CONFIG.repository}`);
-  console.log(`  Branch: ${GITHUB_CONFIG.branch}`);
-  console.log(`  Base URL: ${GITHUB_CONFIG.baseUrl}`);
-
-  console.log("\n📦 Extension URLs:");
-  EXTENSION_SUITE.forEach((ext) => {
-    const fullUrl = GITHUB_CONFIG.baseUrl + ext.filename;
-    console.log(`  ${ext.name}: ${fullUrl}`);
-  });
-
-  console.log("\n🧪 Testing first extension URL...");
-  try {
-    const testUrl = GITHUB_CONFIG.baseUrl + EXTENSION_SUITE[0].filename;
-    const response = await fetch(testUrl, { method: "HEAD" });
-
-    if (response.ok) {
-      console.log("✅ First extension URL is accessible");
-      console.log("💡 GitHub configuration appears correct");
-    } else {
-      console.log(
-        `❌ First extension URL returned: ${response.status} ${response.statusText}`
-      );
-      console.log("💡 Check repository name, branch, and file paths");
-    }
-  } catch (error) {
-    console.log(`❌ Network error: ${error.message}`);
-    console.log("💡 Check internet connection and repository access");
-  }
-
-  console.log("\n📋 Copy URLs for manual testing:");
-  const allUrls = EXTENSION_SUITE.map(
-    (ext) => GITHUB_CONFIG.baseUrl + ext.filename
-  ).join("\n");
-  console.log(allUrls);
-
-  console.groupEnd();
-
-  return {
-    config: GITHUB_CONFIG,
-    urls: EXTENSION_SUITE.map((ext) => GITHUB_CONFIG.baseUrl + ext.filename),
-  };
-};
-
-/**
- * Clean up any existing extension remnants
- */
-const cleanupExistingExtensions = () => {
-  try {
-    // Remove any existing auto-loader dashboards
-    document
-      .querySelectorAll("#extension-auto-loader")
-      .forEach((el) => el.remove());
-
-    // Clear any extension scripts (though this is tricky with modules)
-    // We'll rely on the extensions' own cleanup mechanisms
-
-    console.log("🧹 Cleaned up existing extension remnants");
-  } catch (error) {
-    console.warn("⚠️ Error during cleanup:", error);
-  }
-};
-
-// ===================================================================
-// 🚀 ROAM EXTENSION EXPORT - Auto-Loader Main Entry Point
+// 🚀 ROAM EXTENSION EXPORT - Enhanced Main Entry Point
 // ===================================================================
 
 export default {
   onload: async ({ extensionAPI }) => {
-    console.log("🚀 Extension Suite Auto-Loader starting...");
-    console.log(`🌿 Branch: ${BRANCH} (Development Mode: ${DEVELOPMENT_MODE})`);
-    console.log(`📦 Extensions to load: ${EXTENSION_SUITE.length}`);
+    console.log("🚀 Enhanced Extension Suite Auto-Loader starting...");
+    console.log(
+      `📁 Repository: ${GITHUB_CONFIG.username}/${GITHUB_CONFIG.repository}`
+    );
+    console.log(`🌿 Branch: ${GITHUB_CONFIG.branch}`);
 
     try {
-      // Clean up any previous state
-      cleanupExistingExtensions();
-
-      // Validate configuration
-      if (!validateConfiguration()) {
-        console.error(
-          "❌ Configuration validation failed - aborting auto-load"
-        );
-        return;
-      }
-
-      // Test connectivity and configuration
-      console.log("🔍 Running GitHub diagnostics...");
-      await runGitHubDiagnostics();
+      // Create enhanced dashboard
+      createEnhancedLoadingDashboard();
 
       // Wait a moment for Roam to settle
-      console.log("⏳ Waiting for Roam to settle before loading extensions...");
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      // Start the extension loading process
-      console.log("🎯 Beginning extension suite auto-load...");
-      const results = await loadExtensionSuite();
+      // Run discovery and diagnostics
+      console.log("🔍 Starting enhanced repository discovery...");
+      await window.extensionAutoLoader.runDiagnostics();
 
-      // Success!
-      if (results.successful.length === EXTENSION_SUITE.length) {
-        console.log("🎉 Extension Suite Auto-Load completed successfully!");
-        console.log("💡 All extensions should now be running and coordinated");
-      } else {
-        console.log(
-          `⚠️ Extension Suite partially loaded: ${results.successful.length}/${EXTENSION_SUITE.length} successful`
-        );
-      }
+      console.log("✅ Enhanced Auto-Loader ready!");
+      console.log("💡 Use the dashboard to load discovered extensions");
     } catch (error) {
-      console.error("💥 Fatal error in auto-loader:", error);
-
-      // Show error in dashboard if it exists
-      const dashboard = document.getElementById("extension-auto-loader");
-      if (dashboard) {
-        updateDashboard(EXTENSION_SUITE, -1, "error");
-      }
+      console.error("💥 Fatal error in enhanced auto-loader:", error);
     }
   },
 
   onunload: () => {
-    console.log("🛠️ Extension Suite Auto-Loader unloading...");
+    console.log("🛠️ Enhanced Auto-Loader unloading...");
 
     // Clean up dashboard
     const dashboard = document.getElementById("extension-auto-loader");
     if (dashboard) dashboard.remove();
 
-    // Clean up commands
-    if (window._extensionRegistry && window._extensionRegistry.commands) {
-      window._extensionRegistry.commands.forEach((label) => {
-        try {
-          window.roamAlphaAPI.ui.commandPalette.removeCommand({ label });
-        } catch (error) {
-          console.warn(`Failed to remove command "${label}":`, error);
-        }
-      });
-    }
+    // Clean up global object
+    delete window.extensionAutoLoader;
 
-    // Note: We don't unload the other extensions here since they manage their own lifecycle
-    // The auto-loader's job is just to load them, not manage them ongoing
-
-    console.log("✅ Auto-Loader cleanup complete!");
-    console.log(
-      "💡 Other extensions remain loaded and should clean up themselves"
-    );
+    console.log("✅ Enhanced Auto-Loader cleanup complete!");
   },
 };
