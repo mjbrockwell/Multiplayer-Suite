@@ -691,6 +691,155 @@ window.navigateToUserPage = (username) => {
 };
 
 // ===================================================================
+// 🧭 NAVIGATION INTEGRATION - Show Directory Button Placement
+// ===================================================================
+
+/**
+ * Add navigation buttons using sandbox-confirmed approach
+ */
+const addNavigationButtons = () => {
+  try {
+    // Remove existing buttons first
+    document
+      .querySelectorAll(".user-directory-nav-button")
+      .forEach((btn) => btn.remove());
+
+    console.log(
+      "🎯 Placing Show Directory button using sandbox-confirmed approach..."
+    );
+
+    const platform = window.RoamExtensionSuite;
+    const getCurrentPageTitle = platform.getUtility("getCurrentPageTitle");
+    const getAuthenticatedUser = platform.getUtility("getAuthenticatedUser");
+    const isGraphMember = platform.getUtility("isGraphMember");
+
+    const currentPageTitle = getCurrentPageTitle();
+    const currentUser = getAuthenticatedUser();
+
+    if (!currentPageTitle || !currentUser) return;
+
+    // Sandbox-confirmed multi-selector approach
+    const possibleTargets = [
+      ".roam-article",
+      ".roam-main",
+      ".rm-article-wrapper",
+      ".roam-center-panel",
+      ".flex-h-box > div:nth-child(2)",
+      "#app > div > div > div:nth-child(2)",
+      '.bp3-tab-panel[aria-hidden="false"]',
+    ];
+
+    let targetElement = null;
+    let selectorUsed = null;
+
+    for (const selector of possibleTargets) {
+      const element = document.querySelector(selector);
+      if (element) {
+        targetElement = element;
+        selectorUsed = selector;
+        console.log(`✅ Found target using: ${selector}`);
+        break;
+      }
+    }
+
+    if (!targetElement) {
+      console.error("❌ Could not find suitable target element");
+      targetElement = document.body;
+      selectorUsed = "body (fallback)";
+    }
+
+    // Ensure relative positioning
+    const computedStyle = getComputedStyle(targetElement);
+    if (computedStyle.position === "static") {
+      targetElement.style.position = "relative";
+      console.log(`🔧 Set ${selectorUsed} to position: relative`);
+    }
+
+    // Create the Show Directory button
+    const directoryButton = document.createElement("button");
+    directoryButton.className = "user-directory-nav-button";
+    directoryButton.textContent = "🫂 Show Directory";
+    directoryButton.style.cssText = `
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 9999;
+      background: linear-gradient(135deg, #fef3c7 0%, #fbbf24 100%);
+      color: #92400e;
+      border: 1px solid #f59e0b;
+      border-radius: 8px;
+      padding: 10px 16px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);
+      transition: all 0.2s ease;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    `;
+
+    // Add click handler
+    directoryButton.addEventListener("click", showUserDirectoryModal);
+
+    // Add hover effects
+    directoryButton.addEventListener("mouseenter", () => {
+      directoryButton.style.background =
+        "linear-gradient(135deg, #fde68a 0%, #f59e0b 100%)";
+      directoryButton.style.transform = "translateY(-1px)";
+    });
+
+    directoryButton.addEventListener("mouseleave", () => {
+      directoryButton.style.background =
+        "linear-gradient(135deg, #fef3c7 0%, #fbbf24 100%)";
+      directoryButton.style.transform = "translateY(0)";
+    });
+
+    // Append to target
+    targetElement.appendChild(directoryButton);
+    window._extensionRegistry.elements.push(directoryButton);
+
+    console.log(`✅ Show Directory button added to: ${selectorUsed}`);
+    console.log(`📍 Button position: absolute at top: 10px, left: 10px`);
+
+    const rect = targetElement.getBoundingClientRect();
+    console.log(`📐 Target dimensions:`, {
+      selector: selectorUsed,
+      width: rect.width,
+      height: rect.height,
+      top: rect.top,
+      left: rect.left,
+      position: computedStyle.position,
+    });
+  } catch (error) {
+    console.error("❌ Error adding navigation buttons:", error);
+  }
+};
+
+/**
+ * Monitor page changes and update navigation buttons
+ */
+const startNavigationMonitoring = () => {
+  // Add button initially with delay
+  setTimeout(addNavigationButtons, 1000);
+
+  // Monitor for page changes
+  let lastUrl = window.location.href;
+  const checkUrlChange = () => {
+    if (window.location.href !== lastUrl) {
+      lastUrl = window.location.href;
+      console.log("📍 Page changed, re-adding Show Directory button...");
+      setTimeout(addNavigationButtons, 500);
+    }
+    setTimeout(checkUrlChange, 1000);
+  };
+
+  checkUrlChange();
+
+  console.log(
+    "📡 Navigation monitoring started with sandbox-confirmed placement"
+  );
+};
+
+// ===================================================================
 // 🧪 ENHANCED TESTING AND DEBUGGING - Multiple Data Strategies
 // ===================================================================
 
@@ -818,11 +967,16 @@ export default {
       timezoneManager: timezoneManager,
       debugUserDataDetection: debugUserDataDetection,
       runDirectoryTests: runDirectoryTests,
+      addNavigationButtons: addNavigationButtons,
+      startNavigationMonitoring: startNavigationMonitoring,
     };
 
     Object.entries(directoryServices).forEach(([name, service]) => {
       platform.registerUtility(name, service);
     });
+
+    // 🧭 START NAVIGATION MONITORING (this was missing!)
+    startNavigationMonitoring();
 
     const commands = [
       {
