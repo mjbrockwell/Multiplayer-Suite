@@ -1,6 +1,7 @@
 // ===================================================================
-// Extension 4: Navigation + Protection - Smart Landing & Collaborative Pages
-// Professional navigation experience with intelligent page protection
+// Extension 4: Navigation + Protection - REWRITTEN
+// FIXED: Uses Directory:: as ONLY source of truth for user page protection
+// No pattern matching - direct lookup against [[roam/graph members]]
 // Dependencies: Extensions 1, 1.5, 2, 3
 // ===================================================================
 
@@ -150,8 +151,92 @@ const handleSmartLanding = async () => {
 };
 
 // ===================================================================
-// 🛡️ PAGE PROTECTION SYSTEM - Collaborative Immutability
+// 🛡️ PAGE PROTECTION SYSTEM - Source of Truth Based
 // ===================================================================
+
+/**
+ * Get the authoritative list of graph members from Directory::
+ */
+const getGraphMembersList = () => {
+  try {
+    const platform = window.RoamExtensionSuite;
+    const getGraphMembers = platform.getUtility("getGraphMembers");
+
+    if (getGraphMembers) {
+      return getGraphMembers();
+    }
+
+    // Fallback: direct query if utility not available
+    const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
+    const findDataValue = platform.getUtility("findDataValue");
+
+    const membersPageUid = getPageUidByTitle("roam/graph members");
+    if (!membersPageUid) return [];
+
+    const members = findDataValue(membersPageUid, "Directory");
+    if (!members) return [];
+
+    return Array.isArray(members) ? members : [members];
+  } catch (error) {
+    console.warn("Failed to get graph members list:", error);
+    return [];
+  }
+};
+
+/**
+ * Extract potential page owner from page title
+ * Returns the username if this could be a user page, null otherwise
+ */
+const extractPotentialPageOwner = (pageTitle) => {
+  if (!pageTitle) return null;
+
+  // If page contains "/", the part before "/" might be a username
+  if (pageTitle.includes("/")) {
+    return pageTitle.split("/")[0];
+  }
+
+  // Otherwise, the full page title might be a username
+  return pageTitle;
+};
+
+/**
+ * REWRITTEN: Check if page is protected based ONLY on Directory:: source of truth
+ */
+const isPageProtectedByUser = (pageTitle) => {
+  if (!pageTitle) return { isProtected: false };
+
+  try {
+    // Get authoritative list of graph members
+    const graphMembers = getGraphMembersList();
+
+    if (!graphMembers || graphMembers.length === 0) {
+      return { isProtected: false }; // No members list = no protection
+    }
+
+    // Extract potential page owner
+    const potentialOwner = extractPotentialPageOwner(pageTitle);
+
+    if (!potentialOwner) {
+      return { isProtected: false };
+    }
+
+    // Check if potential owner is in the authoritative Directory:: list
+    const isInDirectory = graphMembers.includes(potentialOwner);
+
+    if (isInDirectory) {
+      return {
+        isProtected: true,
+        pageOwner: potentialOwner,
+        pageType: pageTitle.includes("/") ? "subpage" : "main",
+      };
+    }
+
+    return { isProtected: false };
+  } catch (error) {
+    console.warn("Error checking page protection:", error);
+    return { isProtected: false }; // Fail safe - allow editing
+  }
+};
 
 /**
  * Detect if block is within a roam/comments tree
@@ -186,7 +271,7 @@ const isInCommentsTree = (blockElement) => {
 };
 
 /**
- * Check edit permissions for a block
+ * REWRITTEN: Check edit permissions using source of truth logic
  */
 const checkEditPermission = async (blockElement) => {
   try {
@@ -202,46 +287,42 @@ const checkEditPermission = async (blockElement) => {
       return { allowed: true }; // Can't determine, allow edit
     }
 
-    // Always allow if user is editing their own page
-    if (currentPage === currentUser.displayName) {
-      return { allowed: true };
-    }
-
     // Always allow if in comments tree
     if (isInCommentsTree(blockElement)) {
       return { allowed: true, reason: "comments-tree" };
     }
 
-    // Check if current page is someone's user page
-    const isUserPage =
-      currentPage.includes("/") ||
-      currentPage.match(/^[A-Z][a-z]+ [A-Z][a-z]+$/); // "First Last" pattern
+    // Check if this page is protected based on Directory:: source of truth
+    const protection = isPageProtectedByUser(currentPage);
 
-    if (isUserPage) {
-      // Extract username from page (basic pattern matching)
-      let pageOwner = currentPage;
-      if (currentPage.includes("/")) {
-        pageOwner = currentPage.split("/")[0];
-      }
-
-      // Check if page owner has immutable setting
-      const isImmutable = await getUserPreference(
-        pageOwner,
-        "Immutable Home Page",
-        "yes"
-      );
-
-      if (isImmutable === "yes") {
-        return {
-          allowed: false,
-          reason: "immutable",
-          pageOwner,
-          showModal: true,
-        };
-      }
+    if (!protection.isProtected) {
+      return { allowed: true }; // Not a user page, allow editing
     }
 
-    return { allowed: true };
+    // This is a user page - check if current user is the owner
+    if (protection.pageOwner === currentUser.displayName) {
+      return { allowed: true, reason: "own-page" }; // User editing their own page
+    }
+
+    // Different user's page - check their immutable preference
+    const isImmutable = await getUserPreference(
+      protection.pageOwner,
+      "Immutable Home Page",
+      "no" // Default to allowing edits
+    );
+
+    if (isImmutable === "yes") {
+      return {
+        allowed: false,
+        reason: "immutable",
+        pageOwner: protection.pageOwner,
+        pageType: protection.pageType,
+        showModal: true,
+      };
+    }
+
+    // User allows edits to their page
+    return { allowed: true, reason: "user-allows-edits" };
   } catch (error) {
     console.warn("Permission check failed:", error.message);
     return { allowed: true }; // Fail open for user experience
@@ -251,7 +332,7 @@ const checkEditPermission = async (blockElement) => {
 /**
  * Show protection modal with helpful alternatives
  */
-const showProtectionModal = (pageOwner, attemptingUser) => {
+const showProtectionModal = (pageOwner, pageType, attemptingUser) => {
   // Remove any existing modal
   const existingModal = document.querySelector(
     ".roam-extension-suite-protection-modal"
@@ -287,17 +368,24 @@ const showProtectionModal = (pageOwner, attemptingUser) => {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   `;
 
+  const pageTypeDescription =
+    pageType === "subpage" ? "page and subpages" : "page";
+
   modalContent.innerHTML = `
     <div style="display: flex; align-items: center; margin-bottom: 16px;">
       <span style="font-size: 20px; margin-right: 8px;">🔒</span>
-      <h3 style="margin: 0; font-size: 18px; font-weight: 600;">Protected Page</h3>
+      <h3 style="margin: 0; font-size: 18px; font-weight: 600;">Protected User Page</h3>
     </div>
     <p style="margin: 0 0 20px 0; line-height: 1.5; color: #374151;">
-      ${pageOwner} has set their page to be immutable so blocks cannot be edited. 
+      <strong>${pageOwner}</strong> has set their ${pageTypeDescription} to be immutable, so blocks cannot be edited. 
       However, you can add a comment to any block by hovering over it with the 
       <kbd style="background: #f3f4f6; padding: 2px 6px; border-radius: 3px; font-family: monospace;">Cmd</kbd> 
       key pressed.
     </p>
+    <div style="margin: 12px 0; padding: 12px; background: #f8f9fa; border-radius: 4px; font-size: 14px; color: #666;">
+      <strong>Source:</strong> This page is protected because "${pageOwner}" is listed in the 
+      <strong>roam/graph members → Directory::</strong> and has immutable settings enabled.
+    </div>
     <div style="display: flex; gap: 12px; justify-content: flex-end;">
       <button class="open-my-page" style="background: #137cbd; color: white; border: none; border-radius: 3px; padding: 8px 16px; cursor: pointer; font-weight: 500;">
         Open My Page
@@ -365,10 +453,14 @@ const interceptEditAttempts = () => {
         );
         const currentUser = getAuthenticatedUser();
 
-        showProtectionModal(permission.pageOwner, currentUser);
+        showProtectionModal(
+          permission.pageOwner,
+          permission.pageType,
+          currentUser
+        );
 
         console.log(
-          `🛡️ Edit blocked on ${permission.pageOwner}'s immutable page`
+          `🛡️ Edit blocked on ${permission.pageOwner}'s immutable ${permission.pageType} page`
         );
       }
     }
@@ -429,6 +521,7 @@ const getCurrentPageInfo = () => {
 
   const title = getCurrentPageTitle();
   const uid = title ? getPageUidByTitle(title) : null;
+  const protection = isPageProtectedByUser(title);
 
   return {
     title,
@@ -437,7 +530,62 @@ const getCurrentPageInfo = () => {
     isDailyNote: title
       ? window.roamAlphaAPI.util.dateToPageTitle(new Date()) === title
       : false,
+    protection,
   };
+};
+
+// ===================================================================
+// 🧪 TESTING AND DEBUGGING UTILITIES
+// ===================================================================
+
+/**
+ * Test the protection system with current page
+ */
+const testProtectionSystem = async () => {
+  try {
+    console.group("🧪 Protection System Test");
+
+    const platform = window.RoamExtensionSuite;
+    const getCurrentPageTitle = platform.getUtility("getCurrentPageTitle");
+    const getAuthenticatedUser = platform.getUtility("getAuthenticatedUser");
+
+    const currentPage = getCurrentPageTitle();
+    const currentUser = getAuthenticatedUser();
+
+    console.log("Current Page:", currentPage);
+    console.log("Current User:", currentUser?.displayName);
+
+    // Test protection detection
+    const protection = isPageProtectedByUser(currentPage);
+    console.log("Protection Check:", protection);
+
+    // Test graph members list
+    const members = getGraphMembersList();
+    console.log("Graph Members:", members);
+
+    // Test edit permission
+    const focusedBlock = document.querySelector(".rm-block--focused");
+    if (focusedBlock) {
+      const permission = await checkEditPermission(focusedBlock);
+      console.log("Edit Permission:", permission);
+
+      if (!permission.allowed && permission.showModal) {
+        showProtectionModal(
+          permission.pageOwner,
+          permission.pageType,
+          currentUser
+        );
+      }
+    } else {
+      console.log(
+        "No focused block found - focus on a block to test edit permission"
+      );
+    }
+
+    console.groupEnd();
+  } catch (error) {
+    console.error("Protection test failed:", error);
+  }
 };
 
 // ===================================================================
@@ -446,7 +594,7 @@ const getCurrentPageInfo = () => {
 
 export default {
   onload: async ({ extensionAPI }) => {
-    console.log("🧭 Navigation + Protection starting...");
+    console.log("🧭 Navigation + Protection starting (REWRITTEN)...");
 
     // ✅ VERIFY DEPENDENCIES
     if (!window.RoamExtensionSuite) {
@@ -477,7 +625,7 @@ export default {
     try {
       // Start page protection monitoring
       interceptEditAttempts();
-      console.log("🛡️ Page protection system active");
+      console.log("🛡️ Source-of-truth page protection system active");
 
       // Set up smart landing (delayed to let page load)
       const setupSmartLanding = async () => {
@@ -501,6 +649,9 @@ export default {
       checkEditPermission: checkEditPermission,
       isInCommentsTree: isInCommentsTree,
       calculateSmartLanding: calculateSmartLanding,
+      isPageProtectedByUser: isPageProtectedByUser,
+      getGraphMembersList: getGraphMembersList,
+      testProtectionSystem: testProtectionSystem,
     };
 
     Object.entries(navigationServices).forEach(([name, service]) => {
@@ -518,6 +669,23 @@ export default {
           console.log("UID:", pageInfo.uid);
           console.log("URL:", pageInfo.url);
           console.log("Is Daily Note:", pageInfo.isDailyNote);
+          console.log("Protection Status:", pageInfo.protection);
+          console.groupEnd();
+        },
+      },
+      {
+        label: "Nav: Test Protection System",
+        callback: testProtectionSystem,
+      },
+      {
+        label: "Nav: Show Graph Members List",
+        callback: () => {
+          const members = getGraphMembersList();
+          console.group("📋 Graph Members (Source of Truth)");
+          console.log(`Found ${members.length} members in Directory::`);
+          members.forEach((member, index) => {
+            console.log(`${index + 1}. ${member}`);
+          });
           console.groupEnd();
         },
       },
@@ -548,32 +716,6 @@ export default {
         },
       },
       {
-        label: "Nav: Test Page Protection",
-        callback: async () => {
-          const getAuthenticatedUser = platform.getUtility(
-            "getAuthenticatedUser"
-          );
-          const user = getAuthenticatedUser();
-
-          console.group("🛡️ Page Protection Test");
-          console.log("Current user:", user?.displayName);
-
-          // Test permission for current block
-          const focusedBlock = document.querySelector(".rm-block--focused");
-          if (focusedBlock) {
-            const permission = await checkEditPermission(focusedBlock);
-            console.log("Edit permission:", permission);
-
-            if (!permission.allowed) {
-              showProtectionModal(permission.pageOwner, user);
-            }
-          } else {
-            console.log("No focused block found for testing");
-          }
-          console.groupEnd();
-        },
-      },
-      {
         label: "Nav: Reset Landing Redirect",
         callback: () => {
           sessionStorage.removeItem("roam_landing_redirected");
@@ -595,13 +737,13 @@ export default {
       "navigation-protection",
       {
         services: navigationServices,
-        version: "1.0.0",
+        version: "1.1.0",
       },
       {
-        name: "Navigation + Protection",
+        name: "Navigation + Protection (Source of Truth)",
         description:
-          "Smart landing experience with collaborative page protection",
-        version: "1.0.0",
+          "Smart landing + user page protection based on Directory:: source of truth",
+        version: "1.1.0",
         dependencies: [
           "foundation-registry",
           "utility-library",
@@ -615,11 +757,25 @@ export default {
     const getAuthenticatedUser = platform.getUtility("getAuthenticatedUser");
     const user = getAuthenticatedUser();
     const pageInfo = getCurrentPageInfo();
+    const memberCount = getGraphMembersList().length;
 
-    console.log("✅ Navigation + Protection loaded successfully!");
+    console.log("✅ Navigation + Protection (REWRITTEN) loaded successfully!");
+    console.log("🔧 FIXED: Uses Directory:: as ONLY source of truth");
+    console.log("🔧 FIXED: No pattern matching - direct lookup only");
+    console.log("🔧 FIXED: Fails safe (allows editing) when uncertain");
     console.log(`🧭 Current page: ${pageInfo.title || "Unknown"}`);
     console.log(`👤 User: ${user?.displayName || "Unknown"}`);
-    console.log('💡 Try: Cmd+P → "Nav: Show Current Page Info"');
+    console.log(`📋 Protecting pages for ${memberCount} graph members`);
+    console.log('💡 Try: Cmd+P → "Nav: Test Protection System"');
+
+    // Show protection status for current page
+    if (pageInfo.protection.isProtected) {
+      console.log(
+        `🛡️ Current page is protected by ${pageInfo.protection.pageOwner}`
+      );
+    } else {
+      console.log("🔓 Current page is not protected (not a user page)");
+    }
 
     // Show smart landing status
     const redirected =
