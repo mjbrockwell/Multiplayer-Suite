@@ -9,6 +9,26 @@
 // ===================================================================
 
 /**
+ * Extract graph name from URL and format it nicely
+ */
+const getFormattedGraphName = () => {
+  try {
+    const url = window.location.href;
+    // Extract from pattern: https://roamresearch.com/#/app/Developer_Sandbox_MattB/page/...
+    const match = url.match(/#\/app\/([^\/]+)\//);
+    if (match) {
+      const graphName = match[1];
+      // Replace underscores with spaces: "Developer_Sandbox_MattB" → "Developer Sandbox MattB"
+      return graphName.replace(/_/g, " ");
+    }
+    return "Unknown Graph";
+  } catch (error) {
+    console.warn("Failed to extract graph name:", error);
+    return "Unknown Graph";
+  }
+};
+
+/**
  * Clean timezone parsing and calculation system
  */
 class TimezoneManager {
@@ -188,7 +208,7 @@ const getUserProfileDataClean = async (username) => {
       "location",
       "role",
       "timezone",
-      "aboutme",
+      "aboutMe",
     ];
     const profileData = {
       username,
@@ -394,7 +414,7 @@ const initializeUserProfile = async (username) => {
  */
 const showUserDirectoryModalClean = async () => {
   try {
-    console.log("📋 Opening CLEAN User Directory...");
+    console.log("📋 Opening User Directory...");
 
     // Remove existing modal
     const existingModal = document.getElementById("clean-user-directory-modal");
@@ -436,7 +456,7 @@ const showUserDirectoryModalClean = async () => {
     // Show loading state
     content.innerHTML = `
       <div style="padding: 40px; text-align: center;">
-        <div style="font-size: 16px; color: #666;">Loading clean user directory...</div>
+        <div style="font-size: 16px; color: #666;">Loading user directory...</div>
         <div style="margin-top: 10px; font-size: 14px; color: #999;">Using Extension 1.5 exact functions • No filtering</div>
       </div>
     `;
@@ -460,6 +480,7 @@ const showUserDirectoryModalClean = async () => {
     const profiles = await getAllUserProfilesClean();
     const platform = window.RoamExtensionSuite;
     const currentUser = platform.getUtility("getAuthenticatedUser")();
+    const graphName = getFormattedGraphName();
 
     // Render complete modal
     content.innerHTML = `
@@ -472,7 +493,7 @@ const showUserDirectoryModalClean = async () => {
       ">
         <div>
           <h2 style="margin: 0; font-size: 20px; font-weight: 600; color: #1a202c;">
-            🫂 Clean User Directory
+            👥 User Directory: ${graphName}
           </h2>
           <div style="margin-top: 4px; font-size: 14px; color: #666;">
             ${
@@ -535,14 +556,14 @@ const showUserDirectoryModalClean = async () => {
         color: #666;
         text-align: center;
       ">
-        🧹 CLEAN: Extension 1.5 exact functions • No filtering • Clear placeholder distinction
+        🧹 Extension 1.5 exact functions • No filtering • Clear placeholder distinction
       </div>
     `;
 
     // Start real-time clock updates
     startRealtimeClockUpdatesClean(modal);
 
-    console.log("✅ Clean User Directory modal opened");
+    console.log("✅ User Directory modal opened");
   } catch (error) {
     console.error("❌ Failed to show clean user directory:", error);
   }
@@ -759,7 +780,7 @@ const addNavigationButtonsClean = () => {
     // Create the Show Directory button
     const directoryButton = document.createElement("button");
     directoryButton.className = "clean-directory-nav-button";
-    directoryButton.textContent = "🫂 Clean Directory";
+    directoryButton.textContent = "👥 User Directory";
     directoryButton.style.cssText = `
       position: absolute;
       top: 10px;
@@ -942,7 +963,7 @@ const runCleanSystemTests = async () => {
 
 export default {
   onload: async ({ extensionAPI }) => {
-    console.log("🧹 CLEAN User Directory + Timezones starting...");
+    console.log("👥 User Directory + Timezones starting...");
 
     // ✅ VERIFY DEPENDENCIES
     if (!window.RoamExtensionSuite) {
@@ -1000,11 +1021,11 @@ export default {
     // 📝 REGISTER CLEAN COMMANDS
     const commands = [
       {
-        label: "Clean Directory: Show CLEAN User Directory",
+        label: "User Directory: Show User Directory",
         callback: showUserDirectoryModalClean,
       },
       {
-        label: "Clean Directory: Test My Data Extraction",
+        label: "User Directory: Test My Data Extraction",
         callback: async () => {
           const currentUser = platform.getUtility("getAuthenticatedUser")();
           if (currentUser) {
@@ -1013,11 +1034,11 @@ export default {
         },
       },
       {
-        label: "Clean Directory: Show Placeholder Distinction",
+        label: "User Directory: Show Placeholder Distinction",
         callback: showPlaceholderDistinction,
       },
       {
-        label: "Clean Directory: Initialize My Profile Structure",
+        label: "User Directory: Initialize My Profile Structure",
         callback: async () => {
           const currentUser = platform.getUtility("getAuthenticatedUser")();
           if (currentUser) {
@@ -1036,11 +1057,11 @@ export default {
         },
       },
       {
-        label: "Clean Directory: Run CLEAN System Tests",
+        label: "User Directory: Run System Tests",
         callback: runCleanSystemTests,
       },
       {
-        label: "Clean Directory: Add Show Directory Button",
+        label: "User Directory: Add Show Directory Button",
         callback: addNavigationButtonsClean,
       },
     ];
@@ -1069,13 +1090,13 @@ export default {
 
     // 🎉 STARTUP COMPLETE
     const currentUser = platform.getUtility("getAuthenticatedUser")();
-    console.log("✅ CLEAN User Directory loaded successfully!");
+    console.log("✅ User Directory loaded successfully!");
     console.log("🧹 CLEAN: Uses ONLY Extension 1.5 exact functions");
     console.log("🧹 CLEAN: No filtering - shows actual data");
     console.log("🧹 CLEAN: Clear placeholder distinction");
     console.log(`👤 Current user: ${currentUser?.displayName}`);
     console.log(
-      '💡 Try: Cmd+P → "Clean Directory: Show Placeholder Distinction"'
+      '💡 Try: Cmd+P → "User Directory: Show Placeholder Distinction"'
     );
 
     // Show current user's profile structure
@@ -1088,7 +1109,7 @@ export default {
   },
 
   onunload: () => {
-    console.log("🧹 CLEAN User Directory unloading...");
+    console.log("👥 User Directory unloading...");
 
     // Clean up modals
     const modals = document.querySelectorAll("#clean-user-directory-modal");
@@ -1097,6 +1118,6 @@ export default {
     // Navigation helper cleanup
     delete window.navigateToUserPageClean;
 
-    console.log("✅ CLEAN User Directory cleanup complete!");
+    console.log("✅ User Directory cleanup complete!");
   },
 };
