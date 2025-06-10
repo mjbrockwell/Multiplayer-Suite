@@ -1,7 +1,7 @@
 // ===================================================================
-// Extension 6: User Directory + Timezones - FIXED DATA & UI
-// FIXED: Enhanced data detection, larger modal, clickable names/avatars
-// FIXED: Better debugging for data loading issues
+// Extension 6: Clean User Directory + Timezones - Complete Rebuild
+// CLEAN: Uses ONLY Extension 1.5 exact functions, no filtering
+// Focus: Professional UI, clear placeholder distinction, real data display
 // ===================================================================
 
 // ===================================================================
@@ -9,7 +9,7 @@
 // ===================================================================
 
 /**
- * Comprehensive timezone parsing and calculation system
+ * Clean timezone parsing and calculation system
  */
 class TimezoneManager {
   constructor() {
@@ -58,7 +58,6 @@ class TimezoneManager {
     const offsetMatch = cleaned.match(/^(GMT|UTC)([+-]\d{1,2})$/i);
     if (offsetMatch) {
       const offset = parseInt(offsetMatch[2]);
-      // For simplicity, map some common offsets
       const offsetMap = {
         "-8": "America/Los_Angeles",
         "-7": "America/Denver",
@@ -150,295 +149,262 @@ class TimezoneManager {
 const timezoneManager = new TimezoneManager();
 
 // ===================================================================
-// 👥 ENHANCED USER PROFILE DATA COLLECTION - FIXED with Multiple Detection Methods
+// 👥 CLEAN USER PROFILE DATA COLLECTION - Using ONLY Extension 1.5 Exact Functions
 // ===================================================================
 
 /**
- * 🔧 FIXED: Enhanced getUserProfileData with multiple detection strategies
+ * 🎯 CLEAN: Extract user profile data using ONLY exact functions from Extension 1.5
+ * No filtering, no multiple strategies - just exact extraction
  */
-const getUserProfileData = async (username) => {
+const getUserProfileDataClean = async (username) => {
   try {
-    console.log(`🔍 DEBUGGING: Getting profile data for ${username}...`);
+    console.log(`🔍 CLEAN: Getting profile data for ${username}...`);
 
     const platform = window.RoamExtensionSuite;
     const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
-    const findNestedDataValues = platform.getUtility("findNestedDataValues");
-    const findDataValue = platform.getUtility("findDataValue");
+    const findNestedDataValuesExact = platform.getUtility(
+      "findNestedDataValuesExact"
+    );
 
+    // Step 1: Get user page UID
     const userPageUid = getPageUidByTitle(username);
-    console.log(`📄 User page UID for ${username}:`, userPageUid);
+    console.log(`📄 Page UID for ${username}:`, userPageUid);
 
     if (!userPageUid) {
-      return {
-        username,
-        exists: false,
-        avatar: null,
-        location: null,
-        role: null,
-        timezone: null,
-        aboutMe: null,
-        completeness: 0,
-        missingFields: ["Avatar", "Location", "Role", "Timezone", "About Me"],
-        debugInfo: "User page not found",
-      };
+      return createMissingUserProfile(username);
     }
 
-    // Strategy 1: Try nested data under "My Info::"
-    console.log(
-      `🔍 Strategy 1: Looking for nested data under "My Info::" for ${username}`
-    );
-    let myInfoData = findNestedDataValues(userPageUid, "My Info");
-    console.log(`📊 My Info nested data for ${username}:`, myInfoData);
+    // Step 2: Extract nested data using EXACT functions only
+    const myInfoData = findNestedDataValuesExact(userPageUid, "My Info");
+    console.log(`📊 Raw My Info data for ${username}:`, myInfoData);
 
-    // Strategy 2: Try individual attribute format queries
-    console.log(
-      `🔍 Strategy 2: Looking for individual attributes for ${username}`
-    );
-    const individualFields = {
-      avatar: findDataValue(userPageUid, "Avatar"),
-      location: findDataValue(userPageUid, "Location"),
-      role: findDataValue(userPageUid, "Role"),
-      timezone: findDataValue(userPageUid, "Timezone"),
-      aboutMe: findDataValue(userPageUid, "About Me"),
-    };
-    console.log(`📊 Individual fields for ${username}:`, individualFields);
-
-    // Strategy 3: Try direct block queries to see what's actually on the page
-    console.log(`🔍 Strategy 3: Direct block analysis for ${username}`);
-    const allBlocks = window.roamAlphaAPI.data.q(`
-      [:find ?uid ?string
-       :where 
-       [?parent :block/uid "${userPageUid}"]
-       [?parent :block/children ?child]
-       [?child :block/uid ?uid]
-       [?child :block/string ?string]]
-    `);
-    console.log(`📋 All top-level blocks on ${username} page:`, allBlocks);
-
-    // Look for blocks that might contain profile data
-    const profileBlocks = allBlocks.filter(([uid, text]) => {
-      const lowerText = text.toLowerCase();
-      return (
-        lowerText.includes("avatar") ||
-        lowerText.includes("location") ||
-        lowerText.includes("role") ||
-        lowerText.includes("timezone") ||
-        lowerText.includes("about me") ||
-        lowerText.includes("my info")
-      );
-    });
-    console.log(`🎯 Profile-related blocks for ${username}:`, profileBlocks);
-
-    // Combine data from all strategies
-    let avatar = null,
-      location = null,
-      role = null,
-      timezone = null,
-      aboutMe = null;
-
-    // From nested data
-    if (myInfoData && Object.keys(myInfoData).length > 0) {
-      avatar = getCleanFieldValue(myInfoData, ["Avatar"]);
-      location = getCleanFieldValue(myInfoData, ["Location"]);
-      role = getCleanFieldValue(myInfoData, ["Role"]);
-      timezone = getCleanFieldValue(myInfoData, ["Timezone", "Time Zone"]);
-      aboutMe = getCleanFieldValue(myInfoData, ["About Me"]);
+    if (!myInfoData || Object.keys(myInfoData).length === 0) {
+      return createMissingMyInfoProfile(username);
     }
 
-    // From individual fields (override if found)
-    if (individualFields.avatar) avatar = individualFields.avatar;
-    if (individualFields.location) location = individualFields.location;
-    if (individualFields.role) role = individualFields.role;
-    if (individualFields.timezone) timezone = individualFields.timezone;
-    if (individualFields.aboutMe) aboutMe = individualFields.aboutMe;
-
-    // Clean the values
-    avatar = getCleanFieldValue({ value: avatar }, ["value"]);
-    location = getCleanFieldValue({ value: location }, ["value"]);
-    role = getCleanFieldValue({ value: role }, ["value"]);
-    timezone = getCleanFieldValue({ value: timezone }, ["value"]);
-    aboutMe = getCleanFieldValue({ value: aboutMe }, ["value"]);
-
-    console.log(`📊 Final cleaned data for ${username}:`, {
-      avatar,
-      location,
-      role,
-      timezone,
-      aboutMe,
-    });
-
-    // Calculate profile completeness
-    const requiredFields = ["Avatar", "Location", "Role", "Timezone"];
-    const fieldValues = [avatar, location, role, timezone];
-    const completedFields = fieldValues.filter(
-      (value) => value !== null
-    ).length;
-    const completeness = Math.round(
-      (completedFields / requiredFields.length) * 100
-    );
-
-    // Get timezone information
-    let timezoneInfo = null;
-    if (timezone) {
-      timezoneInfo = timezoneManager.getCurrentTimeForUser(timezone);
-    }
-
-    // Identify missing fields
-    const missingFields = [];
-    if (!avatar) missingFields.push("Avatar");
-    if (!location) missingFields.push("Location");
-    if (!role) missingFields.push("Role");
-    if (!timezone) missingFields.push("Timezone");
-    if (!aboutMe) missingFields.push("About Me");
-
-    const result = {
+    // Step 3: Map expected fields with proper placeholder distinction
+    const expectedFields = [
+      "avatar",
+      "location",
+      "role",
+      "timezone",
+      "aboutme",
+    ];
+    const profileData = {
       username,
       exists: true,
-      avatar,
-      location,
-      role,
-      timezone,
-      aboutMe,
-      completeness,
-      timezoneInfo,
-      missingFields,
-      debugInfo: {
-        strategies: {
-          nestedData: myInfoData,
-          individualFields,
-          profileBlocks: profileBlocks.length,
-        },
-        finalValues: { avatar, location, role, timezone, aboutMe },
-      },
+      hasMyInfo: true,
     };
 
-    console.log(`✅ Final profile result for ${username}:`, result);
-    return result;
-  } catch (error) {
-    console.error(`❌ Failed to get profile data for ${username}:`, error);
-    return {
-      username,
-      exists: false,
-      error: error.message,
-      completeness: 0,
-      missingFields: ["Avatar", "Location", "Role", "Timezone", "About Me"],
-      debugInfo: `Error: ${error.message}`,
-    };
-  }
-};
-
-/**
- * Helper to get clean field values with enhanced placeholder detection
- */
-const getCleanFieldValue = (dataObject, fieldNames) => {
-  for (const fieldName of fieldNames) {
-    const value = dataObject[fieldName];
-    if (value && typeof value === "string") {
-      const trimmed = value.trim();
-
-      // Enhanced placeholder detection
-      const placeholders = [
-        "not set",
-        "not specified",
-        "location not set",
-        "timezone not set",
-        "role not set",
-        "team member",
-        "graph member",
-        "unknown",
-        "tbd",
-        "todo",
-        "—",
-        "-",
-        "",
-      ];
-
-      const isPlaceholder = placeholders.some((placeholder) =>
-        trimmed.toLowerCase().includes(placeholder.toLowerCase())
-      );
-
-      if (!isPlaceholder && trimmed.length > 0) {
-        return trimmed;
+    expectedFields.forEach((field) => {
+      if (myInfoData.hasOwnProperty(field)) {
+        // Field exists - use whatever value is there (no filtering!)
+        profileData[field] = myInfoData[field];
+      } else {
+        // Field completely missing from structure
+        profileData[field] = "__missing field__";
       }
+    });
+
+    // Calculate profile completeness (exclude placeholders)
+    const realDataFields = expectedFields.filter((field) => {
+      const value = profileData[field];
+      return (
+        value &&
+        value !== "__missing field__" &&
+        value !== "__not yet entered__"
+      );
+    });
+
+    profileData.completeness = Math.round(
+      (realDataFields.length / expectedFields.length) * 100
+    );
+
+    // Get timezone information if timezone exists and is real
+    if (
+      profileData.timezone &&
+      profileData.timezone !== "__missing field__" &&
+      profileData.timezone !== "__not yet entered__"
+    ) {
+      profileData.timezoneInfo = timezoneManager.getCurrentTimeForUser(
+        profileData.timezone
+      );
+    } else {
+      profileData.timezoneInfo = { timeString: "—", isValid: false };
     }
+
+    console.log(`✅ CLEAN profile data for ${username}:`, profileData);
+    return profileData;
+  } catch (error) {
+    console.error(`❌ CLEAN extraction failed for ${username}:`, error);
+    return createErrorProfile(username, error.message);
   }
-  return null;
 };
 
 /**
- * Get all user profiles for directory with enhanced error handling
+ * Create profile for user with no page
  */
-const getAllUserProfiles = async () => {
+const createMissingUserProfile = (username) => {
+  return {
+    username,
+    exists: false,
+    hasMyInfo: false,
+    avatar: "__missing field__",
+    location: "__missing field__",
+    role: "__missing field__",
+    timezone: "__missing field__",
+    aboutme: "__missing field__",
+    completeness: 0,
+    timezoneInfo: { timeString: "—", isValid: false },
+    debugInfo: "User page not found",
+  };
+};
+
+/**
+ * Create profile for user page without My Info structure
+ */
+const createMissingMyInfoProfile = (username) => {
+  return {
+    username,
+    exists: true,
+    hasMyInfo: false,
+    avatar: "__missing field__",
+    location: "__missing field__",
+    role: "__missing field__",
+    timezone: "__missing field__",
+    aboutme: "__missing field__",
+    completeness: 0,
+    timezoneInfo: { timeString: "—", isValid: false },
+    debugInfo: "User page exists but no My Info:: structure found",
+  };
+};
+
+/**
+ * Create profile for extraction errors
+ */
+const createErrorProfile = (username, errorMessage) => {
+  return {
+    username,
+    exists: false,
+    hasMyInfo: false,
+    avatar: "__missing field__",
+    location: "__missing field__",
+    role: "__missing field__",
+    timezone: "__missing field__",
+    aboutme: "__missing field__",
+    completeness: 0,
+    timezoneInfo: { timeString: "—", isValid: false },
+    error: errorMessage,
+    debugInfo: `Error: ${errorMessage}`,
+  };
+};
+
+/**
+ * Get all user profiles using clean extraction
+ */
+const getAllUserProfilesClean = async () => {
   try {
     const platform = window.RoamExtensionSuite;
     const getGraphMembers = platform.getUtility("getGraphMembers");
 
     const members = getGraphMembers();
     console.log(
-      `📊 Collecting profiles for ${members.length} graph members...`
+      `📊 CLEAN: Collecting profiles for ${members.length} graph members...`
     );
 
     const profiles = await Promise.all(
       members.map(async (username) => {
-        try {
-          return await getUserProfileData(username);
-        } catch (error) {
-          console.warn(`⚠️ Failed to get profile for ${username}:`, error);
-          return {
-            username,
-            exists: false,
-            error: error.message,
-            completeness: 0,
-            missingFields: [
-              "Avatar",
-              "Location",
-              "Role",
-              "Timezone",
-              "About Me",
-            ],
-            debugInfo: `Error: ${error.message}`,
-          };
-        }
+        return await getUserProfileDataClean(username);
       })
     );
 
+    // Sort by username
     profiles.sort((a, b) => a.username.localeCompare(b.username));
 
-    console.log(`✅ Collected ${profiles.length} user profiles`);
-    console.log(
-      "📊 Profile summary:",
-      profiles.map((p) => ({
-        username: p.username,
-        completeness: p.completeness,
-        missingFields: p.missingFields?.length || 0,
-      }))
-    );
-
+    console.log(`✅ CLEAN: Collected ${profiles.length} user profiles`);
     return profiles;
   } catch (error) {
-    console.error("Failed to collect user profiles:", error);
+    console.error("❌ CLEAN: Failed to collect user profiles:", error);
     return [];
   }
 };
 
+/**
+ * Initialize user profile with clear placeholders
+ */
+const initializeUserProfile = async (username) => {
+  try {
+    console.log(`🎯 Initializing profile structure for ${username}...`);
+
+    const platform = window.RoamExtensionSuite;
+    const createPageIfNotExists = platform.getUtility("createPageIfNotExists");
+    const setNestedDataValuesStructured = platform.getUtility(
+      "setNestedDataValuesStructured"
+    );
+    const getCurrentUser = platform.getUtility("getCurrentUser");
+
+    const userPageUid = await createPageIfNotExists(username);
+    if (!userPageUid) {
+      console.error(`❌ Failed to create page for ${username}`);
+      return false;
+    }
+
+    const currentUser = getCurrentUser();
+    const isCurrentUser = username === currentUser.displayName;
+
+    // Create clear placeholder structure
+    const defaultProfileData = {
+      avatar:
+        isCurrentUser && currentUser.photoUrl
+          ? currentUser.photoUrl
+          : "__not yet entered__",
+      location: "__not yet entered__",
+      role: "__not yet entered__",
+      timezone: "__not yet entered__",
+      aboutme: "__not yet entered__",
+    };
+
+    const success = await setNestedDataValuesStructured(
+      userPageUid,
+      "My Info",
+      defaultProfileData,
+      true // Use attribute format (My Info::)
+    );
+
+    if (success) {
+      console.log(`✅ Profile structure initialized for ${username}`);
+      console.log(
+        "💡 Structure created with obvious placeholders: '__not yet entered__'"
+      );
+    }
+
+    return success;
+  } catch (error) {
+    console.error(`❌ Failed to initialize profile for ${username}:`, error);
+    return false;
+  }
+};
+
 // ===================================================================
-// 🎨 USER DIRECTORY MODAL - FIXED: Larger Size, Clickable Names/Avatars, No Actions
+// 🎨 PROFESSIONAL USER DIRECTORY MODAL - Clean UI with Placeholder Distinction
 // ===================================================================
 
 /**
- * Create and display enhanced user directory modal - FIXED UI
+ * Create and display professional user directory modal
  */
-const showUserDirectoryModal = async () => {
+const showUserDirectoryModalClean = async () => {
   try {
-    console.log("📋 Opening ENHANCED User Directory...");
+    console.log("📋 Opening CLEAN User Directory...");
 
-    const existingModal = document.getElementById("user-directory-modal");
+    // Remove existing modal
+    const existingModal = document.getElementById("clean-user-directory-modal");
     if (existingModal) {
       existingModal.remove();
     }
 
+    // Create modal container
     const modal = document.createElement("div");
-    modal.id = "user-directory-modal";
+    modal.id = "clean-user-directory-modal";
     modal.style.cssText = `
       position: fixed;
       top: 0;
@@ -453,6 +419,7 @@ const showUserDirectoryModal = async () => {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     `;
 
+    // Create modal content
     const content = document.createElement("div");
     content.style.cssText = `
       background: white;
@@ -466,34 +433,35 @@ const showUserDirectoryModal = async () => {
       flex-direction: column;
     `;
 
+    // Show loading state
     content.innerHTML = `
       <div style="padding: 40px; text-align: center;">
-        <div style="font-size: 16px; color: #666;">Loading enhanced user directory...</div>
-        <div style="margin-top: 10px; font-size: 14px; color: #999;">Multi-strategy data detection • Enhanced debugging</div>
+        <div style="font-size: 16px; color: #666;">Loading clean user directory...</div>
+        <div style="margin-top: 10px; font-size: 14px; color: #999;">Using Extension 1.5 exact functions • No filtering</div>
       </div>
     `;
 
     modal.appendChild(content);
     document.body.appendChild(modal);
 
+    // Register for cleanup
     window._extensionRegistry.elements.push(modal);
 
-    const closeModal = () => {
-      modal.remove();
-    };
-
+    // Close modal handlers
+    const closeModal = () => modal.remove();
     modal.addEventListener("click", (e) => {
       if (e.target === modal) closeModal();
     });
-
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") closeModal();
     });
 
-    const profiles = await getAllUserProfiles();
+    // Load profiles using clean extraction
+    const profiles = await getAllUserProfilesClean();
     const platform = window.RoamExtensionSuite;
     const currentUser = platform.getUtility("getAuthenticatedUser")();
 
+    // Render complete modal
     content.innerHTML = `
       <div style="
         padding: 24px 32px 20px;
@@ -504,16 +472,16 @@ const showUserDirectoryModal = async () => {
       ">
         <div>
           <h2 style="margin: 0; font-size: 20px; font-weight: 600; color: #1a202c;">
-            🫂 Enhanced User Directory
+            🫂 Clean User Directory
           </h2>
           <div style="margin-top: 4px; font-size: 14px; color: #666;">
             ${
               profiles.length
-            } graph members • Multi-strategy data detection • Updated ${new Date().toLocaleTimeString()}
+            } graph members • Extension 1.5 exact functions • ${new Date().toLocaleTimeString()}
           </div>
         </div>
         <button 
-          onclick="this.closest('#user-directory-modal').remove()"
+          onclick="this.closest('#clean-user-directory-modal').remove()"
           style="
             background: none;
             border: 1px solid #d1d5db;
@@ -552,7 +520,7 @@ const showUserDirectoryModal = async () => {
           <tbody>
             ${profiles
               .map((profile, index) =>
-                createUserDirectoryRow(profile, currentUser, index)
+                createCleanUserDirectoryRow(profile, currentUser, index)
               )
               .join("")}
           </tbody>
@@ -567,94 +535,137 @@ const showUserDirectoryModal = async () => {
         color: #666;
         text-align: center;
       ">
-        💡 ENHANCED: Multi-strategy data detection • Larger modal • Clickable names/avatars • Enhanced debugging
+        🧹 CLEAN: Extension 1.5 exact functions • No filtering • Clear placeholder distinction
       </div>
     `;
 
-    startRealtimeClockUpdates(modal);
+    // Start real-time clock updates
+    startRealtimeClockUpdatesClean(modal);
 
-    console.log(
-      "✅ Enhanced User Directory modal opened with better data detection"
-    );
+    console.log("✅ Clean User Directory modal opened");
   } catch (error) {
-    console.error("Failed to show user directory:", error);
+    console.error("❌ Failed to show clean user directory:", error);
   }
 };
 
 /**
- * Create individual user row for directory table - FIXED: Clickable names/avatars, no actions
+ * Create individual user row with clear placeholder distinction
  */
-const createUserDirectoryRow = (profile, currentUser, index) => {
+const createCleanUserDirectoryRow = (profile, currentUser, index) => {
   const isCurrentUser = profile.username === currentUser?.displayName;
-  const rowClass = isCurrentUser ? "current-user-row" : "user-row";
 
-  const avatarDisplay = profile.avatar
-    ? `<img src="${profile.avatar}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; cursor: pointer;" alt="${profile.username}" onclick="navigateToUserPage('${profile.username}')" title="Click to visit ${profile.username}'s page">`
-    : `<div onclick="navigateToUserPage('${
-        profile.username
-      }')" style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px; cursor: pointer;" title="Click to visit ${
-        profile.username
-      }'s page">${profile.username.charAt(0).toUpperCase()}</div>`;
+  // Create avatar display
+  const avatarDisplay = createAvatarDisplay(profile);
 
+  // Create clickable username
+  const usernameDisplay = `
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span onclick="navigateToUserPageClean('${profile.username}')" 
+            style="font-weight: 500; color: #1a202c; cursor: pointer; text-decoration: underline;" 
+            title="Click to visit ${profile.username}'s page">
+        ${profile.username}
+      </span>
+      ${
+        isCurrentUser
+          ? '<span style="background: #10b981; color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px; font-weight: 500;">You</span>'
+          : ""
+      }
+      ${createCompletenessIndicator(profile.completeness)}
+    </div>
+  `;
+
+  // Create data cells with placeholder distinction
+  const aboutMeDisplay = createDataCellDisplay(profile.aboutme);
+  const locationDisplay = createDataCellDisplay(profile.location);
+  const roleDisplay = createDataCellDisplay(profile.role);
+  const timezoneDisplay = createDataCellDisplay(profile.timezone);
+
+  // Create time display
   const timeDisplay = profile.timezoneInfo?.isValid
-    ? `<span class="timezone-time" data-timezone="${profile.timezone}" style="font-family: 'SF Mono', Monaco, monospace; color: #059669; font-weight: 500;">${profile.timezoneInfo.timeString}</span>`
+    ? `<span class="clean-timezone-time" data-timezone="${profile.timezone}" style="font-family: 'SF Mono', Monaco, monospace; color: #059669; font-weight: 500;">${profile.timezoneInfo.timeString}</span>`
     : '<span style="color: #9ca3af;">—</span>';
 
-  const completenessColor =
-    profile.completeness >= 75
-      ? "#059669"
-      : profile.completeness >= 50
-      ? "#d97706"
-      : "#dc2626";
+  const rowStyle = `
+    border-bottom: 1px solid #f1f5f9;
+    ${isCurrentUser ? "background: #f0f9ff;" : ""}
+    ${index % 2 === 0 ? "background: #fafafa;" : ""}
+  `;
 
   return `
-    <tr class="${rowClass}" style="border-bottom: 1px solid #f1f5f9; ${
-    isCurrentUser ? "background: #f0f9ff;" : ""
-  } ${index % 2 === 0 ? "background: #fafafa;" : ""}">
+    <tr style="${rowStyle}">
       <td style="padding: 12px 16px; vertical-align: middle;">${avatarDisplay}</td>
-      <td style="padding: 12px 16px; vertical-align: middle;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span onclick="navigateToUserPage('${
-            profile.username
-          }')" style="font-weight: 500; color: #1a202c; cursor: pointer; text-decoration: underline;" title="Click to visit ${
-    profile.username
-  }'s page">${profile.username}</span>
-          ${
-            isCurrentUser
-              ? '<span style="background: #10b981; color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px; font-weight: 500;">You</span>'
-              : ""
-          }
-          <div style="width: 8px; height: 8px; border-radius: 50%; background: ${completenessColor}; opacity: 0.7;" title="${
-    profile.completeness
-  }% complete"></div>
-        </div>
-      </td>
-      <td style="padding: 12px 16px; vertical-align: middle; color: #4b5563;">${
-        profile.aboutMe || '<span style="color: #9ca3af;">—</span>'
-      }</td>
-      <td style="padding: 12px 16px; vertical-align: middle; color: #4b5563;">${
-        profile.location || '<span style="color: #9ca3af;">—</span>'
-      }</td>
-      <td style="padding: 12px 16px; vertical-align: middle; color: #4b5563;">${
-        profile.role || '<span style="color: #9ca3af;">—</span>'
-      }</td>
-      <td style="padding: 12px 16px; vertical-align: middle; color: #4b5563;">${
-        profile.timezone || '<span style="color: #9ca3af;">—</span>'
-      }</td>
+      <td style="padding: 12px 16px; vertical-align: middle;">${usernameDisplay}</td>
+      <td style="padding: 12px 16px; vertical-align: middle;">${aboutMeDisplay}</td>
+      <td style="padding: 12px 16px; vertical-align: middle;">${locationDisplay}</td>
+      <td style="padding: 12px 16px; vertical-align: middle;">${roleDisplay}</td>
+      <td style="padding: 12px 16px; vertical-align: middle;">${timezoneDisplay}</td>
       <td style="padding: 12px 16px; vertical-align: middle;">${timeDisplay}</td>
     </tr>
   `;
 };
 
 /**
- * Start real-time clock updates
+ * Create avatar display with clickable navigation
  */
-const startRealtimeClockUpdates = (modal) => {
+const createAvatarDisplay = (profile) => {
+  if (
+    profile.avatar &&
+    profile.avatar !== "__missing field__" &&
+    profile.avatar !== "__not yet entered__"
+  ) {
+    // Real avatar image
+    return `<img src="${profile.avatar}" 
+                 style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; cursor: pointer;" 
+                 alt="${profile.username}" 
+                 onclick="navigateToUserPageClean('${profile.username}')" 
+                 title="Click to visit ${profile.username}'s page">`;
+  } else {
+    // Initials fallback
+    return `<div onclick="navigateToUserPageClean('${profile.username}')" 
+                 style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px; cursor: pointer;" 
+                 title="Click to visit ${profile.username}'s page">
+              ${profile.username.charAt(0).toUpperCase()}
+            </div>`;
+  }
+};
+
+/**
+ * Create data cell display with clear placeholder distinction
+ */
+const createDataCellDisplay = (value) => {
+  if (value === "__missing field__") {
+    return '<span class="missing-field" style="color: #dc2626; font-style: italic; background: #fef2f2; padding: 2px 6px; border-radius: 3px;">missing field</span>';
+  } else if (value === "__not yet entered__") {
+    return '<span class="not-entered" style="color: #d97706; font-style: italic; background: #fffbeb; padding: 2px 6px; border-radius: 3px;">not yet entered</span>';
+  } else if (value) {
+    return `<span class="real-data" style="color: #374151;">${value}</span>`;
+  } else {
+    return '<span style="color: #9ca3af;">—</span>';
+  }
+};
+
+/**
+ * Create completeness indicator
+ */
+const createCompletenessIndicator = (completeness) => {
+  const color =
+    completeness >= 75 ? "#059669" : completeness >= 50 ? "#d97706" : "#dc2626";
+  return `<div style="width: 8px; height: 8px; border-radius: 50%; background: ${color}; opacity: 0.7;" title="${completeness}% complete"></div>`;
+};
+
+/**
+ * Start real-time clock updates for the modal
+ */
+const startRealtimeClockUpdatesClean = (modal) => {
   const updateClocks = () => {
-    const timeElements = modal.querySelectorAll(".timezone-time");
+    const timeElements = modal.querySelectorAll(".clean-timezone-time");
     timeElements.forEach((element) => {
       const timezone = element.getAttribute("data-timezone");
-      if (timezone) {
+      if (
+        timezone &&
+        timezone !== "__missing field__" &&
+        timezone !== "__not yet entered__"
+      ) {
         const timeInfo = timezoneManager.getCurrentTimeForUser(timezone);
         if (timeInfo.isValid) {
           element.textContent = timeInfo.timeString;
@@ -663,8 +674,10 @@ const startRealtimeClockUpdates = (modal) => {
     });
   };
 
+  // Update every minute
   const interval = setInterval(updateClocks, 60000);
 
+  // Clean up when modal is removed
   const observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       mutation.removedNodes.forEach((node) => {
@@ -682,41 +695,32 @@ const startRealtimeClockUpdates = (modal) => {
 /**
  * Navigate to user page helper function
  */
-window.navigateToUserPage = (username) => {
-  const userPageUrl = `#/app/${window.roamAlphaAPI.graph.name}/page/${username}`;
+window.navigateToUserPageClean = (username) => {
+  const userPageUrl = `#/app/${
+    window.roamAlphaAPI.graph.name
+  }/page/${encodeURIComponent(username)}`;
   window.location.href = userPageUrl;
 
-  const modal = document.getElementById("user-directory-modal");
+  // Close modal
+  const modal = document.getElementById("clean-user-directory-modal");
   if (modal) modal.remove();
 };
 
 // ===================================================================
-// 🧭 NAVIGATION INTEGRATION - Show Directory Button Placement
+// 🧭 NAVIGATION INTEGRATION - Clean Button Placement
 // ===================================================================
 
 /**
- * Add navigation buttons using sandbox-confirmed approach
+ * Add navigation buttons using proven sandbox approach
  */
-const addNavigationButtons = () => {
+const addNavigationButtonsClean = () => {
   try {
-    // Remove existing buttons first
+    // Remove existing buttons
     document
-      .querySelectorAll(".user-directory-nav-button")
+      .querySelectorAll(".clean-directory-nav-button")
       .forEach((btn) => btn.remove());
 
-    console.log(
-      "🎯 Placing Show Directory button using sandbox-confirmed approach..."
-    );
-
-    const platform = window.RoamExtensionSuite;
-    const getCurrentPageTitle = platform.getUtility("getCurrentPageTitle");
-    const getAuthenticatedUser = platform.getUtility("getAuthenticatedUser");
-    const isGraphMember = platform.getUtility("isGraphMember");
-
-    const currentPageTitle = getCurrentPageTitle();
-    const currentUser = getAuthenticatedUser();
-
-    if (!currentPageTitle || !currentUser) return;
+    console.log("🎯 CLEAN: Placing Show Directory button...");
 
     // Sandbox-confirmed multi-selector approach
     const possibleTargets = [
@@ -737,13 +741,11 @@ const addNavigationButtons = () => {
       if (element) {
         targetElement = element;
         selectorUsed = selector;
-        console.log(`✅ Found target using: ${selector}`);
         break;
       }
     }
 
     if (!targetElement) {
-      console.error("❌ Could not find suitable target element");
       targetElement = document.body;
       selectorUsed = "body (fallback)";
     }
@@ -752,44 +754,43 @@ const addNavigationButtons = () => {
     const computedStyle = getComputedStyle(targetElement);
     if (computedStyle.position === "static") {
       targetElement.style.position = "relative";
-      console.log(`🔧 Set ${selectorUsed} to position: relative`);
     }
 
     // Create the Show Directory button
     const directoryButton = document.createElement("button");
-    directoryButton.className = "user-directory-nav-button";
-    directoryButton.textContent = "🫂 Show Directory";
+    directoryButton.className = "clean-directory-nav-button";
+    directoryButton.textContent = "🫂 Clean Directory";
     directoryButton.style.cssText = `
       position: absolute;
       top: 10px;
       left: 10px;
       z-index: 9999;
-      background: linear-gradient(135deg, #fef3c7 0%, #fbbf24 100%);
-      color: #92400e;
-      border: 1px solid #f59e0b;
+      background: linear-gradient(135deg, #c7f3ff 0%, #22d3ee 100%);
+      color: #0e7490;
+      border: 1px solid #06b6d4;
       border-radius: 8px;
       padding: 10px 16px;
       cursor: pointer;
       font-size: 14px;
       font-weight: 600;
-      box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);
+      box-shadow: 0 2px 4px rgba(34, 211, 238, 0.2);
       transition: all 0.2s ease;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     `;
 
     // Add click handler
-    directoryButton.addEventListener("click", showUserDirectoryModal);
+    directoryButton.addEventListener("click", showUserDirectoryModalClean);
 
     // Add hover effects
     directoryButton.addEventListener("mouseenter", () => {
       directoryButton.style.background =
-        "linear-gradient(135deg, #fde68a 0%, #f59e0b 100%)";
+        "linear-gradient(135deg, #a5f3fc 0%, #0891b2 100%)";
       directoryButton.style.transform = "translateY(-1px)";
     });
 
     directoryButton.addEventListener("mouseleave", () => {
       directoryButton.style.background =
-        "linear-gradient(135deg, #fef3c7 0%, #fbbf24 100%)";
+        "linear-gradient(135deg, #c7f3ff 0%, #22d3ee 100%)";
       directoryButton.style.transform = "translateY(0)";
     });
 
@@ -797,99 +798,100 @@ const addNavigationButtons = () => {
     targetElement.appendChild(directoryButton);
     window._extensionRegistry.elements.push(directoryButton);
 
-    console.log(`✅ Show Directory button added to: ${selectorUsed}`);
-    console.log(`📍 Button position: absolute at top: 10px, left: 10px`);
-
-    const rect = targetElement.getBoundingClientRect();
-    console.log(`📐 Target dimensions:`, {
-      selector: selectorUsed,
-      width: rect.width,
-      height: rect.height,
-      top: rect.top,
-      left: rect.left,
-      position: computedStyle.position,
-    });
+    console.log(`✅ CLEAN: Show Directory button added to: ${selectorUsed}`);
   } catch (error) {
-    console.error("❌ Error adding navigation buttons:", error);
+    console.error("❌ Error adding clean navigation buttons:", error);
   }
 };
 
 /**
  * Monitor page changes and update navigation buttons
  */
-const startNavigationMonitoring = () => {
+const startNavigationMonitoringClean = () => {
   // Add button initially with delay
-  setTimeout(addNavigationButtons, 1000);
+  setTimeout(addNavigationButtonsClean, 1000);
 
   // Monitor for page changes
   let lastUrl = window.location.href;
   const checkUrlChange = () => {
     if (window.location.href !== lastUrl) {
       lastUrl = window.location.href;
-      console.log("📍 Page changed, re-adding Show Directory button...");
-      setTimeout(addNavigationButtons, 500);
+      console.log("📍 CLEAN: Page changed, re-adding button...");
+      setTimeout(addNavigationButtonsClean, 500);
     }
     setTimeout(checkUrlChange, 1000);
   };
 
   checkUrlChange();
-
-  console.log(
-    "📡 Navigation monitoring started with sandbox-confirmed placement"
-  );
+  console.log("📡 CLEAN: Navigation monitoring started");
 };
 
 // ===================================================================
-// 🧪 ENHANCED TESTING AND DEBUGGING - Multiple Data Strategies
+// 🧪 CLEAN TESTING AND DEBUGGING COMMANDS
 // ===================================================================
 
 /**
- * Debug a specific user's data detection
+ * Test clean data extraction for specific user
  */
-const debugUserDataDetection = async (username) => {
-  console.group(`🔍 DEBUGGING: Data detection for ${username}`);
+const testCleanDataExtraction = async (username) => {
+  console.group(`🧪 CLEAN: Testing data extraction for ${username}`);
 
   try {
-    const platform = window.RoamExtensionSuite;
-    const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
+    const profile = await getUserProfileDataClean(username);
 
-    const userPageUid = getPageUidByTitle(username);
-    console.log(`📄 Page UID: ${userPageUid}`);
+    console.log("Profile result:", profile);
+    console.log("Has My Info structure:", profile.hasMyInfo);
+    console.log("Completeness:", profile.completeness + "%");
 
-    if (!userPageUid) {
-      console.log(`❌ No page found for ${username}`);
-      console.groupEnd();
-      return;
+    if (profile.error) {
+      console.error("Error:", profile.error);
     }
 
-    // Show all blocks on the page
-    const allBlocks = window.roamAlphaAPI.data.q(`
-      [:find ?uid ?string ?order
-       :where 
-       [?parent :block/uid "${userPageUid}"]
-       [?parent :block/children ?child]
-       [?child :block/uid ?uid]
-       [?child :block/string ?string]
-       [?child :block/order ?order]]
-    `);
+    // Show placeholder types
+    const fields = ["avatar", "location", "role", "timezone", "aboutme"];
+    fields.forEach((field) => {
+      const value = profile[field];
+      let type = "real data";
+      if (value === "__missing field__") type = "missing field";
+      if (value === "__not yet entered__") type = "not yet entered";
 
-    console.log(`📋 All blocks on ${username}'s page:`, allBlocks);
-
-    // Test the actual profile data extraction
-    const profileData = await getUserProfileData(username);
-    console.log(`📊 Extracted profile data:`, profileData);
+      console.log(`${field}: "${value}" (${type})`);
+    });
   } catch (error) {
-    console.error(`❌ Debug failed:`, error);
+    console.error("Test failed:", error);
   }
 
   console.groupEnd();
 };
 
 /**
- * Run comprehensive directory system tests - ENHANCED
+ * Show placeholder distinction demo
  */
-const runDirectoryTests = async () => {
-  console.group("🧪 ENHANCED User Directory System Tests");
+const showPlaceholderDistinction = async () => {
+  console.group("🎨 CLEAN: Placeholder Distinction Demo");
+
+  console.log("Placeholder Types:");
+  console.log(
+    '1. "__missing field__" - Field not in data structure (red background)'
+  );
+  console.log(
+    '2. "__not yet entered__" - Field exists but has placeholder value (orange background)'
+  );
+  console.log("3. Real data - Actual user content (normal text)");
+
+  console.log("\nVisual Styling:");
+  console.log("🔴 Missing field: Red text, light red background");
+  console.log("🟠 Not entered: Orange text, light orange background");
+  console.log("⚫ Real data: Normal text, no background");
+
+  console.groupEnd();
+};
+
+/**
+ * Run comprehensive clean system tests
+ */
+const runCleanSystemTests = async () => {
+  console.group("🧪 CLEAN: System Tests");
 
   try {
     const platform = window.RoamExtensionSuite;
@@ -901,15 +903,22 @@ const runDirectoryTests = async () => {
     const members = getGraphMembers();
     console.log(`📋 Found ${members.length} members:`, members);
 
-    // Test 2: Data Detection for Each User
-    console.log("Test 2: Enhanced Data Detection");
-    for (const username of members) {
-      await debugUserDataDetection(username);
+    // Test 2: Clean Data Extraction
+    console.log("Test 2: Clean Data Extraction");
+    for (const username of members.slice(0, 3)) {
+      // Limit for testing
+      await testCleanDataExtraction(username);
     }
 
     // Test 3: Timezone Management
     console.log("Test 3: Timezone Management");
-    const testTimezones = ["EST", "America/New_York", "PST", "GMT+1"];
+    const testTimezones = [
+      "EST",
+      "America/New_York",
+      "PST",
+      "GMT+1",
+      "__not yet entered__",
+    ];
     testTimezones.forEach((tz) => {
       const timeInfo = timezoneManager.getCurrentTimeForUser(tz);
       console.log(
@@ -919,22 +928,23 @@ const runDirectoryTests = async () => {
       );
     });
 
-    console.log("✅ Enhanced directory tests completed");
+    console.log("✅ Clean system tests completed");
   } catch (error) {
-    console.error("❌ Enhanced directory test failed:", error);
+    console.error("❌ Clean system test failed:", error);
   }
 
   console.groupEnd();
 };
 
 // ===================================================================
-// 🚀 ROAM EXTENSION EXPORT - Enhanced Integration
+// 🚀 ROAM EXTENSION EXPORT - Clean Integration
 // ===================================================================
 
 export default {
   onload: async ({ extensionAPI }) => {
-    console.log("🫂 ENHANCED User Directory + Timezones starting...");
+    console.log("🧹 CLEAN User Directory + Timezones starting...");
 
+    // ✅ VERIFY DEPENDENCIES
     if (!window.RoamExtensionSuite) {
       console.error(
         "❌ Foundation Registry not found! Please load Extension 1 first."
@@ -942,14 +952,16 @@ export default {
       return;
     }
 
+    const platform = window.RoamExtensionSuite;
+
     const requiredDependencies = [
-      "utility-library",
-      "user-authentication",
-      "configuration-manager",
+      "utility-library", // Extension 1.5 with exact functions
+      "user-authentication", // Extension 2
+      "configuration-manager", // Extension 3
     ];
 
     for (const dep of requiredDependencies) {
-      if (!window.RoamExtensionSuite.has(dep)) {
+      if (!platform.has(dep)) {
         console.error(
           `❌ ${dep} not found! Please load required dependencies first.`
         );
@@ -957,54 +969,79 @@ export default {
       }
     }
 
-    const platform = window.RoamExtensionSuite;
+    // 🔧 REGISTER CLEAN SERVICES
+    const cleanDirectoryServices = {
+      // Core data extraction
+      getUserProfileDataClean: getUserProfileDataClean,
+      getAllUserProfilesClean: getAllUserProfilesClean,
+      initializeUserProfile: initializeUserProfile,
 
-    const directoryServices = {
-      getUserProfileData: getUserProfileData,
-      getAllUserProfiles: getAllUserProfiles,
-      getCleanFieldValue: getCleanFieldValue,
-      showUserDirectoryModal: showUserDirectoryModal,
+      // UI components
+      showUserDirectoryModalClean: showUserDirectoryModalClean,
+      addNavigationButtonsClean: addNavigationButtonsClean,
+      startNavigationMonitoringClean: startNavigationMonitoringClean,
+
+      // Timezone management
       timezoneManager: timezoneManager,
-      debugUserDataDetection: debugUserDataDetection,
-      runDirectoryTests: runDirectoryTests,
-      addNavigationButtons: addNavigationButtons,
-      startNavigationMonitoring: startNavigationMonitoring,
+
+      // Testing utilities
+      testCleanDataExtraction: testCleanDataExtraction,
+      showPlaceholderDistinction: showPlaceholderDistinction,
+      runCleanSystemTests: runCleanSystemTests,
     };
 
-    Object.entries(directoryServices).forEach(([name, service]) => {
+    Object.entries(cleanDirectoryServices).forEach(([name, service]) => {
       platform.registerUtility(name, service);
     });
 
-    // 🧭 START NAVIGATION MONITORING (this was missing!)
-    startNavigationMonitoring();
+    // 🧭 START NAVIGATION MONITORING
+    startNavigationMonitoringClean();
 
+    // 📝 REGISTER CLEAN COMMANDS
     const commands = [
       {
-        label: "Directory: Show ENHANCED User Directory",
-        callback: showUserDirectoryModal,
+        label: "Clean Directory: Show CLEAN User Directory",
+        callback: showUserDirectoryModalClean,
       },
       {
-        label: "Directory: Debug My Data Detection",
+        label: "Clean Directory: Test My Data Extraction",
         callback: async () => {
           const currentUser = platform.getUtility("getAuthenticatedUser")();
           if (currentUser) {
-            await debugUserDataDetection(currentUser.displayName);
+            await testCleanDataExtraction(currentUser.displayName);
           }
         },
       },
       {
-        label: "Directory: Debug ALL User Data",
+        label: "Clean Directory: Show Placeholder Distinction",
+        callback: showPlaceholderDistinction,
+      },
+      {
+        label: "Clean Directory: Initialize My Profile Structure",
         callback: async () => {
-          const members = platform.getUtility("getGraphMembers")();
-          console.log("🔍 Starting comprehensive data debug...");
-          for (const username of members) {
-            await debugUserDataDetection(username);
+          const currentUser = platform.getUtility("getAuthenticatedUser")();
+          if (currentUser) {
+            const success = await initializeUserProfile(
+              currentUser.displayName
+            );
+            console.log(
+              `🎯 Profile initialization ${success ? "successful" : "failed"}`
+            );
+            if (success) {
+              console.log(
+                "💡 Check your user page - clear placeholders created"
+              );
+            }
           }
         },
       },
       {
-        label: "Directory: Run ENHANCED System Tests",
-        callback: runDirectoryTests,
+        label: "Clean Directory: Run CLEAN System Tests",
+        callback: runCleanSystemTests,
+      },
+      {
+        label: "Clean Directory: Add Show Directory Button",
+        callback: addNavigationButtonsClean,
       },
     ];
 
@@ -1013,47 +1050,53 @@ export default {
       window._extensionRegistry.commands.push(cmd.label);
     });
 
+    // 🎯 REGISTER SELF WITH PLATFORM
     platform.register(
-      "user-directory",
+      "clean-user-directory",
       {
-        services: directoryServices,
+        services: cleanDirectoryServices,
         timezoneManager: timezoneManager,
-        version: "6.3.0",
+        version: "6.4.0",
       },
       {
-        name: "ENHANCED User Directory + Timezones",
+        name: "CLEAN User Directory + Timezones",
         description:
-          "FIXED: Multi-strategy data detection, larger modal, clickable names/avatars",
-        version: "6.3.0",
+          "Clean rebuild using Extension 1.5 exact functions, clear placeholder distinction",
+        version: "6.4.0",
         dependencies: requiredDependencies,
       }
     );
 
+    // 🎉 STARTUP COMPLETE
     const currentUser = platform.getUtility("getAuthenticatedUser")();
-    console.log("✅ ENHANCED User Directory loaded successfully!");
-    console.log("🔧 FIXED: Multi-strategy data detection");
-    console.log("🔧 FIXED: Larger modal (90% width, max 1200px)");
-    console.log("🔧 FIXED: Clickable names and avatars");
-    console.log("🔧 FIXED: Removed Actions column");
-    console.log("🔧 FIXED: Enhanced debugging capabilities");
+    console.log("✅ CLEAN User Directory loaded successfully!");
+    console.log("🧹 CLEAN: Uses ONLY Extension 1.5 exact functions");
+    console.log("🧹 CLEAN: No filtering - shows actual data");
+    console.log("🧹 CLEAN: Clear placeholder distinction");
     console.log(`👤 Current user: ${currentUser?.displayName}`);
-    console.log('💡 Try: Cmd+P → "Directory: Debug My Data Detection"');
+    console.log(
+      '💡 Try: Cmd+P → "Clean Directory: Show Placeholder Distinction"'
+    );
 
-    // Auto-debug current user on startup
+    // Show current user's profile structure
     setTimeout(async () => {
       if (currentUser) {
-        console.log("🔍 Auto-debugging current user data detection...");
-        await debugUserDataDetection(currentUser.displayName);
+        console.log("🔍 Auto-testing current user data extraction...");
+        await testCleanDataExtraction(currentUser.displayName);
       }
     }, 2000);
   },
 
   onunload: () => {
-    console.log("🫂 ENHANCED User Directory unloading...");
+    console.log("🧹 CLEAN User Directory unloading...");
 
-    const modals = document.querySelectorAll("#user-directory-modal");
+    // Clean up modals
+    const modals = document.querySelectorAll("#clean-user-directory-modal");
     modals.forEach((modal) => modal.remove());
 
-    console.log("✅ ENHANCED User Directory cleanup complete!");
+    // Navigation helper cleanup
+    delete window.navigateToUserPageClean;
+
+    console.log("✅ CLEAN User Directory cleanup complete!");
   },
 };
