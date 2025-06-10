@@ -1,16 +1,15 @@
 // ===================================================================
-// Extension 1.5: Fixed Universal Parser - Exact Matching Implementation
-// MAJOR FIX: Implements exact block matching instead of substring search
-// Following PDF technical specifications for robust data extraction
+// Extension 1.5: Lean Universal Parser - Exact Matching Only
+// SIMPLIFIED: Exact block matching without unnecessary complexity
+// Just extracts data - no filtering, no placeholders, no complications
 // ===================================================================
 
 // ===================================================================
-// 🔧 EXACT MATCHING CORE FUNCTIONS - PDF Specification Implementation
+// 🔧 EXACT MATCHING CORE FUNCTIONS - Clean & Simple
 // ===================================================================
 
 /**
- * 📋 PDF-SPECIFIED: Normalize header text for exact matching
- * Handles all format variations while enabling precise comparison
+ * 📋 Normalize header text for exact matching
  */
 const normalizeHeaderText = (text) => {
   if (!text || typeof text !== "string") return "";
@@ -24,8 +23,7 @@ const normalizeHeaderText = (text) => {
 };
 
 /**
- * 🎯 PDF-SPECIFIED: Find exact header block (no substring matching)
- * Solves the critical use/mention distinction problem
+ * 🎯 Find exact header block (no substring matching)
  */
 const findExactHeaderBlock = (blocks, headerPatterns) => {
   if (
@@ -46,14 +44,13 @@ const findExactHeaderBlock = (blocks, headerPatterns) => {
 
     return headerPatterns.some((pattern) => {
       const normalizedPattern = normalizeHeaderText(pattern);
-      return normalizedText === normalizedPattern; // EXACT MATCH - NO SUBSTRING
+      return normalizedText === normalizedPattern; // EXACT MATCH ONLY
     });
   });
 };
 
 /**
- * 🏗️ PDF-SPECIFIED: Get direct children of a block
- * Implements proper hierarchical data extraction
+ * 🏗️ Get direct children of a block
  */
 const getDirectChildren = (parentUid) => {
   if (!parentUid) return [];
@@ -85,8 +82,7 @@ const getDirectChildren = (parentUid) => {
 };
 
 /**
- * 📝 PDF-SPECIFIED: Normalize category names for consistent key structure
- * Converts "ABOUT ME:" to "aboutMe", "AVATAR:" to "avatar", etc.
+ * 📝 Normalize category names for consistent keys
  */
 const normalizeCategoryName = (categoryText) => {
   if (!categoryText || typeof categoryText !== "string") return "";
@@ -99,19 +95,17 @@ const normalizeCategoryName = (categoryText) => {
 };
 
 // ===================================================================
-// 🆕 NEW EXACT MATCHING FUNCTIONS - Primary Interface
+// 🎯 PRIMARY DATA EXTRACTION FUNCTIONS - Clean & Simple
 // ===================================================================
 
 /**
- * 🎯 FIXED: findDataValueExact - Exact block matching only
- * Replaces the broken substring matching with precise header identification
+ * 🎯 Extract data value using exact block matching
+ * Returns whatever is actually there - no filtering
  */
 const findDataValueExact = (pageUid, key) => {
   if (!pageUid || !key) return null;
 
   try {
-    console.log(`🔍 EXACT SEARCH: Looking for "${key}" on page ${pageUid}`);
-
     // Get all top-level blocks on the page
     const allBlocks = window.roamAlphaAPI.data.q(`
       [:find ?uid ?string ?order
@@ -123,45 +117,33 @@ const findDataValueExact = (pageUid, key) => {
        [?child :block/order ?order]]
     `);
 
-    console.log(`📊 Found ${allBlocks.length} top-level blocks to search`);
-
     // Generate header patterns for exact matching
     const headerPatterns = [
-      key, // Plain format: "Loading Page Preference"
-      `${key}:`, // Colon format: "Loading Page Preference:"
-      `${key}::`, // Attribute format: "Loading Page Preference::"
-      `**${key}:**`, // Bold format: "**Loading Page Preference:**"
-      `**${key}**:`, // Alt bold format: "**Loading Page Preference**:"
+      key, // Plain format
+      `${key}:`, // Colon format
+      `${key}::`, // Attribute format
+      `**${key}:**`, // Bold format
+      `**${key}**:`, // Alt bold format
     ];
 
-    console.log(`🎯 Searching for exact matches of patterns:`, headerPatterns);
-
-    // Find exact header match (NO substring matching)
+    // Find exact header match
     const foundBlock = findExactHeaderBlock(allBlocks, headerPatterns);
 
     if (!foundBlock) {
-      console.log(`❌ No exact match found for "${key}"`);
       return null;
     }
 
     const [blockUid, blockText] = foundBlock;
-    console.log(`✅ Found exact header match: "${blockText}" (${blockUid})`);
 
     // Get children blocks (the actual values)
     const children = getDirectChildren(blockUid);
 
-    console.log(`📋 Found ${children.length} children under header`);
-
     if (children.length === 0) {
-      console.log(`📝 Header found but no children data`);
       return null;
     } else if (children.length === 1) {
-      console.log(`📄 Single value: "${children[0].text}"`);
-      return children[0].text; // Single value
+      return children[0].text; // Single value - whatever it is
     } else {
-      const values = children.map((child) => child.text);
-      console.log(`📋 Multiple values:`, values);
-      return values; // Multiple values
+      return children.map((child) => child.text); // Multiple values - whatever they are
     }
   } catch (error) {
     console.error(`Error in findDataValueExact for "${key}":`, error);
@@ -170,17 +152,13 @@ const findDataValueExact = (pageUid, key) => {
 };
 
 /**
- * 🆕 ENHANCED: findNestedDataValuesExact - Hierarchical exact matching
- * PDF-specified two-level data extraction with exact header identification
+ * 🏗️ Extract nested data values using exact hierarchical matching
+ * Returns whatever is actually there - no filtering
  */
 const findNestedDataValuesExact = (pageUid, parentKey) => {
   if (!pageUid || !parentKey) return null;
 
   try {
-    console.log(
-      `🔍 NESTED EXACT SEARCH: Looking for "${parentKey}" structure on page ${pageUid}`
-    );
-
     // Get all top-level blocks on the page
     const allBlocks = window.roamAlphaAPI.data.q(`
       [:find ?uid ?string ?order
@@ -201,68 +179,44 @@ const findNestedDataValuesExact = (pageUid, parentKey) => {
       `**${parentKey}**:`,
     ];
 
-    console.log(
-      `🎯 Searching for parent header patterns:`,
-      parentHeaderPatterns
-    );
-
     // Find exact parent header match
     const parentBlock = findExactHeaderBlock(allBlocks, parentHeaderPatterns);
 
     if (!parentBlock) {
-      console.log(`❌ No exact parent match found for "${parentKey}"`);
       return null;
     }
 
     const [parentBlockUid, parentBlockText] = parentBlock;
-    console.log(
-      `✅ Found exact parent header: "${parentBlockText}" (${parentBlockUid})`
-    );
 
     // Get all category children of the parent
     const categoryBlocks = getDirectChildren(parentBlockUid);
 
-    console.log(
-      `📊 Found ${categoryBlocks.length} category blocks under parent`
-    );
-
     if (categoryBlocks.length === 0) {
-      console.log(`📝 Parent header found but no category children`);
       return {};
     }
 
-    // Extract data from each category
+    // Extract data from each category - whatever is there
     const nestedData = {};
 
     for (const categoryBlock of categoryBlocks) {
       const categoryName = normalizeCategoryName(categoryBlock.text);
 
       if (!categoryName) {
-        console.warn(`⚠️ Skipping invalid category: "${categoryBlock.text}"`);
-        continue;
+        continue; // Skip invalid category names
       }
 
       // Get data children for this category
       const categoryData = getDirectChildren(categoryBlock.uid);
 
       if (categoryData.length === 0) {
-        console.log(`📝 Category "${categoryName}" has no data children`);
-        // Don't set the key - leave undefined for missing data
+        // No data children - don't set the key
       } else if (categoryData.length === 1) {
-        nestedData[categoryName] = categoryData[0].text;
-        console.log(`📄 ${categoryName}: "${categoryData[0].text}"`);
+        nestedData[categoryName] = categoryData[0].text; // Whatever the value is
       } else {
-        nestedData[categoryName] = categoryData.map((item) => item.text);
-        console.log(`📋 ${categoryName}:`, nestedData[categoryName]);
+        nestedData[categoryName] = categoryData.map((item) => item.text); // Whatever the values are
       }
     }
 
-    console.log(
-      `✅ Extracted ${
-        Object.keys(nestedData).length
-      } categories from "${parentKey}":`,
-      nestedData
-    );
     return nestedData;
   } catch (error) {
     console.error(
@@ -274,8 +228,7 @@ const findNestedDataValuesExact = (pageUid, parentKey) => {
 };
 
 /**
- * 🛠️ ENHANCED: setDataValueStructured - Create proper hierarchical structure
- * Ensures data is created with exact format for future exact matching
+ * 🛠️ Create structured data with proper hierarchy
  */
 const setDataValueStructured = async (
   pageUid,
@@ -286,11 +239,8 @@ const setDataValueStructured = async (
   if (!pageUid || !key) return false;
 
   try {
-    console.log(`📝 Creating structured data for "${key}" on page ${pageUid}`);
-
-    // Format the key based on preference for future exact matching
+    // Format the key for exact matching
     const keyText = useAttributeFormat ? `${key}::` : `**${key}:**`;
-    console.log(`🏷️ Using header format: "${keyText}"`);
 
     // Check if key block already exists using exact matching
     const allBlocks = window.roamAlphaAPI.data.q(`
@@ -315,14 +265,12 @@ const setDataValueStructured = async (
 
     if (!keyBlock) {
       // Create new key block
-      console.log(`📝 Creating new header block: "${keyText}"`);
       keyBlockUid = await window.roamAlphaAPI.data.block.create({
         location: { "parent-uid": pageUid, order: "last" },
         block: { string: keyText },
       });
     } else {
       keyBlockUid = keyBlock[0];
-      console.log(`♻️ Using existing header block: ${keyBlockUid}`);
 
       // Clear existing children for clean update
       const existingChildren = getDirectChildren(keyBlockUid);
@@ -331,12 +279,10 @@ const setDataValueStructured = async (
           block: { uid: child.uid },
         });
       }
-      console.log(`🧹 Cleared ${existingChildren.length} existing children`);
     }
 
     // Add value(s) as children
     const values = Array.isArray(value) ? value : [value];
-    console.log(`📋 Adding ${values.length} value(s):`, values);
 
     for (let i = 0; i < values.length; i++) {
       await window.roamAlphaAPI.data.block.create({
@@ -345,7 +291,6 @@ const setDataValueStructured = async (
       });
     }
 
-    console.log(`✅ Successfully created structured data for "${key}"`);
     return true;
   } catch (error) {
     console.error(`Error in setDataValueStructured for "${key}":`, error);
@@ -354,8 +299,7 @@ const setDataValueStructured = async (
 };
 
 /**
- * 🛠️ ENHANCED: setNestedDataValuesStructured - Create hierarchical nested structure
- * Creates proper two-level structure for complex data like user profiles
+ * 🛠️ Create nested data structure with proper hierarchy
  */
 const setNestedDataValuesStructured = async (
   pageUid,
@@ -368,15 +312,10 @@ const setNestedDataValuesStructured = async (
   }
 
   try {
-    console.log(
-      `📝 Creating nested structure for "${parentKey}" on page ${pageUid}`
-    );
-
     // Format parent key for exact matching
     const parentKeyText = useAttributeFormat
       ? `${parentKey}::`
       : `**${parentKey}:**`;
-    console.log(`🏷️ Using parent header format: "${parentKeyText}"`);
 
     // Check if parent block already exists using exact matching
     const allBlocks = window.roamAlphaAPI.data.q(`
@@ -401,14 +340,12 @@ const setNestedDataValuesStructured = async (
 
     if (!parentBlock) {
       // Create new parent block
-      console.log(`📝 Creating new parent header: "${parentKeyText}"`);
       parentBlockUid = await window.roamAlphaAPI.data.block.create({
         location: { "parent-uid": pageUid, order: "last" },
         block: { string: parentKeyText },
       });
     } else {
       parentBlockUid = parentBlock[0];
-      console.log(`♻️ Using existing parent header: ${parentBlockUid}`);
 
       // Clear existing children for clean update
       const existingChildren = getDirectChildren(parentBlockUid);
@@ -417,22 +354,15 @@ const setNestedDataValuesStructured = async (
           block: { uid: child.uid },
         });
       }
-      console.log(
-        `🧹 Cleared ${existingChildren.length} existing category children`
-      );
     }
 
     // Add each nested key-value pair as category children
     let order = 0;
-    console.log(
-      `📊 Creating ${Object.keys(nestedData).length} nested categories`
-    );
 
     for (const [categoryKey, categoryValue] of Object.entries(nestedData)) {
       const childKeyText = useAttributeFormat
         ? `${categoryKey}::`
         : `**${categoryKey}:**`;
-      console.log(`📝 Creating category: "${childKeyText}"`);
 
       // Create category key block
       const childKeyUid = await window.roamAlphaAPI.data.block.create({
@@ -450,13 +380,8 @@ const setNestedDataValuesStructured = async (
           block: { string: values[i] },
         });
       }
-
-      console.log(
-        `✅ Created category "${categoryKey}" with ${values.length} value(s)`
-      );
     }
 
-    console.log(`✅ Successfully created nested structure for "${parentKey}"`);
     return true;
   } catch (error) {
     console.error(
@@ -468,141 +393,21 @@ const setNestedDataValuesStructured = async (
 };
 
 // ===================================================================
-// 🔧 FIXED PLACEHOLDER DETECTION - Exact Matches Only
+// 🔄 BACKWARD COMPATIBILITY - Keep original functions (with warnings)
 // ===================================================================
 
-/**
- * 🎯 FIXED: Precise placeholder detection using exact string matches
- * No more substring matching that filters real data
- */
-const isPlaceholderValueExact = (value) => {
-  if (!value || typeof value !== "string") return true;
-
-  const trimmed = value.trim().toLowerCase();
-
-  // EXACT matches only - no substring filtering
-  const exactPlaceholders = [
-    "not set",
-    "not specified",
-    "unknown",
-    "tbd",
-    "todo",
-    "—",
-    "-",
-    "",
-    "n/a",
-    "none",
-    "team member", // Exact match - won't filter "Extension Developer"
-    "graph member", // Exact match - won't filter "Graph Member Lead"
-    "location not set",
-    "timezone not set",
-    "role not set",
-  ];
-
-  const isExactPlaceholder = exactPlaceholders.includes(trimmed);
-  const isTooShort = trimmed.length < 2;
-
-  return isExactPlaceholder || isTooShort;
-};
-
-/**
- * 🧹 Clean field value with exact placeholder detection
- */
-const getCleanFieldValueExact = (dataObject, fieldNames) => {
-  for (const fieldName of fieldNames) {
-    const value = dataObject[fieldName];
-    if (value && typeof value === "string") {
-      if (!isPlaceholderValueExact(value)) {
-        return value.trim();
-      }
-    }
-  }
-  return null;
-};
-
-// ===================================================================
-// 🔄 BACKWARD COMPATIBILITY LAYER - Keep existing functions
-// ===================================================================
-
-/**
- * 🔄 Original functions kept for backward compatibility
- * Extensions can migrate gradually to "Exact" versions
- */
-
-// Keep original findDataValue (but log deprecation warning)
 const findDataValue = (pageUid, key) => {
   console.warn(
     `⚠️ DEPRECATED: findDataValue() uses substring matching. Migrate to findDataValueExact() for reliability.`
   );
-
-  if (!pageUid || !key) return null;
-
-  try {
-    // Get all top-level blocks on the page
-    const allBlocks = window.roamAlphaAPI.data.q(`
-      [:find ?uid ?string ?order
-       :where 
-       [?parent :block/uid "${pageUid}"]
-       [?parent :block/children ?child]
-       [?child :block/uid ?uid]
-       [?child :block/string ?string]
-       [?child :block/order ?order]]
-    `);
-
-    let foundBlock = null;
-
-    // Method 1: Look for attribute format "Key::"
-    foundBlock = allBlocks.find(([uid, text]) => {
-      return text.trim() === `${key}::`;
-    });
-
-    // Method 2: Look for text that contains the key (handles bold/plain)
-    if (!foundBlock) {
-      foundBlock = allBlocks.find(([uid, text]) => {
-        const cleanText = text.replace(/\*\*/g, "").replace(/:/g, "").trim();
-        return cleanText.toLowerCase().includes(key.toLowerCase()); // ORIGINAL PROBLEMATIC CODE
-      });
-    }
-
-    if (!foundBlock) return null;
-
-    const [blockUid, blockText] = foundBlock;
-
-    // Get children blocks (the actual values)
-    const children = window.roamAlphaAPI.data
-      .q(
-        `
-      [:find ?childUid ?childString ?childOrder
-       :where 
-       [?parent :block/uid "${blockUid}"]
-       [?parent :block/children ?child]
-       [?child :block/uid ?childUid]
-       [?child :block/string ?childString]
-       [?child :block/order ?childOrder]]
-    `
-      )
-      .sort((a, b) => a[2] - b[2]); // Sort by order
-
-    if (children.length === 0) {
-      return null;
-    } else if (children.length === 1) {
-      return children[0][1]; // Single value
-    } else {
-      return children.map(([uid, text]) => text); // Multiple values
-    }
-  } catch (error) {
-    console.error(`Error in findDataValue for "${key}":`, error);
-    return null;
-  }
+  return findDataValueExact(pageUid, key); // Delegate to exact version
 };
 
-// Keep other original functions with deprecation warnings
 const findNestedDataValues = (pageUid, parentKey) => {
   console.warn(
-    `⚠️ DEPRECATED: findNestedDataValues() may have reliability issues. Migrate to findNestedDataValuesExact().`
+    `⚠️ DEPRECATED: findNestedDataValues() - use findNestedDataValuesExact().`
   );
-  // ... original implementation kept for compatibility
-  return findNestedDataValuesExact(pageUid, parentKey); // Delegate to exact version
+  return findNestedDataValuesExact(pageUid, parentKey);
 };
 
 const setDataValue = async (
@@ -611,14 +416,12 @@ const setDataValue = async (
   value,
   useAttributeFormat = false
 ) => {
-  console.warn(
-    `⚠️ DEPRECATED: setDataValue() - consider using setDataValueStructured() for better structure.`
-  );
+  console.warn(`⚠️ DEPRECATED: setDataValue() - use setDataValueStructured().`);
   return setDataValueStructured(pageUid, key, value, useAttributeFormat);
 };
 
 // ===================================================================
-// 👤 USER DETECTION UTILITIES - Unchanged (already working well)
+// 👤 USER DETECTION UTILITIES - Unchanged (working well)
 // ===================================================================
 
 /**
@@ -731,7 +534,7 @@ const getCurrentUserViaRecentBlocks = () => {
 };
 
 /**
- * Smart user detection with caching - David's optimization pattern
+ * Smart user detection with caching
  */
 let userCache = null;
 let cacheTimestamp = 0;
@@ -760,11 +563,9 @@ const getCurrentUser = () => {
   userCache = user;
   cacheTimestamp = Date.now();
 
-  console.log(`👤 User detected via ${user.method}:`, user.displayName);
   return user;
 };
 
-// User utility functions
 const getCurrentUserUid = () => getCurrentUser().uid;
 const getCurrentUserDisplayName = () => getCurrentUser().displayName;
 const getCurrentUserPhotoUrl = () => getCurrentUser().photoUrl;
@@ -773,12 +574,8 @@ const getCurrentUserEmail = () => getCurrentUser().email;
 const clearUserCache = () => {
   userCache = null;
   cacheTimestamp = 0;
-  console.log("🔄 User cache cleared");
 };
 
-/**
- * Get user by ID (for multi-user scenarios)
- */
 const getUserById = (uidOrDbId) => {
   try {
     const userData = window.roamAlphaAPI.pull(
@@ -802,9 +599,6 @@ const getUserById = (uidOrDbId) => {
   return null;
 };
 
-/**
- * Check if graph has multiple users
- */
 const isMultiUserGraph = () => {
   try {
     const allUsers = window.roamAlphaAPI.data.q(`
@@ -822,9 +616,6 @@ const isMultiUserGraph = () => {
 // 📄 PAGE AND BLOCK UTILITIES - Unchanged (working well)
 // ===================================================================
 
-/**
- * Get page UID by title with proper error handling
- */
 const getPageUidByTitle = (title) => {
   if (!title) return null;
 
@@ -840,9 +631,6 @@ const getPageUidByTitle = (title) => {
   }
 };
 
-/**
- * Create page if it doesn't exist
- */
 const createPageIfNotExists = async (title) => {
   if (!title) return null;
 
@@ -855,7 +643,6 @@ const createPageIfNotExists = async (title) => {
       page: { title, uid: pageUid },
     });
 
-    console.log(`📄 Created page: "${title}" (${pageUid})`);
     return pageUid;
   } catch (error) {
     console.error(`Failed to create page "${title}":`, error);
@@ -863,9 +650,6 @@ const createPageIfNotExists = async (title) => {
   }
 };
 
-/**
- * Get current page title from URL
- */
 const getCurrentPageTitle = () => {
   try {
     const url = window.location.href;
@@ -888,9 +672,6 @@ const getCurrentPageTitle = () => {
 // 🔧 UTILITY FUNCTIONS - Unchanged (working well)
 // ===================================================================
 
-/**
- * Generate unique ID
- */
 const generateUID = () => {
   return (
     window.roamAlphaAPI?.util?.generateUID?.() ||
@@ -898,14 +679,8 @@ const generateUID = () => {
   );
 };
 
-/**
- * Wait utility for async operations
- */
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/**
- * Today's date in Roam format
- */
 const getTodaysRoamDate = () => {
   const today = new Date();
   const month = String(today.getMonth() + 1).padStart(2, "0");
@@ -914,9 +689,6 @@ const getTodaysRoamDate = () => {
   return `${month}-${day}-${year}`;
 };
 
-/**
- * Parse personal shortcuts from various formats
- */
 const parsePersonalShortcuts = (shortcutsString) => {
   if (!shortcutsString) return [];
 
@@ -935,30 +707,28 @@ const parsePersonalShortcuts = (shortcutsString) => {
 };
 
 // ===================================================================
-// 🎯 FIXED UTILITY REGISTRY - Enhanced with Exact Functions
+// 🎯 LEAN UTILITY REGISTRY
 // ===================================================================
 
 const UTILITIES = {
-  // 🆕 NEW EXACT MATCHING FUNCTIONS (Primary Interface)
+  // Primary extraction functions
   findDataValueExact: findDataValueExact,
   findNestedDataValuesExact: findNestedDataValuesExact,
   setDataValueStructured: setDataValueStructured,
   setNestedDataValuesStructured: setNestedDataValuesStructured,
 
-  // 🔧 ENHANCED HELPER FUNCTIONS
-  isPlaceholderValueExact: isPlaceholderValueExact,
-  getCleanFieldValueExact: getCleanFieldValueExact,
+  // Core helper functions
   normalizeHeaderText: normalizeHeaderText,
   findExactHeaderBlock: findExactHeaderBlock,
   getDirectChildren: getDirectChildren,
   normalizeCategoryName: normalizeCategoryName,
 
-  // 🔄 DEPRECATED (kept for compatibility)
+  // Backward compatibility (deprecated)
   findDataValue: findDataValue,
-  setDataValue: setDataValue,
   findNestedDataValues: findNestedDataValues,
+  setDataValue: setDataValue,
 
-  // 👤 USER DETECTION (unchanged - working well)
+  // User detection
   getCurrentUser: getCurrentUser,
   getCurrentUserUid: getCurrentUserUid,
   getCurrentUserDisplayName: getCurrentUserDisplayName,
@@ -968,12 +738,12 @@ const UTILITIES = {
   isMultiUserGraph: isMultiUserGraph,
   clearUserCache: clearUserCache,
 
-  // 📄 PAGE OPERATIONS (unchanged - working well)
+  // Page operations
   getPageUidByTitle: getPageUidByTitle,
   createPageIfNotExists: createPageIfNotExists,
   getCurrentPageTitle: getCurrentPageTitle,
 
-  // 🔧 HELPER UTILITIES (unchanged - working well)
+  // Utilities
   generateUID: generateUID,
   wait: wait,
   getTodaysRoamDate: getTodaysRoamDate,
@@ -981,14 +751,13 @@ const UTILITIES = {
 };
 
 // ===================================================================
-// 🚀 ROAM EXTENSION EXPORT - Professional Integration
+// 🚀 ROAM EXTENSION EXPORT
 // ===================================================================
 
 export default {
   onload: async ({ extensionAPI }) => {
-    console.log("🔧 FIXED Universal Parser starting...");
+    console.log("🔧 Lean Universal Parser starting...");
 
-    // ✅ VERIFY FOUNDATION DEPENDENCY
     if (!window.RoamExtensionSuite) {
       console.error(
         "❌ Foundation Registry not found! Please load Extension 1 first."
@@ -996,26 +765,24 @@ export default {
       return;
     }
 
-    // 🎯 REGISTER ALL UTILITIES WITH PLATFORM
     const platform = window.RoamExtensionSuite;
 
+    // Register all utilities
     Object.entries(UTILITIES).forEach(([name, utility]) => {
       platform.registerUtility(name, utility);
-      const isNew = name.includes("Exact") || name.includes("Structured");
-      console.log(`🔧 Registered ${isNew ? "🆕 NEW" : ""} utility: ${name}`);
     });
 
-    // 📝 REGISTER COMPREHENSIVE TEST COMMANDS
+    // Simple test commands
     const commands = [
       {
-        label: "Utils: Test EXACT vs SUBSTRING Matching",
+        label: "Utils: Test Exact Data Extraction",
         callback: async () => {
           const user = getCurrentUser();
           const pageTitle = `${user.displayName}/user preferences`;
           const pageUid = getPageUidByTitle(pageTitle);
 
           if (pageUid) {
-            console.group("🧪 EXACT vs SUBSTRING Matching Test");
+            console.group("🧪 Testing Exact Data Extraction");
             console.log("Page UID:", pageUid);
 
             const testKeys = [
@@ -1025,25 +792,8 @@ export default {
             ];
 
             testKeys.forEach((key) => {
-              console.log(`\n🔍 Testing key: "${key}"`);
-
-              const exactResult = findDataValueExact(pageUid, key);
-              console.log(`✅ EXACT match result:`, exactResult);
-
-              const substringResult = findDataValue(pageUid, key);
-              console.log(`⚠️  SUBSTRING match result:`, substringResult);
-
-              if (
-                JSON.stringify(exactResult) !== JSON.stringify(substringResult)
-              ) {
-                console.log(
-                  `🚨 DIFFERENT RESULTS! Exact matching fixed a false positive.`
-                );
-              } else {
-                console.log(
-                  `✅ Results match - both methods work for this case`
-                );
-              }
+              const value = findDataValueExact(pageUid, key);
+              console.log(`${key}:`, value || "Not found");
             });
 
             console.groupEnd();
@@ -1053,38 +803,23 @@ export default {
         },
       },
       {
-        label: "Utils: Test Nested EXACT Data Parser",
+        label: "Utils: Test Nested Data Extraction",
         callback: async () => {
           const user = getCurrentUser();
           const userPageUid = getPageUidByTitle(user.displayName);
 
           if (userPageUid) {
-            console.group("🧪 Testing Nested EXACT Data Parser");
-            console.log("User Page UID:", userPageUid);
+            console.group("🧪 Testing Nested Data Extraction");
 
-            const testParentKeys = [
-              "My Info",
-              "Contact Info",
-              "About Me",
-              "Profile Data",
-            ];
-
-            testParentKeys.forEach((parentKey) => {
-              console.log(`\n🔍 Testing nested extraction for: "${parentKey}"`);
-
-              const nestedData = findNestedDataValuesExact(
-                userPageUid,
-                parentKey
-              );
-              if (nestedData && Object.keys(nestedData).length > 0) {
-                console.log(
-                  `✅ Extracted ${Object.keys(nestedData).length} categories:`,
-                  nestedData
-                );
-              } else {
-                console.log(`📝 No nested data found for "${parentKey}"`);
-              }
-            });
+            const nestedData = findNestedDataValuesExact(
+              userPageUid,
+              "My Info"
+            );
+            if (nestedData && Object.keys(nestedData).length > 0) {
+              console.log("My Info data:", nestedData);
+            } else {
+              console.log("No My Info structure found");
+            }
 
             console.groupEnd();
           } else {
@@ -1093,83 +828,13 @@ export default {
         },
       },
       {
-        label: "Utils: Test Exact Header Block Matching",
-        callback: () => {
-          console.group("🧪 Testing Exact Header Block Matching");
-
-          // Test normalization
-          const testCases = [
-            "My Info:",
-            "**My Info:**",
-            "My Info::",
-            "MY INFO::",
-            "  **My Info:**  ",
-          ];
-
-          console.log("Header Normalization Tests:");
-          testCases.forEach((testCase) => {
-            const normalized = normalizeHeaderText(testCase);
-            console.log(`"${testCase}" → "${normalized}"`);
-          });
-
-          // Test exact matching vs substring
-          const mockBlocks = [
-            [1, "My Info::", 0],
-            [2, "This explains My Info setup", 1],
-            [3, "**Personal Info:**", 2],
-            [4, "Loading Page Preference documentation mentions My Info", 3],
-          ];
-
-          console.log("\nExact Block Matching Tests:");
-          const patterns = ["My Info", "Personal Info"];
-
-          patterns.forEach((pattern) => {
-            const exactMatch = findExactHeaderBlock(mockBlocks, [pattern]);
-            console.log(
-              `Pattern "${pattern}":`,
-              exactMatch ? `Found: "${exactMatch[1]}"` : "Not found"
-            );
-          });
-
-          console.groupEnd();
-        },
-      },
-      {
-        label: "Utils: Test FIXED Placeholder Detection",
-        callback: () => {
-          console.group("🧪 Testing FIXED Placeholder Detection");
-
-          const testValues = [
-            "Extension Developer", // ✅ Should be kept (contains "team member" but not exact)
-            "team member", // ❌ Should be filtered (exact match)
-            "Oakland, California, US", // ✅ Should be kept (real location)
-            "not specified", // ❌ Should be filtered (exact match)
-            "Graph Member Lead", // ✅ Should be kept (contains "Graph Member" but not exact)
-            "graph member", // ❌ Should be filtered (exact match)
-            "https://photo.url", // ✅ Should be kept (real URL)
-            "—", // ❌ Should be filtered (exact match)
-            "", // ❌ Should be filtered (empty)
-            "Building extensions", // ✅ Should be kept (real content)
-          ];
-
-          console.log("Placeholder Detection Results:");
-          testValues.forEach((value) => {
-            const isPlaceholder = isPlaceholderValueExact(value);
-            const status = isPlaceholder ? "❌ FILTERED" : "✅ KEPT";
-            console.log(`${status} "${value}"`);
-          });
-
-          console.groupEnd();
-        },
-      },
-      {
-        label: "Utils: Create Test Data Structure",
+        label: "Utils: Create Sample Profile Structure",
         callback: async () => {
           const user = getCurrentUser();
           const userPageUid = await createPageIfNotExists(user.displayName);
 
           if (userPageUid) {
-            console.log("🧪 Creating test nested data structure...");
+            console.log("🧪 Creating sample profile structure...");
 
             const profileData = {
               avatar:
@@ -1177,167 +842,67 @@ export default {
                 `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
                   user.displayName
                 )}`,
-              location: "Oakland, California, US",
-              role: "Extension Developer",
-              timezone: "America/Los_Angeles",
-              aboutMe:
-                "Building professional Roam extensions with exact matching",
+              location: "__not yet entered__",
+              role: "__not yet entered__",
+              timezone: "__not yet entered__",
+              aboutMe: "__not yet entered__",
             };
 
             const success = await setNestedDataValuesStructured(
               userPageUid,
               "My Info",
               profileData,
-              true // Use attribute format for proper blue pills
+              true
             );
 
             if (success) {
+              console.log("✅ Sample profile structure created!");
               console.log(
-                "✅ Test nested data structure created successfully!"
+                "💡 Check your user page - shows obvious placeholders"
               );
-              console.log(
-                "💡 Check your user page - should see proper blue pill structure"
-              );
-              console.log("🧪 Now try 'Utils: Test Nested EXACT Data Parser'");
-            } else {
-              console.log("❌ Failed to create test nested data structure");
             }
           }
         },
       },
-      {
-        label: "Utils: Test All User Detection Methods",
-        callback: () => {
-          console.group("🧪 Testing All User Detection Methods");
-          console.log("Official API:", getCurrentUserViaOfficialAPI());
-          console.log("localStorage:", getCurrentUserViaLocalStorage());
-          console.log("Recent blocks:", getCurrentUserViaRecentBlocks());
-          console.log("Final result:", getCurrentUser());
-          console.log("Multi-user graph:", isMultiUserGraph());
-          console.groupEnd();
-        },
-      },
-      {
-        label: "Utils: List All FIXED Utilities",
-        callback: () => {
-          console.group("🔧 FIXED Universal Parser Utilities");
-
-          const categories = {
-            "🆕 NEW EXACT FUNCTIONS": [
-              "findDataValueExact",
-              "findNestedDataValuesExact",
-              "setDataValueStructured",
-              "setNestedDataValuesStructured",
-            ],
-            "🔧 ENHANCED HELPERS": [
-              "isPlaceholderValueExact",
-              "getCleanFieldValueExact",
-              "normalizeHeaderText",
-              "findExactHeaderBlock",
-              "getDirectChildren",
-              "normalizeCategoryName",
-            ],
-            "⚠️ DEPRECATED (compatibility)": [
-              "findDataValue",
-              "findNestedDataValues",
-              "setDataValue",
-            ],
-            "👤 USER DETECTION": [
-              "getCurrentUser",
-              "getCurrentUserUid",
-              "getCurrentUserDisplayName",
-              "getUserById",
-              "isMultiUserGraph",
-            ],
-            "📄 PAGE OPERATIONS": [
-              "getPageUidByTitle",
-              "createPageIfNotExists",
-              "getCurrentPageTitle",
-            ],
-            "🔧 UTILITIES": [
-              "generateUID",
-              "wait",
-              "getTodaysRoamDate",
-              "parsePersonalShortcuts",
-            ],
-          };
-
-          Object.entries(categories).forEach(([category, utilities]) => {
-            console.log(`\n${category}:`);
-            utilities.forEach((util) => {
-              console.log(`  • ${util}`);
-            });
-          });
-
-          console.log(
-            `\nTotal: ${Object.keys(UTILITIES).length} utilities available`
-          );
-          console.groupEnd();
-        },
-      },
     ];
 
-    // Add commands and register for cleanup
     commands.forEach((cmd) => {
       window.roamAlphaAPI.ui.commandPalette.addCommand(cmd);
       window._extensionRegistry.commands.push(cmd.label);
     });
 
-    // 🎯 REGISTER SELF WITH PLATFORM
     platform.register(
       "utility-library",
       {
         utilities: UTILITIES,
-        // Primary interface for Extension 6
         findDataValueExact,
         findNestedDataValuesExact,
-        setDataValueStructured,
         getCurrentUser,
-        version: "1.5.2", // Incremented for major fixes
+        version: "1.5.3",
       },
       {
-        name: "FIXED Universal Parser",
-        description:
-          "MAJOR FIX: Exact block matching eliminates false positives from documentation",
-        version: "1.5.2",
+        name: "Lean Universal Parser",
+        description: "Clean exact matching without unnecessary complexity",
+        version: "1.5.3",
         dependencies: ["foundation-registry"],
       }
     );
 
-    // 🎉 STARTUP COMPLETE
-    console.log("✅ FIXED Universal Parser loaded successfully!");
-    console.log("🔧 MAJOR FIX: Exact block matching replaces substring search");
-    console.log(
-      "🔧 MAJOR FIX: Precise placeholder detection (exact matches only)"
-    );
-    console.log("🔧 MAJOR FIX: PDF-specified header normalization");
-    console.log("🆕 NEW: Hierarchical nested data extraction");
-    console.log(
-      "🔄 COMPATIBILITY: Old functions kept with deprecation warnings"
-    );
+    console.log("✅ Lean Universal Parser loaded!");
+    console.log("🔧 CLEAN: Exact block matching only");
+    console.log("🔧 CLEAN: No placeholder filtering - shows actual data");
+    console.log("🔧 CLEAN: Simple and focused");
     console.log(`🎯 ${Object.keys(UTILITIES).length} utilities available`);
-    console.log('💡 Try: Cmd+P → "Utils: Test EXACT vs SUBSTRING Matching"');
 
-    // Test user detection on startup
     const currentUser = getCurrentUser();
     console.log(
       `👤 Current user: ${currentUser.displayName} (${currentUser.method})`
     );
-
-    // Show improvement summary
-    console.log("\n🚀 KEY IMPROVEMENTS:");
-    console.log("  ✅ No more false positives from documentation blocks");
-    console.log("  ✅ Real data like 'Extension Developer' no longer filtered");
-    console.log("  ✅ Proper hierarchical data extraction following PDF specs");
-    console.log("  ✅ Backward compatibility maintained for gradual migration");
   },
 
   onunload: () => {
-    console.log("🔧 FIXED Universal Parser unloading...");
-
-    // Clear caches
+    console.log("🔧 Lean Universal Parser unloading...");
     clearUserCache();
-
-    console.log("✅ FIXED Universal Parser cleanup complete!");
+    console.log("✅ Lean Universal Parser cleanup complete!");
   },
 };
