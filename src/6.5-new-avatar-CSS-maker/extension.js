@@ -146,13 +146,76 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
    * @returns {Promise<string>} - Found block UID
    */
   async findChildBlockByString(parentUid, searchString) {
-    const children = await window.roamAlphaAPI.data.block.getChildren(parentUid);
-    for (const child of children) {
-      if (child.string && child.string.includes(searchString)) {
-        return child.uid;
+    try {
+      // Use q to find blocks with matching string
+      const blocks = await window.roamAlphaAPI.q(`
+        [:find ?uid ?string
+         :where
+         [?parent :block/uid "${parentUid}"]
+         [?parent :block/children ?child]
+         [?child :block/string ?string]
+         [?child :block/uid ?uid]
+         [(clojure.string/includes? ?string "${searchString}")]]
+      `);
+      
+      if (blocks && blocks.length > 0) {
+        return blocks[0][0]; // Return the first matching block's UID
       }
+      return null;
+    } catch (error) {
+      console.error("Error finding child block:", error);
+      return null;
     }
-    return null;
+  },
+
+  /**
+   * Extract image URLs from text using regex
+   * @param {string} text - Text to extract URLs from
+   * @returns {Promise<string[]>} - Array of image URLs
+   */
+  async extractImageUrls(text) {
+    console.group("🔍 Extracting images from:", text);
+    try {
+      if (!text) {
+        console.log("❌ No text provided");
+        return [];
+      }
+
+      // Common image URL patterns
+      const patterns = [
+        // Markdown image syntax
+        /!\[.*?\]\((.*?)\)/g,
+        // HTML img tag
+        /<img[^>]+src="([^">]+)"/g,
+        // Direct URL (must end with image extension)
+        /(https?:\/\/[^\s<>"]+?\.(?:png|jpe?g|gif|webp|svg|ico)(?:\?[^\s<>"]*)?)/gi,
+        // Google Photos URL
+        /(https?:\/\/lh3\.googleusercontent\.com\/[^\s<>"]+)/g
+      ];
+
+      const urls = new Set();
+      
+      // Try each pattern
+      for (const pattern of patterns) {
+        let match;
+        while ((match = pattern.exec(text)) !== null) {
+          const url = match[1] || match[0];
+          if (url) {
+            console.log("Found URL:", url);
+            urls.add(url);
+          }
+        }
+      }
+
+      const uniqueUrls = Array.from(urls);
+      console.log("Extracted URLs:", uniqueUrls);
+      return uniqueUrls;
+    } catch (error) {
+      console.error("💥 Error extracting image URLs:", error);
+      return [];
+    } finally {
+      console.groupEnd();
+    }
   },
 
   /**
@@ -206,12 +269,9 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
         const platformAvatar = currentUser.photoURL;
         if (platformAvatar) {
           console.log("Found platform avatar:", platformAvatar);
-          const images = await this.extractImageUrls(platformAvatar);
-          console.log("Extracted images:", images);
-          if (images.length > 0) {
-            console.log("✅ Found image in platform data:", images[0]);
-            return images[0];
-          }
+          // For platform avatar, we can use it directly since it's already a URL
+          console.log("✅ Using platform avatar directly:", platformAvatar);
+          return platformAvatar;
         } else {
           console.log("❌ No platform avatar found");
         }
@@ -291,31 +351,6 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
       throw error;
     }
     console.groupEnd();
-  },
-
-  /**
-   * Helper: Extract image URLs from text using universal image extraction
-   * @param {string} text - Text to extract images from
-   * @returns {Promise<string[]>} - Array of image URLs
-   */
-  async extractImageUrls(text) {
-    console.log("🔍 Extracting images from:", text);
-    
-    // First try the utility
-    const images = await window.RoamExtensionSuite.getUtility("extractImageUrls")(text);
-    console.log("Utility found images:", images);
-    
-    // If no images found, try manual extraction for Roam uploads
-    if (images.length === 0) {
-      // Look for Roam's image upload format
-      const roamUploadMatch = text.match(/!\[.*?\]\((https:\/\/firebasestorage\.googleapis\.com\/.*?)\)/);
-      if (roamUploadMatch) {
-        console.log("Found Roam upload image:", roamUploadMatch[1]);
-        return [roamUploadMatch[1]];
-      }
-    }
-    
-    return images;
   },
 
   /**
