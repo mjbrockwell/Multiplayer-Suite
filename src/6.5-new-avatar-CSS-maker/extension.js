@@ -52,19 +52,51 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
    * @returns {Promise<Object>} - User data object
    */
   async getUserData(username) {
-    // Try to get user data from their main page
-    const pageUid = await window.roamAlphaAPI.q(`[:find ?uid :where [?uid :node/title "${username}"]]`);
-    if (!pageUid?.[0]?.[0]) return null;
+    console.group("👤 Getting User Data");
+    try {
+      // Try to get user data from their main page
+      const pageUid = await window.roamAlphaAPI.q(`[:find ?uid :where [?uid :node/title "${username}"]]`);
+      if (!pageUid?.[0]?.[0]) {
+        console.log(`❌ No page found for ${username}`);
+        return null;
+      }
 
-    // Use exact data extraction for user info
-    const userData = {
-      username,
-      avatar: await this.findDataValueExact(pageUid[0][0], "Avatar"),
-      displayName: await this.findDataValueExact(pageUid[0][0], "Display Name"),
-      // Add any other user data fields you want to track
-    };
+      console.log("📄 Found user page, searching for data...");
+      
+      // Use findNestedDataValuesExact to get data under My Info
+      const myInfoData = await window.RoamExtensionSuite.getUtility("findNestedDataValuesExact")(pageUid[0][0], "My Info");
+      console.log("📝 My Info data:", myInfoData);
 
-    return userData;
+      // The avatar should be in the nested data
+      const avatar = myInfoData?.Avatar;
+      console.log("🖼️ Avatar data:", avatar);
+
+      return {
+        username,
+        avatar: avatar || null
+      };
+    } catch (error) {
+      console.error("💥 Error getting user data:", error);
+      return { username };
+    } finally {
+      console.groupEnd();
+    }
+  },
+
+  /**
+   * Helper: Find child block by string content
+   * @param {string} parentUid - Parent block UID
+   * @param {string} searchString - String to search for
+   * @returns {Promise<string>} - Found block UID
+   */
+  async findChildBlockByString(parentUid, searchString) {
+    const children = await window.roamAlphaAPI.data.block.getChildren(parentUid);
+    for (const child of children) {
+      if (child.string && child.string.includes(searchString)) {
+        return child.uid;
+      }
+    }
+    return null;
   },
 
   /**
@@ -95,7 +127,7 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
         `[:find ?uid :where [?uid :node/title "${user.username}/preferences"]]`
       );
       if (prefsPageUid?.[0]?.[0]) {
-        const prefsAvatar = await this.findDataValueExact(prefsPageUid[0][0], "Avatar");
+        const prefsAvatar = await window.RoamExtensionSuite.getUtility("findDataValueExact")(prefsPageUid[0][0], "Avatar");
         if (prefsAvatar) {
           console.log("Found avatar in preferences:", prefsAvatar);
           const images = await this.extractImageUrls(prefsAvatar);
