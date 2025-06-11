@@ -36,7 +36,7 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
       const css = this.generateAvatarCSS(username, avatarURL);
 
       // Apply to roam/css using bulletproof cascade
-      await this.applyAvatarCSS(username, css);
+      await this.applyAvatarCSS(username, avatarURL);
 
       console.log(`🎉 Avatar sync completed for ${username}`);
       return true;
@@ -313,44 +313,127 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
   },
 
   /**
-   * Apply avatar CSS using bulletproof cascade
-   * @param {string} username - The username
-   * @param {string} css - The CSS to apply
+   * Apply avatar CSS to user's page
+   * @param {string} username - Username to apply CSS for
+   * @param {string} avatarUrl - Avatar URL to use
+   * @returns {Promise<boolean>} - Success status
    */
-  async applyAvatarCSS(username, css) {
+  async applyAvatarCSS(username, avatarUrl) {
     console.group("🔄 Applying Avatar CSS");
     try {
-      // First ensure the roam/css page exists
-      const cssPageUid = await window.roamAlphaAPI.q(
-        `[:find ?uid :where [?uid :node/title "roam/css"]]`
-      );
-      if (!cssPageUid?.[0]?.[0]) {
-        console.log("📄 Creating roam/css page...");
-        await window.roamAlphaAPI.data.page.create({ title: "roam/css" });
+      // Find or create the user's page
+      const pageUid = await this.findOrCreatePage(username);
+      if (!pageUid) {
+        console.error("❌ Could not find or create user page");
+        return false;
       }
 
-      // Create or find the User Avatars block with proper formatting
-      const userAvatarsBlockUid = await this.cascadeToBlock(["roam/css", "**User Avatars:**"]);
-      
-      // Create or find the username block
-      const usernameBlockUid = await this.cascadeToBlock(["roam/css", "**User Avatars:**", `${username}:`]);
-      
-      // Update the block with the CSS
-      await window.roamAlphaAPI.data.block.update({
-        block: { uid: usernameBlockUid, string: css }
+      // Find or create the My Info block
+      const myInfoBlock = await this.findOrCreateBlock(pageUid, "My Info::");
+      if (!myInfoBlock) {
+        console.error("❌ Could not find or create My Info block");
+        return false;
+      }
+
+      // Find or create the Avatar block
+      const avatarBlock = await this.findOrCreateBlock(myInfoBlock, "Avatar::");
+      if (!avatarBlock) {
+        console.error("❌ Could not find or create Avatar block");
+        return false;
+      }
+
+      // Update the Avatar block with the image
+      await window.roamAlphaAPI.updateBlock({
+        block: {
+          uid: avatarBlock,
+          string: `![Avatar](${avatarUrl})`
+        }
       });
 
-      console.log("✅ CSS applied successfully");
-      console.log("📁 Block hierarchy:");
-      console.log("  roam/css");
-      console.log("    **User Avatars:**");
-      console.log(`      ${username}:`);
-      console.log("        [CSS Block]");
+      console.log("✅ Avatar CSS applied successfully");
+      return true;
     } catch (error) {
       console.error("💥 Error applying CSS:", error);
-      throw error;
+      return false;
+    } finally {
+      console.groupEnd();
     }
-    console.groupEnd();
+  },
+
+  /**
+   * Find or create a page
+   * @param {string} title - Page title
+   * @returns {Promise<string>} - Page UID
+   */
+  async findOrCreatePage(title) {
+    try {
+      // Try to find existing page
+      const pageUid = await window.roamAlphaAPI.q(
+        `[:find ?uid :where [?uid :node/title "${title}"]]`
+      );
+
+      if (pageUid?.[0]?.[0]) {
+        console.log("📄 Found existing page");
+        return pageUid[0][0];
+      }
+
+      // Create new page
+      console.log("📄 Creating new page");
+      const newPageUid = window.roamAlphaAPI.util.generateUID();
+      await window.roamAlphaAPI.createPage({
+        page: {
+          uid: newPageUid,
+          title: title
+        }
+      });
+
+      return newPageUid;
+    } catch (error) {
+      console.error("Error finding/creating page:", error);
+      return null;
+    }
+  },
+
+  /**
+   * Find or create a block
+   * @param {string} parentUid - Parent block/page UID
+   * @param {string} blockString - Block string to find/create
+   * @returns {Promise<string>} - Block UID
+   */
+  async findOrCreateBlock(parentUid, blockString) {
+    try {
+      // Try to find existing block
+      const blocks = await window.roamAlphaAPI.q(`
+        [:find ?uid
+         :where
+         [?parent :block/uid "${parentUid}"]
+         [?parent :block/children ?child]
+         [?child :block/string ?string]
+         [?child :block/uid ?uid]
+         [(clojure.string/includes? ?string "${blockString}")]]
+      `);
+
+      if (blocks?.[0]?.[0]) {
+        console.log("📝 Found existing block");
+        return blocks[0][0];
+      }
+
+      // Create new block
+      console.log("📝 Creating new block");
+      const newBlockUid = window.roamAlphaAPI.util.generateUID();
+      await window.roamAlphaAPI.createBlock({
+        location: { "parent-uid": parentUid, order: 0 },
+        block: {
+          uid: newBlockUid,
+          string: blockString
+        }
+      });
+
+      return newBlockUid;
+    } catch (error) {
+      console.error("Error finding/creating block:", error);
+      return null;
+    }
   },
 
   /**
@@ -506,7 +589,7 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
       console.log(css);
       
       console.log("\n🔄 Applying test CSS...");
-      await this.applyAvatarCSS(username, css);
+      await this.applyAvatarCSS(username, testAvatarURL);
       
       console.log("✅ Test CSS applied successfully");
       console.log("💡 Check the roam/css page for the test CSS block");
