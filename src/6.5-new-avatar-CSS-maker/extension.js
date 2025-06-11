@@ -278,8 +278,45 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
    * @returns {Promise<Object>} - Current user data
    */
   async getCurrentUser() {
-    // Use the new getCurrentUser utility
-    return window.RoamExtensionSuite.getUtility("getCurrentUser")();
+    console.group("👤 Getting Current User");
+    try {
+      // Try the utility first
+      const user = await window.RoamExtensionSuite.getUtility("getCurrentUser")();
+      console.log("Utility returned user:", user);
+
+      if (user) {
+        return user;
+      }
+
+      // Fallback: Try to get from Roam API directly
+      console.log("Trying Roam API directly...");
+      if (window.roamAlphaAPI?.platform?.getCurrentUser) {
+        const roamUser = await window.roamAlphaAPI.platform.getCurrentUser();
+        console.log("Roam API returned user:", roamUser);
+        return roamUser;
+      }
+
+      // Final fallback: Try to get from localStorage
+      console.log("Trying localStorage fallback...");
+      const storedUser = localStorage.getItem("roam-user");
+      if (storedUser) {
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          console.log("localStorage returned user:", parsedUser);
+          return parsedUser;
+        } catch (e) {
+          console.error("Failed to parse stored user:", e);
+        }
+      }
+
+      console.error("❌ Could not determine current user");
+      return null;
+    } catch (error) {
+      console.error("💥 Error getting current user:", error);
+      return null;
+    } finally {
+      console.groupEnd();
+    }
   },
 
   /**
@@ -299,13 +336,23 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
     console.group("🧪 Testing Avatar Sync for Current User");
     try {
       const currentUser = await this.getCurrentUser();
+      console.log("👤 Current user data:", currentUser);
+      
       if (!currentUser) {
         console.error("❌ No current user found");
         return;
       }
 
-      console.log(`👤 Testing for user: ${currentUser.displayName || currentUser.username}`);
-      const result = await this.syncAvatar(currentUser.displayName || currentUser.username);
+      // Try different username formats
+      const username = currentUser.displayName || currentUser.username || currentUser.name;
+      console.log(`👤 Testing for user: ${username}`);
+      
+      if (!username) {
+        console.error("❌ Could not determine username from:", currentUser);
+        return;
+      }
+
+      const result = await this.syncAvatar(username);
       
       if (result) {
         console.log("✅ Avatar sync successful!");
