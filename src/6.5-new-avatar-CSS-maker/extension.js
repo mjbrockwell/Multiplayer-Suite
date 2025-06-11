@@ -47,7 +47,49 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
   },
 
   /**
-   * Get user data using new utilities
+   * Get current user data using Roam's native API
+   * @returns {Promise<Object>} - User data object
+   */
+  async getCurrentUser() {
+    console.group("👤 Getting Current User");
+    try {
+      // Get user UID using Roam's API
+      const userUid = window.roamAlphaAPI.user.uid();
+      console.log("User UID:", userUid);
+
+      // Pull user data using Roam's API
+      const userData = await window.roamAlphaAPI.pull("[*]", [":user/uid", userUid]);
+      console.log("User data from API:", userData);
+
+      // Get username from various possible fields
+      const username = userData?.[":user/display-name"] || 
+                      userData?.[":user/username"] || 
+                      userData?.[":user/name"] ||
+                      userData?.[":user/email"]?.split("@")[0];
+
+      console.log("Found username:", username);
+
+      if (!username) {
+        console.warn("⚠️ Could not determine username from user data");
+        return null;
+      }
+
+      return {
+        username,
+        displayName: userData?.[":user/display-name"],
+        email: userData?.[":user/email"],
+        photoURL: userData?.[":user/photo-url"]
+      };
+    } catch (error) {
+      console.error("💥 Error getting current user:", error);
+      return null;
+    } finally {
+      console.groupEnd();
+    }
+  },
+
+  /**
+   * Get user data using Roam's native API
    * @param {string} username - The username to get data for
    * @returns {Promise<Object>} - User data object
    */
@@ -63,17 +105,31 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
 
       console.log("📄 Found user page, searching for data...");
       
-      // Use findNestedDataValuesExact to get data under My Info
-      const myInfoData = await window.RoamExtensionSuite.getUtility("findNestedDataValuesExact")(pageUid[0][0], "My Info");
-      console.log("📝 My Info data:", myInfoData);
+      // Get the My Info block first
+      const myInfoBlock = await this.findChildBlockByString(pageUid[0][0], "My Info::");
+      if (!myInfoBlock) {
+        console.log("❌ No My Info:: block found");
+        return { username };
+      }
 
-      // The avatar should be in the nested data
-      const avatar = myInfoData?.Avatar;
-      console.log("🖼️ Avatar data:", avatar);
+      console.log("✅ Found My Info:: block");
+      
+      // Then get the Avatar block under My Info
+      const avatarBlock = await this.findChildBlockByString(myInfoBlock, "Avatar::");
+      if (!avatarBlock) {
+        console.log("❌ No Avatar:: block found under My Info");
+        return { username };
+      }
+
+      console.log("✅ Found Avatar:: block");
+      
+      // Get the block's string content
+      const blockData = await window.roamAlphaAPI.data.block.get(avatarBlock);
+      console.log("📝 Block content:", blockData?.string);
 
       return {
         username,
-        avatar: avatar || null
+        avatar: blockData?.string || null
       };
     } catch (error) {
       console.error("💥 Error getting user data:", error);
@@ -127,7 +183,7 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
         `[:find ?uid :where [?uid :node/title "${user.username}/preferences"]]`
       );
       if (prefsPageUid?.[0]?.[0]) {
-        const prefsAvatar = await window.RoamExtensionSuite.getUtility("findDataValueExact")(prefsPageUid[0][0], "Avatar");
+        const prefsAvatar = await this.findDataValueExact(prefsPageUid[0][0], "Avatar");
         if (prefsAvatar) {
           console.log("Found avatar in preferences:", prefsAvatar);
           const images = await this.extractImageUrls(prefsAvatar);
@@ -147,7 +203,7 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
       console.log("\nStrategy 3: Checking platform data...");
       const currentUser = await this.getCurrentUser();
       if (currentUser?.username === user.username || currentUser?.displayName === user.username) {
-        const platformAvatar = currentUser.photoURL || currentUser.photoUrl;
+        const platformAvatar = currentUser.photoURL;
         if (platformAvatar) {
           console.log("Found platform avatar:", platformAvatar);
           const images = await this.extractImageUrls(platformAvatar);
@@ -263,14 +319,35 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
   },
 
   /**
-   * Helper: Find exact data value using new utilities
+   * Helper: Find exact data value
    * @param {string} pageUid - Page UID
    * @param {string} key - Data key to find
    * @returns {Promise<string>} - Found value
    */
   async findDataValueExact(pageUid, key) {
-    // Use the new findDataValueExact utility
-    return window.RoamExtensionSuite.getUtility("findDataValueExact")(pageUid, key);
+    try {
+      const utility = window.RoamExtensionSuite.getUtility("findDataValueExact");
+      if (typeof utility === 'function') {
+        return await utility(pageUid, key);
+      }
+      
+      // Fallback: Manual search
+      const children = await window.roamAlphaAPI.data.block.getChildren(pageUid);
+      for (const child of children) {
+        if (child.string && (
+          child.string.startsWith(`${key}:`) ||
+          child.string.startsWith(`${key}::`) ||
+          child.string.startsWith(`**${key}:**`) ||
+          child.string.startsWith(`**${key}**:`)
+        )) {
+          return child.string;
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error("Error in findDataValueExact:", error);
+      return null;
+    }
   },
 
   /**
@@ -311,52 +388,6 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
       console.error("💥 Test failed:", error);
     }
     console.groupEnd();
-  },
-
-  /**
-   * Helper: Get current user using new utilities
-   * @returns {Promise<Object|string>} - Current user data
-   */
-  async getCurrentUser() {
-    console.group("👤 Getting Current User");
-    try {
-      // Try the utility first
-      const user = await window.RoamExtensionSuite.getUtility("getCurrentUser")();
-      console.log("Utility returned user:", user);
-
-      if (user) {
-        return user; // This could be a string or an object
-      }
-
-      // Fallback: Try to get from Roam API directly
-      console.log("Trying Roam API directly...");
-      if (window.roamAlphaAPI?.platform?.getCurrentUser) {
-        const roamUser = await window.roamAlphaAPI.platform.getCurrentUser();
-        console.log("Roam API returned user:", roamUser);
-        return roamUser;
-      }
-
-      // Final fallback: Try to get from localStorage
-      console.log("Trying localStorage fallback...");
-      const storedUser = localStorage.getItem("roam-user");
-      if (storedUser) {
-        try {
-          const parsedUser = JSON.parse(storedUser);
-          console.log("localStorage returned user:", parsedUser);
-          return parsedUser;
-        } catch (e) {
-          console.error("Failed to parse stored user:", e);
-        }
-      }
-
-      console.error("❌ Could not determine current user");
-      return null;
-    } catch (error) {
-      console.error("💥 Error getting current user:", error);
-      return null;
-    } finally {
-      console.groupEnd();
-    }
   },
 
   /**
