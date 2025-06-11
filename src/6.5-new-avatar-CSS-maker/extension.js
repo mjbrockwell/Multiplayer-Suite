@@ -1,5 +1,5 @@
-// Extension 6.5 Avatar Maker - Fixed Implementation
-// Fixes: 1) Correct block hierarchy, 2) Fresh data extraction
+// Extension 6.5 Avatar Maker - Rebuilt with Extension 1.5 Utilities
+// Features: Race condition-free block creation, universal image extraction, exact data parsing
 
 window.RoamExtensionSuite = window.RoamExtensionSuite || {};
 
@@ -7,25 +7,24 @@ window.RoamExtensionSuite.extensions =
   window.RoamExtensionSuite.extensions || {};
 
 window.RoamExtensionSuite.extensions.avatarMaker = {
-  // Cache for preventing race conditions during cascade operations
-  workingOn: new Set(),
-
-  // Cache for user data - with invalidation capability
-  userDataCache: new Map(),
-
   /**
    * Main entry point for syncing user avatar
+   * @param {string} username - The username to sync avatar for
+   * @returns {Promise<boolean>} - Success status
    */
   async syncAvatar(username) {
     console.log(`🎯 Starting avatar sync for: ${username}`);
 
     try {
-      // FIX #2: Clear any cached user data before extraction
-      this.clearUserDataCache(username);
+      // Get fresh user data using new utilities
+      const user = await this.getUserData(username);
+      if (!user) {
+        console.log(`❌ No user data found for ${username}`);
+        return false;
+      }
 
-      // Extract fresh avatar URL
-      const avatarURL = await this.extractUserAvatarURL(username);
-
+      // Extract avatar URL using universal image extraction
+      const avatarURL = await this.extractAvatarURL(user);
       if (!avatarURL) {
         console.log(`❌ No avatar URL found for ${username}`);
         return false;
@@ -36,8 +35,8 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
       // Generate CSS
       const css = this.generateAvatarCSS(username, avatarURL);
 
-      // Apply to roam/css with correct hierarchy
-      await this.bulletproofCascadeToCSS(username, css);
+      // Apply to roam/css using bulletproof cascade
+      await this.applyAvatarCSS(username, css);
 
       console.log(`🎉 Avatar sync completed for ${username}`);
       return true;
@@ -48,97 +47,57 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
   },
 
   /**
-   * FIXED: Extract user avatar URL with cache invalidation and fresh data priority
+   * Get user data using new utilities
+   * @param {string} username - The username to get data for
+   * @returns {Promise<Object>} - User data object
    */
-  async extractUserAvatarURL(username) {
-    console.log(`🔍 Extracting avatar URL for: ${username}`);
+  async getUserData(username) {
+    // Try to get user data from their main page
+    const pageUid = await window.roamAlphaAPI.q(`[:find ?uid :where [?uid :node/title "${username}"]]`);
+    if (!pageUid?.[0]?.[0]) return null;
 
-    // FIX #2: Comprehensive logging and fresh data prioritization
-    let avatarURL = null;
+    // Use exact data extraction for user info
+    const userData = {
+      username,
+      avatar: await this.findDataValueExact(pageUid[0][0], "Avatar"),
+      displayName: await this.findDataValueExact(pageUid[0][0], "Display Name"),
+      // Add any other user data fields you want to track
+    };
 
-    // Strategy 1: Check user's main page for Avatar data (PRIORITIZED - fresh graph data)
-    console.log("🔍 STRATEGY 1 - Checking user main page...");
-    try {
-      avatarURL = await this.extractFromUserMainPage(username);
-      if (avatarURL) {
-        console.log(`✅ STRATEGY 1 SUCCESS - User main page: ${avatarURL}`);
-        return avatarURL;
-      }
-      console.log("❌ STRATEGY 1 - No avatar in user main page");
-    } catch (error) {
-      console.log("❌ STRATEGY 1 ERROR:", error.message);
+    return userData;
+  },
+
+  /**
+   * Extract avatar URL using universal image extraction
+   * @param {Object} user - User data object
+   * @returns {Promise<string>} - Avatar URL
+   */
+  async extractAvatarURL(user) {
+    // Strategy 1: Check user's main page for Avatar data
+    if (user.avatar) {
+      const images = await this.extractImageUrls(user.avatar);
+      if (images.length > 0) return images[0];
     }
 
-    // Strategy 2: Check user preferences page (fresh graph data)
-    console.log("🔍 STRATEGY 2 - Checking user preferences page...");
-    try {
-      avatarURL = await this.extractFromUserPreferencesPage(username);
-      if (avatarURL) {
-        console.log(
-          `✅ STRATEGY 2 SUCCESS - User preferences page: ${avatarURL}`
-        );
-        return avatarURL;
-      }
-      console.log("❌ STRATEGY 2 - No avatar in user preferences page");
-    } catch (error) {
-      console.log("❌ STRATEGY 2 ERROR:", error.message);
-    }
-
-    // Strategy 3: Check current user platform data (DEPRIORITIZED - may be cached)
-    console.log(
-      "🔍 STRATEGY 3 - Checking platform user data (cache-busted)..."
+    // Strategy 2: Check user preferences page
+    const prefsPageUid = await window.roamAlphaAPI.q(
+      `[:find ?uid :where [?uid :node/title "${user.username}/preferences"]]`
     );
-    try {
-      // FIX #2: Force fresh platform data by clearing cache first
-      this.clearPlatformUserCache();
-      avatarURL = await this.extractFromPlatformUserData(username);
-      if (avatarURL) {
-        console.log(`✅ STRATEGY 3 SUCCESS - Platform user data: ${avatarURL}`);
-        return avatarURL;
+    if (prefsPageUid?.[0]?.[0]) {
+      const prefsAvatar = await this.findDataValueExact(prefsPageUid[0][0], "Avatar");
+      if (prefsAvatar) {
+        const images = await this.extractImageUrls(prefsAvatar);
+        if (images.length > 0) return images[0];
       }
-      console.log("❌ STRATEGY 3 - No avatar in platform user data");
-    } catch (error) {
-      console.log("❌ STRATEGY 3 ERROR:", error.message);
     }
 
-    console.log(`❌ All strategies failed for ${username}`);
-    return null;
-  },
-
-  /**
-   * Extract avatar from user's main page
-   */
-  async extractFromUserMainPage(username) {
-    const getPageUidByTitle =
-      window.RoamExtensionSuite.getUtility("getPageUidByTitle");
-    const getDirectChildren =
-      window.RoamExtensionSuite.getUtility("getDirectChildren");
-
-    const pageUid = getPageUidByTitle(username);
-
-    if (!pageUid) {
-      throw new Error(`User page not found: ${username}`);
-    }
-
-    const children = getDirectChildren(pageUid);
-
-    for (const child of children) {
-      const blockString = child.string || "";
-
-      // Look for Avatar:: pattern
-      if (blockString.toLowerCase().includes("avatar::")) {
-        const match = blockString.match(/avatar::\s*(https?:\/\/[^\s\)]+)/i);
-        if (match) {
-          return match[1].trim();
-        }
-      }
-
-      // Look for direct image URLs
-      const urlMatch = blockString.match(
-        /(https?:\/\/[^\s\)]+\.(jpg|jpeg|png|gif|webp))/i
-      );
-      if (urlMatch) {
-        return urlMatch[1].trim();
+    // Strategy 3: Check platform user data
+    const currentUser = await this.getCurrentUser();
+    if (currentUser?.username === user.username || currentUser?.displayName === user.username) {
+      const platformAvatar = currentUser.photoURL || currentUser.photoUrl;
+      if (platformAvatar) {
+        const images = await this.extractImageUrls(platformAvatar);
+        if (images.length > 0) return images[0];
       }
     }
 
@@ -146,383 +105,82 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
   },
 
   /**
-   * Extract avatar from user preferences page
-   */
-  async extractFromUserPreferencesPage(username) {
-    const getPageUidByTitle =
-      window.RoamExtensionSuite.getUtility("getPageUidByTitle");
-    const getDirectChildren =
-      window.RoamExtensionSuite.getUtility("getDirectChildren");
-
-    const prefsPageTitle = `${username}/preferences`;
-    const pageUid = getPageUidByTitle(prefsPageTitle);
-
-    if (!pageUid) {
-      return null;
-    }
-
-    const children = getDirectChildren(pageUid);
-
-    for (const child of children) {
-      const blockString = child.string || "";
-
-      if (blockString.toLowerCase().includes("avatar")) {
-        const urlMatch = blockString.match(/(https?:\/\/[^\s\)]+)/i);
-        if (urlMatch) {
-          return urlMatch[1].trim();
-        }
-      }
-    }
-
-    return null;
-  },
-
-  /**
-   * Extract avatar from platform user data (with cache busting)
-   */
-  async extractFromPlatformUserData(username) {
-    const utils = window.RoamExtensionSuite.getUtility;
-
-    // Force fresh user data by bypassing any cached getCurrentUser
-    const currentUser = await this.getFreshCurrentUser();
-
-    if (!currentUser) {
-      throw new Error("No current user data available");
-    }
-
-    console.log(`🔍 Platform user data:`, currentUser);
-    console.log(
-      `🔍 Comparing username: "${username}" with displayName: "${currentUser.displayName}"`
-    );
-
-    // Check if this is the current user
-    if (
-      currentUser.displayName === username ||
-      currentUser.username === username
-    ) {
-      // Try both photoURL and photoUrl (different APIs use different cases)
-      const avatarURL = currentUser.photoURL || currentUser.photoUrl;
-      console.log(`🔍 Found avatar field:`, avatarURL);
-
-      if (avatarURL) {
-        return avatarURL;
-      }
-    }
-
-    return null;
-  },
-
-  /**
-   * FIXED: Bulletproof cascade with correct 3-level hierarchy
-   */
-  async bulletproofCascadeToCSS(username, css) {
-    console.log(`🔄 Starting bulletproof cascade for ${username}`);
-
-    // FIXED: Define ALL utilities at function scope (not inside if blocks)
-    console.log("🔍 Loading utilities at function scope...");
-
-    let getPageUidByTitle,
-      createPage,
-      createChildBlock,
-      updateBlock,
-      getDirectChildren;
-
-    try {
-      // Load all utilities ONCE at the beginning
-      getPageUidByTitle =
-        window.RoamExtensionSuite.getUtility("getPageUidByTitle");
-      createPage = window.RoamExtensionSuite.getUtility("createPage");
-      createChildBlock =
-        window.RoamExtensionSuite.getUtility("createChildBlock");
-      updateBlock = window.RoamExtensionSuite.getUtility("updateBlock");
-      getDirectChildren =
-        window.RoamExtensionSuite.getUtility("getDirectChildren");
-
-      console.log("✅ All utilities loaded successfully:");
-      console.log("  getPageUidByTitle:", typeof getPageUidByTitle);
-      console.log("  createPage:", typeof createPage);
-      console.log("  createChildBlock:", typeof createChildBlock);
-      console.log("  updateBlock:", typeof updateBlock);
-      console.log("  getDirectChildren:", typeof getDirectChildren);
-    } catch (error) {
-      console.error("❌ Extension utilities not available:", error);
-      throw new Error(
-        "❌ Extension 1.5 utilities are required. Make sure they are loaded before running Avatar Maker."
-      );
-    }
-
-    // Verify critical functions are available
-    if (!createChildBlock || !getPageUidByTitle) {
-      throw new Error(
-        "❌ Critical utilities missing. Ensure Extension 1.5 is loaded."
-      );
-    }
-
-    let currentStep = "roam-css-page";
-
-    try {
-      // Step 1: Ensure [[roam/css]] page exists
-      currentStep = "roam-css-page";
-      if (this.workingOn.has(currentStep)) {
-        console.log(`⏳ Waiting for ${currentStep} to complete...`);
-        await this.waitForCompletion(currentStep);
-      }
-
-      this.workingOn.add(currentStep);
-
-      let roamCssPageUid = getPageUidByTitle("roam/css");
-      if (!roamCssPageUid) {
-        console.log("📄 Creating [[roam/css]] page...");
-        roamCssPageUid = await createPage("roam/css");
-        await this.sleep(50); // Brief pause for Roam to process
-      }
-
-      this.workingOn.delete(currentStep);
-      console.log("✅ Step 1: [[roam/css]] page ready");
-
-      // Step 2: Ensure "User Avatars:" block exists under [[roam/css]]
-      currentStep = "user-avatars-block";
-      if (this.workingOn.has(currentStep)) {
-        console.log(`⏳ Waiting for ${currentStep} to complete...`);
-        await this.waitForCompletion(currentStep);
-      }
-
-      this.workingOn.add(currentStep);
-
-      let userAvatarsBlockUid = this.findChildBlockByString(
-        roamCssPageUid,
-        "**User Avatars:**"
-      );
-      if (!userAvatarsBlockUid) {
-        console.log('📝 Creating "User Avatars:" block...');
-        userAvatarsBlockUid = await createChildBlock(
-          roamCssPageUid,
-          "**User Avatars:**"
-        );
-        await this.sleep(50);
-      }
-
-      this.workingOn.delete(currentStep);
-      console.log('✅ Step 2: "User Avatars:" block ready');
-
-      // STEP 3: FIXED - Ensure username block exists under "User Avatars:"
-      currentStep = `username-block-${username}`;
-      if (this.workingOn.has(currentStep)) {
-        console.log(`⏳ Waiting for ${currentStep} to complete...`);
-        await this.waitForCompletion(currentStep);
-      }
-
-      this.workingOn.add(currentStep);
-
-      let usernameBlockUid = this.findChildBlockByString(
-        userAvatarsBlockUid,
-        `${username}:`
-      );
-      if (!usernameBlockUid) {
-        console.log(`📝 Creating "${username}:" block...`);
-        usernameBlockUid = await createChildBlock(
-          userAvatarsBlockUid,
-          `${username}:`
-        );
-        await this.sleep(50);
-      }
-
-      this.workingOn.delete(currentStep);
-      console.log(`✅ Step 3: "${username}:" block ready`);
-
-      // STEP 4: FIXED - Create/update CSS block under username block (not User Avatars)
-      currentStep = `css-block-${username}`;
-      if (this.workingOn.has(currentStep)) {
-        console.log(`⏳ Waiting for ${currentStep} to complete...`);
-        await this.waitForCompletion(currentStep);
-      }
-
-      this.workingOn.add(currentStep);
-
-      // Look for existing CSS block under the username block
-      let cssBlockUid = this.findChildBlockWithCSS(usernameBlockUid);
-
-      if (cssBlockUid) {
-        console.log("🔄 Updating existing CSS block...");
-        await updateBlock(cssBlockUid, css);
-      } else {
-        console.log("✨ Creating new CSS block...");
-        cssBlockUid = await createChildBlock(usernameBlockUid, css);
-      }
-
-      this.workingOn.delete(currentStep);
-      console.log("✅ Step 4: CSS block created/updated");
-
-      console.log(`🎉 Bulletproof cascade completed for ${username}`);
-      console.log(
-        `📁 Final hierarchy: roam/css → User Avatars → ${username} → [CSS Block]`
-      );
-    } catch (error) {
-      // Clean up working state on error
-      this.workingOn.delete(currentStep);
-      console.error(`💥 Cascade error at step ${currentStep}:`, error);
-      throw error;
-    }
-  },
-
-  /**
-   * Generate CSS for user avatar
+   * Generate CSS for the avatar
+   * @param {string} username - The username
+   * @param {string} avatarURL - The avatar URL
+   * @returns {string} - Generated CSS
    */
   generateAvatarCSS(username, avatarURL) {
-    return `\`\`\`css
-/* Avatar for ${username} */
-.rm-page-ref[data-tag="${username}"]::before {
-    content: "";
-    display: inline-block;
-    width: 20px;
-    height: 20px;
-    background-image: url("${avatarURL}");
-    background-size: cover;
-    background-position: center;
-    border-radius: 50%;
-    margin-right: 6px;
-    vertical-align: middle;
-    border: 1px solid #e0e0e0;
+    return `
+/* Avatar CSS for ${username} */
+.roam-avatar[data-username="${username}"] {
+  background-image: url("${avatarURL}") !important;
+  background-size: cover !important;
+  background-position: center !important;
+  border-radius: 50% !important;
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  min-height: 32px !important;
+  margin-right: 8px !important;
 }
-
-/* Hover effect */
-.rm-page-ref[data-tag="${username}"]:hover::before {
-    border-color: #007acc;
-    transform: scale(1.1);
-    transition: all 0.2s ease;
-}
-\`\`\``;
+`;
   },
 
   /**
-   * Find child block by string content
+   * Apply avatar CSS using bulletproof cascade
+   * @param {string} username - The username
+   * @param {string} css - The CSS to apply
    */
-  findChildBlockByString(parentUid, searchString) {
-    const getDirectChildren =
-      window.RoamExtensionSuite.getUtility("getDirectChildren");
-    const children = getDirectChildren(parentUid);
-
-    for (const child of children) {
-      if (child.string && child.string.includes(searchString)) {
-        return child.uid;
-      }
-    }
-
-    return null;
+  async applyAvatarCSS(username, css) {
+    // Use the new cascadeToBlock utility for race condition-free block creation
+    const blockUid = await this.cascadeToBlock(["roam/css", "User Avatars", username]);
+    
+    // Update the block with the CSS
+    await window.roamAlphaAPI.data.block.update({
+      block: { uid: blockUid, string: css }
+    });
   },
 
   /**
-   * Find child block containing CSS
+   * Helper: Extract image URLs from text using universal image extraction
+   * @param {string} text - Text to extract images from
+   * @returns {Promise<string[]>} - Array of image URLs
    */
-  findChildBlockWithCSS(parentUid) {
-    const getDirectChildren =
-      window.RoamExtensionSuite.getUtility("getDirectChildren");
-    const children = getDirectChildren(parentUid);
-
-    for (const child of children) {
-      if (child.string && child.string.includes("```css")) {
-        return child.uid;
-      }
-    }
-
-    return null;
+  async extractImageUrls(text) {
+    // Use the new extractImageUrls utility
+    return window.RoamExtensionSuite.getUtility("extractImageUrls")(text);
   },
 
   /**
-   * CACHE MANAGEMENT - FIXES FOR ISSUE #2
+   * Helper: Find exact data value using new utilities
+   * @param {string} pageUid - Page UID
+   * @param {string} key - Data key to find
+   * @returns {Promise<string>} - Found value
    */
-
-  /**
-   * Clear user data cache for specific user
-   */
-  clearUserDataCache(username) {
-    console.log(`🧹 Clearing user data cache for: ${username}`);
-    this.userDataCache.delete(username);
-    this.userDataCache.delete("current_user"); // Clear current user cache too
+  async findDataValueExact(pageUid, key) {
+    // Use the new findDataValueExact utility
+    return window.RoamExtensionSuite.getUtility("findDataValueExact")(pageUid, key);
   },
 
   /**
-   * Clear platform user cache (force fresh getCurrentUser)
+   * Helper: Get current user using new utilities
+   * @returns {Promise<Object>} - Current user data
    */
-  clearPlatformUserCache() {
-    console.log(`🧹 Clearing platform user cache`);
-
-    // Clear any cached user data in the extension utilities
-    try {
-      const clearUserCache =
-        window.RoamExtensionSuite.getUtility("clearUserCache");
-      if (clearUserCache) {
-        clearUserCache();
-      }
-    } catch (error) {
-      console.log("Note: clearUserCache utility not available");
-    }
-
-    // Clear our internal cache
-    this.userDataCache.clear();
+  async getCurrentUser() {
+    // Use the new getCurrentUser utility
+    return window.RoamExtensionSuite.getUtility("getCurrentUser")();
   },
 
   /**
-   * Get fresh current user data (bypass cache)
+   * Helper: Create nested block structure using new utilities
+   * @param {string[]} pathArray - Array of block titles
+   * @returns {Promise<string>} - Created block UID
    */
-  async getFreshCurrentUser() {
-    console.log(`🔄 Fetching fresh current user data`);
-
-    // Try to get fresh data by forcing a re-query
-
-    // Method 1: Direct Roam API call if available
-    if (
-      window.roamAlphaAPI &&
-      window.roamAlphaAPI.platform &&
-      window.roamAlphaAPI.platform.getCurrentUser
-    ) {
-      try {
-        const freshUser = await window.roamAlphaAPI.platform.getCurrentUser();
-        console.log(`✅ Fresh user data from Roam API:`, freshUser);
-        return freshUser;
-      } catch (error) {
-        console.log(`❌ Roam API getCurrentUser failed:`, error.message);
-      }
-    }
-
-    // Method 2: Extension utility (with cache cleared)
-    try {
-      const getCurrentUser =
-        window.RoamExtensionSuite.getUtility("getCurrentUser");
-      if (getCurrentUser) {
-        const cachedUser = getCurrentUser();
-        console.log(`✅ User data from extension utility:`, cachedUser);
-        return cachedUser;
-      }
-    } catch (error) {
-      console.log(`❌ Extension getCurrentUser failed:`, error.message);
-    }
-
-    console.log(`❌ All fresh user data methods failed`);
-    return null;
-  },
-
-  /**
-   * Utility functions
-   */
-
-  async waitForCompletion(step) {
-    let attempts = 0;
-    const maxAttempts = 50; // 5 seconds max wait
-
-    while (this.workingOn.has(step) && attempts < maxAttempts) {
-      await this.sleep(100);
-      attempts++;
-    }
-
-    if (attempts >= maxAttempts) {
-      console.warn(`⚠️ Timeout waiting for step: ${step}`);
-    }
-  },
-
-  sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  },
+  async cascadeToBlock(pathArray) {
+    // Use the new cascadeToBlock utility
+    return window.RoamExtensionSuite.getUtility("cascadeToBlock")(pathArray);
+  }
 };
 
 // DEBUG UTILITIES FOR TESTING
