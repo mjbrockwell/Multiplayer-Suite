@@ -1601,6 +1601,7 @@ export default {
           console.groupEnd();
         },
       },
+        label: "Utils: Create Profile Structure", 
         callback: async () => {
           const user = getCurrentUser();
           const userPageUid = await createPageIfNotExists(user.displayName);
