@@ -274,8 +274,48 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
   },
 
   /**
+   * Test command: Test avatar sync for current user
+   */
+  async testCurrentUserAvatar() {
+    console.group("🧪 Testing Avatar Sync for Current User");
+    try {
+      const currentUser = await this.getCurrentUser();
+      console.log("👤 Current user data:", currentUser);
+      
+      if (!currentUser) {
+        console.error("❌ No current user found");
+        return;
+      }
+
+      // Handle both string and object returns
+      const username = typeof currentUser === 'string' 
+        ? currentUser 
+        : currentUser.displayName || currentUser.username || currentUser.name;
+
+      console.log(`👤 Testing for user: ${username}`);
+      
+      if (!username) {
+        console.error("❌ Could not determine username from:", currentUser);
+        return;
+      }
+
+      const result = await this.syncAvatar(username);
+      
+      if (result) {
+        console.log("✅ Avatar sync successful!");
+        console.log("💡 Check your avatar in the roam/css page");
+      } else {
+        console.error("❌ Avatar sync failed");
+      }
+    } catch (error) {
+      console.error("💥 Test failed:", error);
+    }
+    console.groupEnd();
+  },
+
+  /**
    * Helper: Get current user using new utilities
-   * @returns {Promise<Object>} - Current user data
+   * @returns {Promise<Object|string>} - Current user data
    */
   async getCurrentUser() {
     console.group("👤 Getting Current User");
@@ -285,7 +325,7 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
       console.log("Utility returned user:", user);
 
       if (user) {
-        return user;
+        return user; // This could be a string or an object
       }
 
       // Fallback: Try to get from Roam API directly
@@ -327,43 +367,6 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
   async cascadeToBlock(pathArray) {
     // Use the new cascadeToBlock utility
     return window.RoamExtensionSuite.getUtility("cascadeToBlock")(pathArray);
-  },
-
-  /**
-   * Test command: Test avatar sync for current user
-   */
-  async testCurrentUserAvatar() {
-    console.group("🧪 Testing Avatar Sync for Current User");
-    try {
-      const currentUser = await this.getCurrentUser();
-      console.log("👤 Current user data:", currentUser);
-      
-      if (!currentUser) {
-        console.error("❌ No current user found");
-        return;
-      }
-
-      // Try different username formats
-      const username = currentUser.displayName || currentUser.username || currentUser.name;
-      console.log(`👤 Testing for user: ${username}`);
-      
-      if (!username) {
-        console.error("❌ Could not determine username from:", currentUser);
-        return;
-      }
-
-      const result = await this.syncAvatar(username);
-      
-      if (result) {
-        console.log("✅ Avatar sync successful!");
-        console.log("💡 Check your avatar in the roam/css page");
-      } else {
-        console.error("❌ Avatar sync failed");
-      }
-    } catch (error) {
-      console.error("💥 Test failed:", error);
-    }
-    console.groupEnd();
   },
 
   /**
