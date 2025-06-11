@@ -328,6 +328,8 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
         return false;
       }
 
+      console.log("📄 Using page UID:", pageUid);
+
       // Find or create the My Info block
       const myInfoBlock = await this.findOrCreateBlock(pageUid, "My Info::");
       if (!myInfoBlock) {
@@ -335,12 +337,16 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
         return false;
       }
 
+      console.log("📝 Using My Info block UID:", myInfoBlock);
+
       // Find or create the Avatar block
       const avatarBlock = await this.findOrCreateBlock(myInfoBlock, "Avatar::");
       if (!avatarBlock) {
         console.error("❌ Could not find or create Avatar block");
         return false;
       }
+
+      console.log("📝 Using Avatar block UID:", avatarBlock);
 
       // Update the Avatar block with the image
       await window.roamAlphaAPI.updateBlock({
@@ -387,7 +393,12 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
         }
       });
 
-      return newPageUid;
+      // Get the page UID after creation
+      const createdPageUid = await window.roamAlphaAPI.q(
+        `[:find ?uid :where [?uid :node/title "${title}"]]`
+      );
+
+      return createdPageUid?.[0]?.[0] || newPageUid;
     } catch (error) {
       console.error("Error finding/creating page:", error);
       return null;
@@ -402,6 +413,11 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
    */
   async findOrCreateBlock(parentUid, blockString) {
     try {
+      if (!parentUid) {
+        console.error("❌ No parent UID provided");
+        return null;
+      }
+
       // Try to find existing block
       const blocks = await window.roamAlphaAPI.q(`
         [:find ?uid
@@ -421,13 +437,31 @@ window.RoamExtensionSuite.extensions.avatarMaker = {
       // Create new block
       console.log("📝 Creating new block");
       const newBlockUid = window.roamAlphaAPI.util.generateUID();
-      await window.roamAlphaAPI.createBlock({
-        location: { "parent-uid": parentUid, order: 0 },
-        block: {
-          uid: newBlockUid,
-          string: blockString
-        }
-      });
+      
+      // First check if parent is a page or block
+      const parentIsPage = await window.roamAlphaAPI.q(
+        `[:find ?e :where [?e :node/title "${parentUid}"]]`
+      );
+
+      if (parentIsPage?.[0]?.[0]) {
+        // Parent is a page, create block at page level
+        await window.roamAlphaAPI.createBlock({
+          location: { "parent-uid": parentUid, order: 0 },
+          block: {
+            uid: newBlockUid,
+            string: blockString
+          }
+        });
+      } else {
+        // Parent is a block, create as child block
+        await window.roamAlphaAPI.createBlock({
+          location: { "parent-uid": parentUid, order: 0 },
+          block: {
+            uid: newBlockUid,
+            string: blockString
+          }
+        });
+      }
 
       return newBlockUid;
     } catch (error) {
