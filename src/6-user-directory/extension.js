@@ -273,7 +273,7 @@ const createMissingUserProfile = (username) => {
     location: "__missing field__",
     role: "__missing field__",
     timezone: "__missing field__",
-    aboutme: "__missing field__",
+    aboutMe: "__missing field__",
     completeness: 0,
     timezoneInfo: { timeString: "—", isValid: false },
     debugInfo: "User page not found",
@@ -292,7 +292,7 @@ const createMissingMyInfoProfile = (username) => {
     location: "__missing field__",
     role: "__missing field__",
     timezone: "__missing field__",
-    aboutme: "__missing field__",
+    aboutMe: "__missing field__",
     completeness: 0,
     timezoneInfo: { timeString: "—", isValid: false },
     debugInfo: "User page exists but no My Info:: structure found",
@@ -311,7 +311,7 @@ const createErrorProfile = (username, errorMessage) => {
     location: "__missing field__",
     role: "__missing field__",
     timezone: "__missing field__",
-    aboutme: "__missing field__",
+    aboutMe: "__missing field__",
     completeness: 0,
     timezoneInfo: { timeString: "—", isValid: false },
     error: errorMessage,
@@ -381,7 +381,7 @@ const initializeUserProfile = async (username) => {
       location: "__not yet entered__",
       role: "__not yet entered__",
       timezone: "__not yet entered__",
-      aboutme: "__not yet entered__",
+      aboutMe: "__not yet entered__",
     };
 
     const success = await setNestedDataValuesStructured(
@@ -596,7 +596,7 @@ const createCleanUserDirectoryRow = (profile, currentUser, index) => {
   `;
 
   // Create data cells with placeholder distinction
-  const aboutMeDisplay = createDataCellDisplay(profile.aboutme);
+  const aboutMeDisplay = createDataCellDisplay(profile.aboutMe);
   const locationDisplay = createDataCellDisplay(profile.location);
   const roleDisplay = createDataCellDisplay(profile.role);
   const timezoneDisplay = createDataCellDisplay(profile.timezone);
@@ -869,7 +869,7 @@ const testCleanDataExtraction = async (username) => {
     }
 
     // Show placeholder types
-    const fields = ["avatar", "location", "role", "timezone", "aboutme"];
+    const fields = ["avatar", "location", "role", "timezone", "aboutMe"];
     fields.forEach((field) => {
       const value = profile[field];
       let type = "real data";
