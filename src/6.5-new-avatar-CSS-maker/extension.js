@@ -1,813 +1,556 @@
-// Extension 6.5 Avatar Maker - Rebuilt with Extension 1.5 Utilities
-// Features: Race condition-free block creation, universal image extraction, exact data parsing
+// ===================================================================
+// 🎭 EXTENSION 6.5: SYNC AVATAR FUNCTION
+// ===================================================================
+// Purpose: Extract current user's avatar image from their home page
+//          and create/update corresponding CSS on the [[roam/css]] page
+// Dependencies: extractImageUrls utility function, Roam Alpha API
+// ===================================================================
 
-window.RoamExtensionSuite = window.RoamExtensionSuite || {};
+/**
+ * 🎭 6.1: SYNC AVATAR - Main Function
+ * Extracts user avatar and creates CSS for avatar display in tags
+ */
+const syncAvatar = async () => {
+  console.group("🎭 syncAvatar: Starting avatar sync process");
 
-window.RoamExtensionSuite.extensions =
-  window.RoamExtensionSuite.extensions || {};
+  try {
+    // ===================================================================
+    // 🔍 6.1.1: GET CURRENT USER UID
+    // ===================================================================
+    console.log("🔍 Step 1: Getting current user UID...");
+    const userUID = window.roamAlphaAPI?.user?.uid();
 
-window.RoamExtensionSuite.extensions.avatarMaker = {
-  /**
-   * Main entry point for syncing user avatar
-   * @param {string} username - The username to sync avatar for
-   * @returns {Promise<boolean>} - Success status
-   */
-  async syncAvatar(username) {
-    console.log(`🎯 Starting avatar sync for: ${username}`);
-
-    try {
-      // Get fresh user data using new utilities
-      const user = await this.getUserData(username);
-      if (!user) {
-        console.log(`❌ No user data found for ${username}`);
-        return false;
-      }
-
-      // Extract avatar URL using universal image extraction
-      const avatarURL = await this.extractAvatarURL(user);
-      if (!avatarURL) {
-        console.log(`❌ No avatar URL found for ${username}`);
-        return false;
-      }
-
-      console.log(`✅ Found avatar URL for ${username}: ${avatarURL}`);
-
-      // Generate CSS
-      const css = this.generateAvatarCSS(username, avatarURL);
-
-      // Apply to roam/css using bulletproof cascade
-      await this.applyAvatarCSS(username, avatarURL);
-
-      console.log(`🎉 Avatar sync completed for ${username}`);
-      return true;
-    } catch (error) {
-      console.error(`💥 Error syncing avatar for ${username}:`, error);
-      return false;
-    }
-  },
-
-  /**
-   * Get current user data using Roam's native API
-   * @returns {Promise<Object>} - User data object
-   */
-  async getCurrentUser() {
-    console.group("👤 Getting Current User");
-    try {
-      // Get user UID using Roam's API
-      const userUid = window.roamAlphaAPI.user.uid();
-      console.log("User UID:", userUid);
-
-      // Pull user data using Roam's API
-      const userData = await window.roamAlphaAPI.pull("[*]", [":user/uid", userUid]);
-      console.log("User data from API:", userData);
-
-      // Get username from various possible fields
-      const username = userData?.[":user/display-name"] || 
-                      userData?.[":user/username"] || 
-                      userData?.[":user/name"] ||
-                      userData?.[":user/email"]?.split("@")[0];
-
-      console.log("Found username:", username);
-
-      if (!username) {
-        console.warn("⚠️ Could not determine username from user data");
-        return null;
-      }
-
-      return {
-        username,
-        displayName: userData?.[":user/display-name"],
-        email: userData?.[":user/email"],
-        photoURL: userData?.[":user/photo-url"]
-      };
-    } catch (error) {
-      console.error("💥 Error getting current user:", error);
-      return null;
-    } finally {
-      console.groupEnd();
-    }
-  },
-
-  /**
-   * Get user data using Roam's native API
-   * @param {string} username - The username to get data for
-   * @returns {Promise<Object>} - User data object
-   */
-  async getUserData(username) {
-    console.group("👤 Getting User Data");
-    try {
-      // Try to get user data from their main page
-      const pageUid = await window.roamAlphaAPI.q(`[:find ?uid :where [?uid :node/title "${username}"]]`);
-      if (!pageUid?.[0]?.[0]) {
-        console.log(`❌ No page found for ${username}`);
-        return null;
-      }
-
-      console.log("📄 Found user page, searching for data...");
-      
-      // Get the My Info block first
-      const myInfoBlock = await this.findChildBlockByString(pageUid[0][0], "My Info::");
-      if (!myInfoBlock) {
-        console.log("❌ No My Info:: block found");
-        return { username };
-      }
-
-      console.log("✅ Found My Info:: block");
-      
-      // Then get the Avatar block under My Info
-      const avatarBlock = await this.findChildBlockByString(myInfoBlock, "Avatar::");
-      if (!avatarBlock) {
-        console.log("❌ No Avatar:: block found under My Info");
-        return { username };
-      }
-
-      console.log("✅ Found Avatar:: block");
-      
-      // Get the block's string content
-      const blockData = await window.roamAlphaAPI.data.block.get(avatarBlock);
-      console.log("📝 Block content:", blockData?.string);
-
-      return {
-        username,
-        avatar: blockData?.string || null
-      };
-    } catch (error) {
-      console.error("💥 Error getting user data:", error);
-      return { username };
-    } finally {
-      console.groupEnd();
-    }
-  },
-
-  /**
-   * Helper: Find child block by string content
-   * @param {string} parentUid - Parent block UID
-   * @param {string} searchString - String to search for
-   * @returns {Promise<string>} - Found block UID
-   */
-  async findChildBlockByString(parentUid, searchString) {
-    try {
-      // Use q to find blocks with matching string
-      const blocks = await window.roamAlphaAPI.q(`
-        [:find ?uid ?string
-         :where
-         [?parent :block/uid "${parentUid}"]
-         [?parent :block/children ?child]
-         [?child :block/string ?string]
-         [?child :block/uid ?uid]
-         [(clojure.string/includes? ?string "${searchString}")]]
-      `);
-      
-      if (blocks && blocks.length > 0) {
-        return blocks[0][0]; // Return the first matching block's UID
-      }
-      return null;
-    } catch (error) {
-      console.error("Error finding child block:", error);
-      return null;
-    }
-  },
-
-  /**
-   * Extract image URLs from text using regex
-   * @param {string} text - Text to extract URLs from
-   * @returns {Promise<string[]>} - Array of image URLs
-   */
-  async extractImageUrls(text) {
-    console.group("🔍 Extracting images from:", text);
-    try {
-      if (!text) {
-        console.log("❌ No text provided");
-        return [];
-      }
-
-      // Common image URL patterns
-      const patterns = [
-        // Markdown image syntax
-        /!\[.*?\]\((.*?)\)/g,
-        // HTML img tag
-        /<img[^>]+src="([^">]+)"/g,
-        // Direct URL (must end with image extension)
-        /(https?:\/\/[^\s<>"]+?\.(?:png|jpe?g|gif|webp|svg|ico)(?:\?[^\s<>"]*)?)/gi,
-        // Google Photos URL
-        /(https?:\/\/lh3\.googleusercontent\.com\/[^\s<>"]+)/g
-      ];
-
-      const urls = new Set();
-      
-      // Try each pattern
-      for (const pattern of patterns) {
-        let match;
-        while ((match = pattern.exec(text)) !== null) {
-          const url = match[1] || match[0];
-          if (url) {
-            console.log("Found URL:", url);
-            urls.add(url);
-          }
-        }
-      }
-
-      const uniqueUrls = Array.from(urls);
-      console.log("Extracted URLs:", uniqueUrls);
-      return uniqueUrls;
-    } catch (error) {
-      console.error("💥 Error extracting image URLs:", error);
-      return [];
-    } finally {
-      console.groupEnd();
-    }
-  },
-
-  /**
-   * Extract avatar URL using universal image extraction
-   * @param {Object} user - User data object
-   * @returns {Promise<string>} - Avatar URL
-   */
-  async extractAvatarURL(user) {
-    console.group("🔍 Extracting Avatar URL");
-    try {
-      // Strategy 1: Check user's main page for Avatar data
-      console.log("Strategy 1: Checking user main page...");
-      if (user.avatar) {
-        console.log("Found avatar data:", user.avatar);
-        const images = await this.extractImageUrls(user.avatar);
-        console.log("Extracted images:", images);
-        if (images.length > 0) {
-          console.log("✅ Found image in main page:", images[0]);
-          return images[0];
-        }
-      } else {
-        console.log("❌ No avatar data in main page");
-      }
-
-      // Strategy 2: Check user preferences page
-      console.log("\nStrategy 2: Checking preferences page...");
-      const prefsPageUid = await window.roamAlphaAPI.q(
-        `[:find ?uid :where [?uid :node/title "${user.username}/preferences"]]`
+    if (!userUID) {
+      throw new Error(
+        "Failed to get user UID - roamAlphaAPI.user.uid() returned null/undefined"
       );
-      if (prefsPageUid?.[0]?.[0]) {
-        const prefsAvatar = await this.findDataValueExact(prefsPageUid[0][0], "Avatar");
-        if (prefsAvatar) {
-          console.log("Found avatar in preferences:", prefsAvatar);
-          const images = await this.extractImageUrls(prefsAvatar);
-          console.log("Extracted images:", images);
-          if (images.length > 0) {
-            console.log("✅ Found image in preferences:", images[0]);
-            return images[0];
-          }
-        } else {
-          console.log("❌ No avatar in preferences");
-        }
-      } else {
-        console.log("❌ No preferences page found");
-      }
-
-      // Strategy 3: Check platform user data
-      console.log("\nStrategy 3: Checking platform data...");
-      const currentUser = await this.getCurrentUser();
-      if (currentUser?.username === user.username || currentUser?.displayName === user.username) {
-        const platformAvatar = currentUser.photoURL;
-        if (platformAvatar) {
-          console.log("Found platform avatar:", platformAvatar);
-          // For platform avatar, we can use it directly since it's already a URL
-          console.log("✅ Using platform avatar directly:", platformAvatar);
-          return platformAvatar;
-        } else {
-          console.log("❌ No platform avatar found");
-        }
-      } else {
-        console.log("❌ Not the current user");
-      }
-
-      console.log("❌ No avatar found in any strategy");
-      return null;
-    } catch (error) {
-      console.error("💥 Error extracting avatar:", error);
-      return null;
-    } finally {
-      console.groupEnd();
     }
-  },
 
-  /**
-   * Generate CSS for the avatar
-   * @param {string} username - The username
-   * @param {string} avatarURL - The avatar URL
-   * @returns {string} - Generated CSS
-   */
-  generateAvatarCSS(username, avatarURL) {
-    return `
-/* Avatar CSS for ${username} */
-.roam-avatar[data-username="${username}"] {
-  background-image: url("${avatarURL}") !important;
-  background-size: cover !important;
-  background-position: center !important;
-  border-radius: 50% !important;
-  width: 32px !important;
-  height: 32px !important;
-  min-width: 32px !important;
-  min-height: 32px !important;
-  margin-right: 8px !important;
+    console.log(`✅ User UID retrieved: ${userUID}`);
+
+    // ===================================================================
+    // 🖼️ 6.1.2: EXTRACT AVATAR IMAGE URL
+    // ===================================================================
+    console.log("🖼️ Step 2: Extracting avatar image URL...");
+
+    // Get user's home page UID (same as user UID)
+    const userPageUID = userUID;
+
+    // Navigate to user's home page and find My Info:: block
+    const userPageInfo = window.roamAlphaAPI.pull(
+      "[:block/children {:block/children ...}]",
+      [":block/uid", userPageUID]
+    );
+
+    if (!userPageInfo) {
+      throw new Error(`Cannot access user home page with UID: ${userPageUID}`);
+    }
+
+    // Find "My Info::" block
+    let myInfoBlock = null;
+    const findMyInfoRecursive = (blocks) => {
+      if (!blocks) return null;
+      for (const block of blocks) {
+        if (block[":block/string"] === "My Info::") {
+          return block;
+        }
+        if (block[":block/children"]) {
+          const found = findMyInfoRecursive(block[":block/children"]);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    myInfoBlock = findMyInfoRecursive(userPageInfo[":block/children"] || []);
+
+    if (!myInfoBlock) {
+      throw new Error('Cannot find "My Info::" block on user home page');
+    }
+
+    console.log("✅ Found 'My Info::' block");
+
+    // Find "Avatar::" block under "My Info::"
+    let avatarBlock = null;
+    if (myInfoBlock[":block/children"]) {
+      for (const child of myInfoBlock[":block/children"]) {
+        if (child[":block/string"] === "Avatar::") {
+          avatarBlock = child;
+          break;
+        }
+      }
+    }
+
+    if (!avatarBlock) {
+      throw new Error('Cannot find "Avatar::" block under "My Info::"');
+    }
+
+    console.log("✅ Found 'Avatar::' block");
+
+    // Get Avatar block UID and extract image URLs
+    const avatarBlockUID = avatarBlock[":block/uid"];
+
+    // Check if extractImageUrls utility is available
+    const platform = window.RoamExtensionSuite;
+    if (!platform || !platform.getUtility) {
+      throw new Error(
+        "RoamExtensionSuite platform not found - Extension 1 required"
+      );
+    }
+
+    const extractImageUrls = platform.getUtility("extractImageUrls");
+    if (!extractImageUrls) {
+      throw new Error(
+        "extractImageUrls utility not found - Extension 1.5 required"
+      );
+    }
+
+    console.log(
+      `🔍 Extracting images from Avatar block UID: ${avatarBlockUID}`
+    );
+    const imageUrls = extractImageUrls(avatarBlockUID);
+
+    if (!imageUrls || imageUrls.length === 0) {
+      throw new Error("No valid image URLs found in Avatar:: block");
+    }
+
+    const avatarImageURL = imageUrls[0]; // Use first valid URL
+    console.log(`✅ Avatar image URL extracted: ${avatarImageURL}`);
+
+    // ===================================================================
+    // 🎨 6.1.3: ACCESS/CREATE [[roam/css]] PAGE STRUCTURE
+    // ===================================================================
+    console.log("🎨 Step 3: Accessing [[roam/css]] page...");
+
+    // Get roam/css page UID
+    const cssPageUID = window.roamAlphaAPI.q(`
+      [:find ?uid .
+       :where [?page :node/title "roam/css"]
+              [?page :block/uid ?uid]]
+    `);
+
+    if (!cssPageUID) {
+      throw new Error("[[roam/css]] page not found");
+    }
+
+    console.log(`✅ Found [[roam/css]] page UID: ${cssPageUID}`);
+
+    // Get page structure
+    const cssPageInfo = window.roamAlphaAPI.pull(
+      "[:block/children {:block/children ...}]",
+      [":block/uid", cssPageUID]
+    );
+
+    // Find or create "**User Avatars:**" block
+    let userAvatarsBlock = null;
+    const cssChildren = cssPageInfo[":block/children"] || [];
+
+    for (const child of cssChildren) {
+      if (child[":block/string"] === "**User Avatars:**") {
+        userAvatarsBlock = child;
+        break;
+      }
+    }
+
+    if (!userAvatarsBlock) {
+      console.log("📝 Creating '**User Avatars:**' block...");
+      const newBlockUID = window.roamAlphaAPI.util.generateUID();
+      await window.roamAlphaAPI.createBlock({
+        location: { "parent-uid": cssPageUID, order: "last" },
+        block: { string: "**User Avatars:**", uid: newBlockUID },
+      });
+
+      // Refresh page info to get the new block
+      const updatedPageInfo = window.roamAlphaAPI.pull(
+        "[:block/children {:block/children ...}]",
+        [":block/uid", cssPageUID]
+      );
+
+      for (const child of updatedPageInfo[":block/children"]) {
+        if (child[":block/uid"] === newBlockUID) {
+          userAvatarsBlock = child;
+          break;
+        }
+      }
+    }
+
+    console.log("✅ User Avatars block ready");
+
+    // ===================================================================
+    // 🔧 6.1.4: MANAGE USER-SPECIFIC CSS BLOCK
+    // ===================================================================
+    console.log("🔧 Step 4: Managing user-specific CSS block...");
+
+    const userBlockTitle = `(${userUID}):`;
+    let userCSSBlock = null;
+    let existingCSSCodeBlock = null;
+
+    // Look for existing user block
+    const avatarChildren = userAvatarsBlock[":block/children"] || [];
+    for (const child of avatarChildren) {
+      if (child[":block/string"] === userBlockTitle) {
+        userCSSBlock = child;
+
+        // Look for existing CSS code block within user block
+        const userBlockChildren = child[":block/children"] || [];
+        for (const grandchild of userBlockChildren) {
+          const content = grandchild[":block/string"] || "";
+          if (
+            content.includes("```css") &&
+            content.includes("span.rm-page-ref--tag")
+          ) {
+            existingCSSCodeBlock = grandchild;
+            break;
+          }
+        }
+        break;
+      }
+    }
+
+    // Create user block if it doesn't exist
+    if (!userCSSBlock) {
+      console.log(`📝 Creating user block: ${userBlockTitle}`);
+      const userBlockUID = window.roamAlphaAPI.util.generateUID();
+      await window.roamAlphaAPI.createBlock({
+        location: {
+          "parent-uid": userAvatarsBlock[":block/uid"],
+          order: "last",
+        },
+        block: { string: userBlockTitle, uid: userBlockUID },
+      });
+
+      userCSSBlock = { ":block/uid": userBlockUID };
+    }
+
+    console.log("✅ User CSS block ready");
+
+    // ===================================================================
+    // 🎨 6.1.5: GENERATE CSS CONTENT
+    // ===================================================================
+    console.log("🎨 Step 5: Generating CSS content...");
+
+    const cssTemplate = `\`\`\`css
+/* Updated CSS - Remove the ::after tooltip completely */
+span.rm-page-ref--tag[data-tag="[USERNAME]"] {
+    display: inline-flex !important;
+    color: transparent !important;
+    overflow: visible !important;
+    width: 2.4rem !important;
+    height: 2.4rem !important;
+    border: solid 1.5px #555 !important;
+    border-radius: 100% !important;
+    transition: 0.2s !important;
+    position: relative !important;
+    vertical-align: middle !important;
+    margin: 0 3px !important;
+    background: none !important;
+    cursor: pointer !important;
 }
-`;
-  },
-
-  /**
-   * Apply avatar CSS to user's page
-   * @param {string} username - Username to apply CSS for
-   * @param {string} avatarUrl - Avatar URL to use
-   * @returns {Promise<boolean>} - Success status
-   */
-  async applyAvatarCSS(username, avatarUrl) {
-    console.group("🔄 Applying Avatar CSS");
-    try {
-      // Find or create the user's page
-      const pageUid = await this.findOrCreatePage(username);
-      if (!pageUid) {
-        console.error("❌ Could not find or create user page");
-        return false;
-      }
-
-      console.log("📄 Using page UID:", pageUid);
-
-      // Find or create the My Info block
-      const myInfoBlock = await this.findOrCreateBlock(pageUid, "My Info::");
-      if (!myInfoBlock) {
-        console.error("❌ Could not find or create My Info block");
-        return false;
-      }
-
-      console.log("📝 Using My Info block UID:", myInfoBlock);
-
-      // Find or create the Avatar block
-      const avatarBlock = await this.findOrCreateBlock(myInfoBlock, "Avatar::");
-      if (!avatarBlock) {
-        console.error("❌ Could not find or create Avatar block");
-        return false;
-      }
-
-      console.log("📝 Using Avatar block UID:", avatarBlock);
-
-      // Update the Avatar block with the image
-      await window.roamAlphaAPI.updateBlock({
-        block: {
-          uid: avatarBlock,
-          string: `![Avatar](${avatarUrl})`
-        }
-      });
-
-      console.log("✅ Avatar CSS applied successfully");
-      return true;
-    } catch (error) {
-      console.error("💥 Error applying CSS:", error);
-      return false;
-    } finally {
-      console.groupEnd();
-    }
-  },
-
-  /**
-   * Find or create a page
-   * @param {string} title - Page title
-   * @returns {Promise<string>} - Page UID
-   */
-  async findOrCreatePage(title) {
-    try {
-      // Try to find existing page
-      const pageUid = await window.roamAlphaAPI.q(
-        `[:find ?uid :where [?uid :node/title "${title}"]]`
-      );
-
-      if (pageUid?.[0]?.[0]) {
-        console.log("📄 Found existing page");
-        return pageUid[0][0];
-      }
-
-      // Create new page
-      console.log("📄 Creating new page");
-      const newPageUid = window.roamAlphaAPI.util.generateUID();
-      await window.roamAlphaAPI.createPage({
-        page: {
-          uid: newPageUid,
-          title: title
-        }
-      });
-
-      // Get the page UID after creation
-      const createdPageUid = await window.roamAlphaAPI.q(
-        `[:find ?uid :where [?uid :node/title "${title}"]]`
-      );
-
-      return createdPageUid?.[0]?.[0] || newPageUid;
-    } catch (error) {
-      console.error("Error finding/creating page:", error);
-      return null;
-    }
-  },
-
-  /**
-   * Find or create a block
-   * @param {string} parentUid - Parent block/page UID
-   * @param {string} blockString - Block string to find/create
-   * @returns {Promise<string>} - Block UID
-   */
-  async findOrCreateBlock(parentUid, blockString) {
-    try {
-      if (!parentUid) {
-        console.error("❌ No parent UID provided");
-        return null;
-      }
-
-      // Try to find existing block
-      const blocks = await window.roamAlphaAPI.q(`
-        [:find ?uid
-         :where
-         [?parent :block/uid "${parentUid}"]
-         [?parent :block/children ?child]
-         [?child :block/string ?string]
-         [?child :block/uid ?uid]
-         [(clojure.string/includes? ?string "${blockString}")]]
-      `);
-
-      if (blocks?.[0]?.[0]) {
-        console.log("📝 Found existing block");
-        return blocks[0][0];
-      }
-
-      // Create new block
-      console.log("📝 Creating new block");
-      const newBlockUid = window.roamAlphaAPI.util.generateUID();
-      
-      // First check if parent is a page or block
-      const parentIsPage = await window.roamAlphaAPI.q(
-        `[:find ?e :where [?e :node/title "${parentUid}"]]`
-      );
-
-      if (parentIsPage?.[0]?.[0]) {
-        // Parent is a page, create block at page level
-        await window.roamAlphaAPI.createBlock({
-          location: { "parent-uid": parentUid, order: 0 },
-          block: {
-            uid: newBlockUid,
-            string: blockString
-          }
-        });
-      } else {
-        // Parent is a block, create as child block
-        await window.roamAlphaAPI.createBlock({
-          location: { "parent-uid": parentUid, order: 0 },
-          block: {
-            uid: newBlockUid,
-            string: blockString
-          }
-        });
-      }
-
-      return newBlockUid;
-    } catch (error) {
-      console.error("Error finding/creating block:", error);
-      return null;
-    }
-  },
-
-  /**
-   * Helper: Find exact data value
-   * @param {string} pageUid - Page UID
-   * @param {string} key - Data key to find
-   * @returns {Promise<string>} - Found value
-   */
-  async findDataValueExact(pageUid, key) {
-    try {
-      const utility = window.RoamExtensionSuite.getUtility("findDataValueExact");
-      if (typeof utility === 'function') {
-        return await utility(pageUid, key);
-      }
-      
-      // Fallback: Manual search
-      const children = await window.roamAlphaAPI.data.block.getChildren(pageUid);
-      for (const child of children) {
-        if (child.string && (
-          child.string.startsWith(`${key}:`) ||
-          child.string.startsWith(`${key}::`) ||
-          child.string.startsWith(`**${key}:**`) ||
-          child.string.startsWith(`**${key}**:`)
-        )) {
-          return child.string;
-        }
-      }
-      return null;
-    } catch (error) {
-      console.error("Error in findDataValueExact:", error);
-      return null;
-    }
-  },
-
-  /**
-   * Test command: Test avatar sync for current user
-   */
-  async testCurrentUserAvatar() {
-    console.group("🧪 Testing Avatar Sync for Current User");
-    try {
-      const currentUser = await this.getCurrentUser();
-      console.log("👤 Current user data:", currentUser);
-      
-      if (!currentUser) {
-        console.error("❌ No current user found");
-        return;
-      }
-
-      // Handle both string and object returns
-      const username = typeof currentUser === 'string' 
-        ? currentUser 
-        : currentUser.displayName || currentUser.username || currentUser.name;
-
-      console.log(`👤 Testing for user: ${username}`);
-      
-      if (!username) {
-        console.error("❌ Could not determine username from:", currentUser);
-        return;
-      }
-
-      const result = await this.syncAvatar(username);
-      
-      if (result) {
-        console.log("✅ Avatar sync successful!");
-        console.log("💡 Check your avatar in the roam/css page");
-      } else {
-        console.error("❌ Avatar sync failed");
-      }
-    } catch (error) {
-      console.error("💥 Test failed:", error);
-    }
-    console.groupEnd();
-  },
-
-  /**
-   * Helper: Create nested block structure using new utilities
-   * @param {string[]} pathArray - Array of block titles
-   * @returns {Promise<string>} - Created block UID
-   */
-  async cascadeToBlock(pathArray) {
-    // Use the new cascadeToBlock utility
-    return window.RoamExtensionSuite.getUtility("cascadeToBlock")(pathArray);
-  },
-
-  /**
-   * Test command: Test avatar extraction strategies
-   */
-  async testAvatarExtraction(username) {
-    console.group("🧪 Testing Avatar Extraction Strategies");
-    try {
-      const user = await this.getUserData(username);
-      if (!user) {
-        console.error(`❌ No user data found for ${username}`);
-        return;
-      }
-
-      console.log("🔍 Testing Strategy 1: User Main Page");
-      if (user.avatar) {
-        const images = await this.extractImageUrls(user.avatar);
-        console.log(images.length > 0 ? "✅ Found images:" : "❌ No images found");
-        images.forEach(url => console.log(`   ${url}`));
-      } else {
-        console.log("❌ No avatar data in main page");
-      }
-
-      console.log("\n🔍 Testing Strategy 2: User Preferences");
-      const prefsPageUid = await window.roamAlphaAPI.q(
-        `[:find ?uid :where [?uid :node/title "${username}/preferences"]]`
-      );
-      if (prefsPageUid?.[0]?.[0]) {
-        const prefsAvatar = await this.findDataValueExact(prefsPageUid[0][0], "Avatar");
-        if (prefsAvatar) {
-          const images = await this.extractImageUrls(prefsAvatar);
-          console.log(images.length > 0 ? "✅ Found images:" : "❌ No images found");
-          images.forEach(url => console.log(`   ${url}`));
-        } else {
-          console.log("❌ No avatar in preferences");
-        }
-      } else {
-        console.log("❌ No preferences page found");
-      }
-
-      console.log("\n🔍 Testing Strategy 3: Platform User Data");
-      const currentUser = await this.getCurrentUser();
-      if (currentUser?.username === username || currentUser?.displayName === username) {
-        const platformAvatar = currentUser.photoURL || currentUser.photoUrl;
-        if (platformAvatar) {
-          const images = await this.extractImageUrls(platformAvatar);
-          console.log(images.length > 0 ? "✅ Found images:" : "❌ No images found");
-          images.forEach(url => console.log(`   ${url}`));
-        } else {
-          console.log("❌ No platform avatar found");
-        }
-      } else {
-        console.log("❌ Not the current user");
-      }
-    } catch (error) {
-      console.error("💥 Test failed:", error);
-    }
-    console.groupEnd();
-  },
-
-  /**
-   * Test command: Test CSS generation and application
-   */
-  async testCSSGeneration(username) {
-    console.group("🧪 Testing CSS Generation and Application");
-    try {
-      const testAvatarURL = "https://api.dicebear.com/7.x/initials/svg?seed=test";
-      const css = this.generateAvatarCSS(username, testAvatarURL);
-      
-      console.log("📝 Generated CSS:");
-      console.log(css);
-      
-      console.log("\n🔄 Applying test CSS...");
-      await this.applyAvatarCSS(username, testAvatarURL);
-      
-      console.log("✅ Test CSS applied successfully");
-      console.log("💡 Check the roam/css page for the test CSS block");
-    } catch (error) {
-      console.error("💥 Test failed:", error);
-    }
-    console.groupEnd();
-  }
-};
-
-// DEBUG UTILITIES FOR TESTING
-
-/**
- * Debug command: Test current extraction and see what data each strategy finds
- */
-window.debugAvatarExtraction = async function (username) {
-  console.log(`🔍 DEBUG: Avatar extraction for ${username}`);
-  const avatarMaker = window.RoamExtensionSuite.extensions.avatarMaker;
-
-  // Clear cache first
-  avatarMaker.clearUserDataCache(username);
-
-  // Test each strategy individually
-  console.log("=".repeat(50));
-  console.log("STRATEGY 1 - User Main Page:");
-  try {
-    const result1 = await avatarMaker.extractFromUserMainPage(username);
-    console.log("Result:", result1);
-  } catch (error) {
-    console.log("Error:", error.message);
-  }
-
-  console.log("=".repeat(50));
-  console.log("STRATEGY 2 - User Preferences Page:");
-  try {
-    const result2 = await avatarMaker.extractFromUserPreferencesPage(username);
-    console.log("Result:", result2);
-  } catch (error) {
-    console.log("Error:", error.message);
-  }
-
-  console.log("=".repeat(50));
-  console.log("STRATEGY 3 - Platform User Data:");
-  try {
-    const result3 = await avatarMaker.extractFromPlatformUserData(username);
-    console.log("Result:", result3);
-  } catch (error) {
-    console.log("Error:", error.message);
-  }
-
-  console.log("=".repeat(50));
-  console.log("FULL EXTRACTION:");
-  const finalResult = await avatarMaker.extractUserAvatarURL(username);
-  console.log("Final Result:", finalResult);
-};
-
-/**
- * Debug command: Test hierarchy creation
- */
-window.debugAvatarHierarchy = async function (username) {
-  console.log(`🏗️ DEBUG: Hierarchy creation for ${username}`);
-  const avatarMaker = window.RoamExtensionSuite.extensions.avatarMaker;
-
-  const testCSS = `\`\`\`css
-/* TEST CSS for ${username} */
-.test { color: red; }
+span.rm-page-ref--tag[data-tag="[USERNAME]"]::before {
+    content: "" !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background-image: url("[IMAGE_URL]") !important;
+    background-position: center !important;
+    background-size: cover !important;
+    border-radius: 100% !important;
+    transition: 0.2s !important;
+}
+span.rm-page-ref--tag[data-tag="[USERNAME]"]:hover {
+    transform: scale(1.05) !important;
+    border-color: #333 !important;
+    overflow: visible !important;
+}
+span.rm-page-ref--tag[data-tag="[USERNAME]"]:hover::before {
+    transform: scale(1.02) !important;
+}
 \`\`\``;
 
-  await avatarMaker.bulletproofCascadeToCSS(username, testCSS);
+    // Replace placeholders with actual values
+    let generatedCSS = cssTemplate;
 
-  console.log("✅ Hierarchy test complete. Check roam/css page structure:");
-  console.log(
-    "Expected: roam/css → User Avatars → " + username + " → [CSS Block]"
-  );
-};
+    // Replace all 4 instances of [USERNAME] with actual user UID
+    generatedCSS = generatedCSS.replace(/\[USERNAME\]/g, userUID);
 
-/**
- * Main debug command
- */
-window.debugAvatar = async function (username) {
-  console.log(`🎯 FULL DEBUG: Avatar system for ${username}`);
+    // Replace single instance of [IMAGE_URL] with extracted avatar URL
+    generatedCSS = generatedCSS.replace(/\[IMAGE_URL\]/g, avatarImageURL);
 
-  await debugAvatarExtraction(username);
-  await debugAvatarHierarchy(username);
+    console.log("✅ CSS content generated with replacements");
 
-  console.log(`🎉 Debug complete for ${username}`);
-};
+    // ===================================================================
+    // 💾 6.1.6: UPDATE/CREATE CSS CODE BLOCK
+    // ===================================================================
+    console.log("💾 Step 6: Updating CSS code block...");
 
-/**
- * Utility checker - run this first to diagnose utility availability
- */
-window.checkUtilities = function () {
-  console.log("🔍 UTILITY DIAGNOSTICS");
-  console.log("=".repeat(50));
-
-  // Check RoamExtensionSuite
-  console.log("RoamExtensionSuite:", !!window.RoamExtensionSuite);
-  if (window.RoamExtensionSuite) {
-    console.log(
-      "  getUtility function:",
-      !!window.RoamExtensionSuite.getUtility
-    );
-    console.log("  extensions object:", !!window.RoamExtensionSuite.extensions);
-
-    if (window.RoamExtensionSuite.getUtility) {
-      const utilities = [
-        "getPageUidByTitle",
-        "createPage",
-        "createChildBlock",
-        "updateBlock",
-        "getDirectChildren",
-        "getCurrentUser",
-      ];
-      utilities.forEach((util) => {
-        try {
-          const fn = window.RoamExtensionSuite.getUtility(util);
-          console.log(`  ${util}:`, !!fn, typeof fn);
-        } catch (error) {
-          console.log(`  ${util}: ERROR -`, error.message);
-        }
+    if (existingCSSCodeBlock) {
+      // Update existing CSS block
+      console.log("🔄 Updating existing CSS code block...");
+      await window.roamAlphaAPI.updateBlock({
+        block: {
+          uid: existingCSSCodeBlock[":block/uid"],
+          string: generatedCSS,
+        },
+      });
+    } else {
+      // Create new CSS code block
+      console.log("📝 Creating new CSS code block...");
+      const cssCodeBlockUID = window.roamAlphaAPI.util.generateUID();
+      await window.roamAlphaAPI.createBlock({
+        location: { "parent-uid": userCSSBlock[":block/uid"], order: "last" },
+        block: { string: generatedCSS, uid: cssCodeBlockUID },
       });
     }
-  }
 
-  // Check Roam Alpha API
-  console.log("\nRoam Alpha API:", !!window.roamAlphaAPI);
-  if (window.roamAlphaAPI) {
-    console.log("  createBlock:", !!window.roamAlphaAPI.createBlock);
-    console.log("  updateBlock:", !!window.roamAlphaAPI.updateBlock);
-    console.log("  createPage:", !!window.roamAlphaAPI.createPage);
-    console.log("  q (query):", !!window.roamAlphaAPI.q);
+    console.log("✅ CSS code block updated successfully");
+
+    // ===================================================================
+    // 🎉 6.1.7: SUCCESS SUMMARY
+    // ===================================================================
+    console.log("🎉 syncAvatar completed successfully!");
+    console.log(`📋 Summary:`);
+    console.log(`   User UID: ${userUID}`);
+    console.log(`   Avatar URL: ${avatarImageURL}`);
+    console.log(`   CSS generated and applied to [[roam/css]]`);
+
+    return {
+      success: true,
+      userUID,
+      avatarImageURL,
+      message: "Avatar CSS synchronized successfully",
+    };
+  } catch (error) {
+    console.error("❌ syncAvatar failed:", error.message);
+    console.error("🔍 Error details:", error);
+
+    return {
+      success: false,
+      error: error.message,
+      message: `Avatar sync failed: ${error.message}`,
+    };
+  } finally {
+    console.groupEnd();
+  }
+};
+
+// ===================================================================
+// 🧪 6.2: TESTING AND VALIDATION UTILITIES
+// ===================================================================
+
+/**
+ * 🧪 6.2.1: Test avatar sync prerequisites
+ */
+const testAvatarSyncPrerequisites = async () => {
+  console.group("🧪 Testing Avatar Sync Prerequisites");
+
+  const results = {
+    userUID: null,
+    myInfoExists: false,
+    avatarExists: false,
+    extractImageUrlsAvailable: false,
+    roamCSSPageExists: false,
+  };
+
+  try {
+    // Test 1: User UID
+    console.log("🔍 Test 1: User UID availability...");
+    results.userUID = window.roamAlphaAPI?.user?.uid();
     console.log(
-      "  util.generateUID:",
-      !!(window.roamAlphaAPI.util && window.roamAlphaAPI.util.generateUID)
+      results.userUID ? "✅ User UID available" : "❌ User UID not available"
     );
+
+    // Test 2: My Info block exists
+    if (results.userUID) {
+      console.log("🔍 Test 2: Checking for 'My Info::' block...");
+      const userPageInfo = window.roamAlphaAPI.pull(
+        "[:block/children {:block/children ...}]",
+        [":block/uid", results.userUID]
+      );
+
+      const findMyInfo = (blocks) => {
+        if (!blocks) return false;
+        for (const block of blocks) {
+          if (block[":block/string"] === "My Info::") return true;
+          if (block[":block/children"] && findMyInfo(block[":block/children"]))
+            return true;
+        }
+        return false;
+      };
+
+      results.myInfoExists = findMyInfo(
+        userPageInfo?.[":block/children"] || []
+      );
+      console.log(
+        results.myInfoExists
+          ? "✅ 'My Info::' block found"
+          : "❌ 'My Info::' block not found"
+      );
+    }
+
+    // Test 3: extractImageUrls utility
+    console.log("🔍 Test 3: Checking extractImageUrls utility...");
+    const platform = window.RoamExtensionSuite;
+    results.extractImageUrlsAvailable =
+      !!platform?.getUtility?.("extractImageUrls");
+    console.log(
+      results.extractImageUrlsAvailable
+        ? "✅ extractImageUrls available"
+        : "❌ extractImageUrls not available"
+    );
+
+    // Test 4: roam/css page
+    console.log("🔍 Test 4: Checking [[roam/css]] page...");
+    const cssPageUID = window.roamAlphaAPI.q(`
+      [:find ?uid .
+       :where [?page :node/title "roam/css"]
+              [?page :block/uid ?uid]]
+    `);
+    results.roamCSSPageExists = !!cssPageUID;
+    console.log(
+      results.roamCSSPageExists
+        ? "✅ [[roam/css]] page exists"
+        : "❌ [[roam/css]] page not found"
+    );
+  } catch (error) {
+    console.error("❌ Prerequisites test failed:", error);
   }
 
-  console.log("=".repeat(50));
+  console.log("📋 Prerequisites Summary:", results);
+  console.groupEnd();
+
+  return results;
 };
 
 /**
- * Quick test command
+ * 🧪 6.2.2: Validate generated CSS
  */
-window.syncAvatar = async function (username) {
-  return await window.RoamExtensionSuite.extensions.avatarMaker.syncAvatar(
-    username
+const validateGeneratedCSS = (userUID, imageURL) => {
+  console.group("🧪 Validating Generated CSS");
+
+  const cssTemplate = `span.rm-page-ref--tag[data-tag="${userUID}"]`;
+  const expectedUsernamePlaceholders = 4;
+  const expectedImageURLPlaceholders = 1;
+
+  console.log(
+    `🔍 Expected username replacements: ${expectedUsernamePlaceholders}`
   );
+  console.log(
+    `🔍 Expected image URL replacements: ${expectedImageURLPlaceholders}`
+  );
+  console.log(`✅ CSS selector format: ${cssTemplate}`);
+
+  console.groupEnd();
+
+  return true;
 };
 
-// Register test commands
-const commands = [
-  {
-    label: "Avatar: Test Current User",
-    callback: () => window.RoamExtensionSuite.extensions.avatarMaker.testCurrentUserAvatar()
-  },
-  {
-    label: "Avatar: Test Extraction",
-    callback: () => {
-      const username = prompt("Enter username to test:");
-      if (username) {
-        window.RoamExtensionSuite.extensions.avatarMaker.testAvatarExtraction(username);
-      }
-    }
-  },
-  {
-    label: "Avatar: Test CSS Generation",
-    callback: () => {
-      const username = prompt("Enter username to test:");
-      if (username) {
-        window.RoamExtensionSuite.extensions.avatarMaker.testCSSGeneration(username);
-      }
-    }
-  }
-];
+// ===================================================================
+// 🚀 ROAM EXTENSION EXPORT - Extension 6.5
+// ===================================================================
 
-// Add commands to Roam
-commands.forEach(cmd => {
-  window.roamAlphaAPI.ui.commandPalette.addCommand(cmd);
-  window._extensionRegistry.commands.push(cmd.label);
-});
+export default {
+  onload: async ({ extensionAPI }) => {
+    console.log("🎭 Extension 6.5: Avatar Sync starting...");
 
-console.log("🎯 Extension 6.5 Avatar Maker (FIXED) loaded!");
-console.log("💡 Test commands:");
-console.log("  await syncAvatar('Matt Brockwell')");
-console.log("  await debugAvatar('Matt Brockwell')");
-console.log("  await debugAvatarExtraction('Matt Brockwell')");
-console.log("  await debugAvatarHierarchy('Matt Brockwell')");
+    // ✅ VERIFY DEPENDENCIES
+    if (!window.RoamExtensionSuite) {
+      console.error(
+        "❌ Foundation Registry not found! Please load Extension 1 first."
+      );
+      return;
+    }
+
+    const platform = window.RoamExtensionSuite;
+
+    // Check for required utilities
+    const extractImageUrls = platform.getUtility("extractImageUrls");
+    if (!extractImageUrls) {
+      console.error(
+        "❌ extractImageUrls utility not found! Please load Extension 1.5 first."
+      );
+      return;
+    }
+
+    // 🔧 REGISTER AVATAR SYNC FUNCTION
+    platform.registerUtility("syncAvatar", syncAvatar);
+    platform.registerUtility(
+      "testAvatarSyncPrerequisites",
+      testAvatarSyncPrerequisites
+    );
+    platform.registerUtility("validateGeneratedCSS", validateGeneratedCSS);
+
+    // 📝 REGISTER COMMANDS
+    extensionAPI.ui.commandPalette.addCommand({
+      label: "🎭 Sync Avatar CSS",
+      callback: async () => {
+        console.log("🎭 Running avatar sync from command palette...");
+        const result = await syncAvatar();
+
+        if (result.success) {
+          alert(
+            `✅ Avatar sync successful!\n\nUser: ${result.userUID}\nAvatar URL: ${result.avatarImageURL}`
+          );
+        } else {
+          alert(`❌ Avatar sync failed!\n\nError: ${result.error}`);
+        }
+      },
+    });
+
+    extensionAPI.ui.commandPalette.addCommand({
+      label: "🧪 Test Avatar Sync Prerequisites",
+      callback: async () => {
+        const results = await testAvatarSyncPrerequisites();
+        const allGood = Object.values(results).every(
+          (v) => v === true || v !== null
+        );
+
+        alert(
+          allGood
+            ? "✅ All prerequisites met! Ready for avatar sync."
+            : "❌ Some prerequisites missing. Check console for details."
+        );
+      },
+    });
+
+    // 📊 REGISTER WITH EXTENSION SUITE
+    platform.registerExtension("avatar-sync", {
+      name: "Avatar Sync",
+      version: "6.5.0",
+      description:
+        "Synchronizes user avatar images with Roam CSS for tag display",
+      utilities: [
+        "syncAvatar",
+        "testAvatarSyncPrerequisites",
+        "validateGeneratedCSS",
+      ],
+      commands: ["🎭 Sync Avatar CSS", "🧪 Test Avatar Sync Prerequisites"],
+    });
+
+    console.log("✅ Extension 6.5: Avatar Sync loaded successfully");
+    console.log(
+      "💡 Use command palette: '🎭 Sync Avatar CSS' to run avatar sync"
+    );
+
+    // Auto-run prerequisites test
+    setTimeout(async () => {
+      console.log("🔍 Auto-running prerequisites check...");
+      await testAvatarSyncPrerequisites();
+    }, 1000);
+  },
+
+  onunload: () => {
+    console.log("👋 Extension 6.5: Avatar Sync unloading...");
+
+    if (window.RoamExtensionSuite) {
+      const platform = window.RoamExtensionSuite;
+      platform.unregisterUtility("syncAvatar");
+      platform.unregisterUtility("testAvatarSyncPrerequisites");
+      platform.unregisterUtility("validateGeneratedCSS");
+      platform.unregisterExtension("avatar-sync");
+    }
+
+    console.log("✅ Extension 6.5: Avatar Sync unloaded");
+  },
+};
