@@ -1,407 +1,674 @@
 // ===================================================================
-// Extension 2: ULTRA MINIMAL User Authentication - Self-Contained
-// No dependencies on Extension 1.5 utilities during initialization
+// Extension 2.0: User Authentication + User Preferences System
+// Complete clean implementation - depends only on Extension 1.5
+// Features: User authentication + user preferences management
 // ===================================================================
 
 // ===================================================================
-// 🎯 SELF-CONTAINED HELPER FUNCTIONS
+// 🦊 1.0 USER PREFERENCES SYSTEM - Complete Implementation
 // ===================================================================
 
 /**
- * Get page UID by title - our own implementation
+ * 🦊 1.1 Get user preferences page UID with auto-creation
+ * Creates the user's preference page if it doesn't exist
+ * @param {string} username - Username for the preferences page
+ * @returns {string|null} - UID of the preferences page or null if failed
  */
-const getPageUidByTitle = (title) => {
-  try {
-    const result = window.roamAlphaAPI.q(`
-      [:find ?uid
-       :where 
-       [?page :node/title "${title}"]
-       [?page :block/uid ?uid]]
-    `);
-    return result.length > 0 ? result[0][0] : null;
-  } catch (error) {
-    console.warn(`Error getting page UID for "${title}":`, error);
-    return null;
+const getUserPreferencesPageUid = async (username) => {
+  const platform = window.RoamExtensionSuite;
+  const cascadeToBlock = platform.getUtility("cascadeToBlock");
+
+  const pageTitle = `${username}/user preferences`;
+
+  // Use bulletproof cascading to create page if it doesn't exist
+  const pageUid = await cascadeToBlock(pageTitle, [], true);
+
+  if (pageUid) {
+    console.log(`📄 User preferences page ready: ${pageTitle}`);
+  } else {
+    console.error(`Failed to create preferences page for ${username}`);
   }
+
+  return pageUid;
 };
 
-// ===================================================================
-// 🎯 CORE USER FUNCTIONS
-// ===================================================================
-
 /**
- * Get current authenticated user - safe utility access
+ * 🦊 1.2 Get user preference with intelligent defaults
+ * Retrieves a specific preference value for a user
+ * @param {string} username - Username to get preference for
+ * @param {string} key - Preference key to retrieve
+ * @param {any} defaultValue - Default value if preference not found
+ * @returns {any} - Preference value or default
  */
-const getAuthenticatedUser = () => {
+const getUserPreference = async (username, key, defaultValue = null) => {
   try {
-    // Try to get from Extension 1.5 first
-    if (window.RoamExtensionSuite?.getUtility) {
-      const getCurrentUser =
-        window.RoamExtensionSuite.getUtility("getCurrentUser");
-      if (getCurrentUser) {
-        const userResult = getCurrentUser();
-        console.log("🔐 Got user from Extension 1.5:", userResult);
+    const platform = window.RoamExtensionSuite;
+    const findDataValueExact = platform.getUtility("findDataValueExact");
 
-        // Handle both string and object returns
-        if (typeof userResult === "string") {
-          return {
-            displayName: userResult,
-            method: userResult === "Current User" ? "fallback" : "official-api",
-          };
-        } else if (userResult && typeof userResult === "object") {
-          return userResult;
-        }
-      }
-    }
+    const pageUid = await getUserPreferencesPageUid(username);
+    if (!pageUid) return defaultValue;
 
-    // Fallback: try direct Roam API
-    try {
-      const userUid = window.roamAlphaAPI?.user?.uid?.();
-      if (userUid) {
-        const userData = window.roamAlphaAPI.pull("[*]", [
-          ":user/uid",
-          userUid,
-        ]);
-        const displayName =
-          userData?.[":user/display-name"] ||
-          userData?.[":user/email"] ||
-          "Unknown User";
-        return { displayName, method: "direct-api" };
-      }
-    } catch (e) {
-      console.warn("Direct API failed:", e);
-    }
+    const value = findDataValueExact(pageUid, key);
+    const result = value !== null ? value : defaultValue;
 
-    // Final fallback
-    return { displayName: "Current User", method: "fallback" };
+    console.log(`⚙️ Preference "${key}" for ${username}: ${result}`);
+    return result;
   } catch (error) {
-    console.error("❌ Error getting user:", error);
-    return { displayName: "Unknown User", method: "fallback" };
+    console.error(`Failed to get preference "${key}" for ${username}:`, error);
+    return defaultValue;
   }
 };
 
 /**
- * Check if user is authenticated
+ * 🦊 1.3 Set user preference with proper structure
+ * Sets a preference value for a user
+ * @param {string} username - Username to set preference for
+ * @param {string} key - Preference key to set
+ * @param {any} value - Value to set
+ * @param {boolean} useAttributeFormat - Whether to use Roam attribute format
+ * @returns {boolean} - Success status
  */
-const isUserAuthenticated = () => {
-  const user = getAuthenticatedUser();
-  return user && user.method !== "fallback";
-};
-
-// ===================================================================
-// 📋 BASIC GRAPH MEMBERS FUNCTIONS
-// ===================================================================
-
-/**
- * Get graph members page UID, create if needed with proper block structure
- */
-const getGraphMembersPageUid = async () => {
+const setUserPreference = async (
+  username,
+  key,
+  value,
+  useAttributeFormat = false
+) => {
   try {
-    // Try to find existing page
-    let pageUid = getPageUidByTitle("roam/graph members");
+    const platform = window.RoamExtensionSuite;
+    const setDataValueStructured = platform.getUtility(
+      "setDataValueStructured"
+    );
 
-    if (!pageUid) {
-      // Create the page
-      console.log("📋 Creating [[roam/graph members]] page...");
-      pageUid = await window.roamAlphaAPI.createPage({
-        page: { title: "roam/graph members" },
-      });
+    const pageUid = await getUserPreferencesPageUid(username);
+    if (!pageUid) return false;
 
-      if (pageUid) {
-        // Create Directory:: parent block
-        console.log("📋 Setting up Directory:: structure...");
-
-        const directoryBlock = await window.roamAlphaAPI.createBlock({
-          location: { "parent-uid": pageUid, order: 0 },
-          block: { string: "Directory::" },
-        });
-
-        console.log(
-          "✅ Created [[roam/graph members]] page with Directory:: structure"
-        );
-      }
-    }
-
-    return pageUid;
-  } catch (error) {
-    console.error("❌ Error with graph members page:", error);
-    return null;
-  }
-};
-
-/**
- * Add member to graph - as child block under Directory::
- */
-const addGraphMember = async (username) => {
-  try {
-    if (!username || username === "undefined") {
-      console.warn("📋 Invalid username provided");
-      return false;
-    }
-
-    console.log(`📋 Adding ${username} to graph members...`);
-
-    // Ensure page exists
-    const pageUid = await getGraphMembersPageUid();
-    if (!pageUid) {
-      console.error("❌ Could not create/find graph members page");
-      return false;
-    }
-
-    // Find the Directory:: block
-    const pageData = window.roamAlphaAPI.pull("[:block/children]", [
-      ":block/uid",
+    const success = await setDataValueStructured(
       pageUid,
-    ]);
-    const children = pageData?.[":block/children"] || [];
+      key,
+      value,
+      useAttributeFormat
+    );
 
-    let directoryBlockUid = null;
-
-    // Find the Directory:: block
-    for (const child of children) {
-      const childUid = child[":block/uid"];
-      const childData = window.roamAlphaAPI.pull("[:block/string]", [
-        ":block/uid",
-        childUid,
-      ]);
-      const childString = childData?.[":block/string"] || "";
-
-      if (childString === "Directory::") {
-        directoryBlockUid = childUid;
-        break;
-      }
+    if (success) {
+      console.log(`✅ Set preference "${key}" for ${username}: ${value}`);
+    } else {
+      console.error(`❌ Failed to set preference "${key}" for ${username}`);
     }
 
-    // If no Directory:: block found, create it
-    if (!directoryBlockUid) {
-      directoryBlockUid = await window.roamAlphaAPI.createBlock({
-        location: { "parent-uid": pageUid, order: 0 },
-        block: { string: "Directory::" },
-      });
-    }
-
-    // Check if user already exists
-    const currentMembers = getGraphMembers();
-    if (currentMembers.includes(username)) {
-      console.log(`📋 ${username} already in members list`);
-      return true;
-    }
-
-    // Add user as child block under Directory::
-    await window.roamAlphaAPI.createBlock({
-      location: { "parent-uid": directoryBlockUid, order: "last" },
-      block: { string: username },
-    });
-
-    console.log(`✅ Added ${username} as child block under Directory::`);
-    return true;
+    return success;
   } catch (error) {
-    console.error(`❌ Error adding ${username} to graph members:`, error);
+    console.error(`Error setting preference "${key}" for ${username}:`, error);
     return false;
   }
 };
 
 /**
- * Get list of graph members - read child blocks under Directory::
+ * 🦊 1.4 Get all user preferences as object
+ * Retrieves all preferences for a user as a key-value object
+ * @param {string} username - Username to get preferences for
+ * @returns {Object} - Object containing all preferences
  */
-const getGraphMembers = () => {
+const getAllUserPreferences = async (username) => {
   try {
-    const pageUid = getPageUidByTitle("roam/graph members");
+    const platform = window.RoamExtensionSuite;
+    const findDataValueExact = platform.getUtility("findDataValueExact");
+    const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
+
+    const pageTitle = `${username}/user preferences`;
+    const pageUid = getPageUidByTitle(pageTitle);
+
     if (!pageUid) {
-      console.log("📋 No graph members page found");
-      return [];
+      console.log(`📄 No preferences page found for ${username}`);
+      return {};
     }
 
-    // Get page children blocks
-    const pageData = window.roamAlphaAPI.pull("[:block/children]", [
-      ":block/uid",
-      pageUid,
-    ]);
-    const children = pageData?.[":block/children"] || [];
+    // Common preference keys to check
+    const preferenceKeys = [
+      "Loading Page Preference",
+      "Immutable Home Page",
+      "Weekly Bundle",
+      "Journal Header Color",
+      "Personal Shortcuts",
+    ];
 
-    // Find the Directory:: block
-    for (const child of children) {
-      const childUid = child[":block/uid"];
-      const childData = window.roamAlphaAPI.pull(
-        "[:block/string :block/children]",
-        [":block/uid", childUid]
-      );
-      const childString = childData?.[":block/string"] || "";
+    const preferences = {};
 
-      if (childString === "Directory::") {
-        // Get the children of the Directory:: block (these are the members)
-        const directoryChildren = childData?.[":block/children"] || [];
-        const members = [];
-
-        for (const memberChild of directoryChildren) {
-          const memberUid = memberChild[":block/uid"];
-          const memberData = window.roamAlphaAPI.pull("[:block/string]", [
-            ":block/uid",
-            memberUid,
-          ]);
-          const memberName = memberData?.[":block/string"] || "";
-
-          if (memberName.trim()) {
-            members.push(memberName.trim());
-          }
-        }
-
-        console.log(`📋 Found ${members.length} graph members:`, members);
-        return members;
+    // Collect preference values
+    for (const key of preferenceKeys) {
+      const value = findDataValueExact(pageUid, key);
+      if (value !== null) {
+        preferences[key] = value;
       }
     }
 
-    console.log("📋 No Directory:: block found");
-    return [];
+    console.log(
+      `📊 Loaded ${Object.keys(preferences).length} preferences for ${username}`
+    );
+    return preferences;
   } catch (error) {
-    console.error("❌ Error getting graph members:", error);
-    return [];
+    console.error(`Failed to get all preferences for ${username}:`, error);
+    return {};
   }
 };
 
 /**
- * Check if user is a graph member
+ * 🦊 1.5 Initialize default preferences for new users
+ * Sets up default preference values for a new user
+ * @param {string} username - Username to initialize preferences for
+ * @returns {boolean} - Success status
  */
-const isGraphMember = (username) => {
-  const members = getGraphMembers();
-  return members.includes(username);
-};
+const initializeUserPreferences = async (username) => {
+  try {
+    console.log(`🎯 Initializing default preferences for ${username}...`);
 
-/**
- * Get graph member count
- */
-const getGraphMemberCount = () => {
-  return getGraphMembers().length;
+    // Default preference values
+    const defaults = {
+      "Loading Page Preference": "Daily Page",
+      "Immutable Home Page": "yes",
+      "Weekly Bundle": "no",
+      "Journal Header Color": "blue",
+      "Personal Shortcuts": ["Daily Notes", "Chat Room"],
+    };
+
+    let successCount = 0;
+
+    // Set each default preference
+    for (const [key, value] of Object.entries(defaults)) {
+      const success = await setUserPreference(username, key, value);
+      if (success) successCount++;
+    }
+
+    console.log(
+      `✅ Initialized ${successCount}/${
+        Object.keys(defaults).length
+      } default preferences`
+    );
+    return successCount === Object.keys(defaults).length;
+  } catch (error) {
+    console.error(`Failed to initialize preferences for ${username}:`, error);
+    return false;
+  }
 };
 
 // ===================================================================
-// 🧪 TESTING FUNCTIONS
+// 🔍 2.0 USER AUTHENTICATION - Simple Current User Detection
 // ===================================================================
 
 /**
- * Show authentication status
+ * 🔍 2.1 Get current authenticated user
+ * Returns the current user detected by Extension 1.5
+ * @returns {Object|null} - User object or null if not detected
  */
-const showAuthenticationStatus = () => {
-  console.group("🔐 Authentication Status");
+const getAuthenticatedUser = () => {
+  const platform = window.RoamExtensionSuite;
+  const getCurrentUser = platform.getUtility("getCurrentUser");
 
+  const user = getCurrentUser();
+  if (user && user.method !== "error") {
+    return user;
+  }
+
+  console.warn("Could not detect authenticated user");
+  return null;
+};
+
+/**
+ * 🔍 2.2 Check if user is authenticated (not a fallback user)
+ * Determines if the current user is properly authenticated
+ * @returns {boolean} - True if user is authenticated
+ */
+const isUserAuthenticated = () => {
   const user = getAuthenticatedUser();
-  const members = getGraphMembers();
-  const memberCount = getGraphMemberCount();
-
-  console.log(`👤 Current User: ${user.displayName}`);
-  console.log(`🔍 Detection Method: ${user.method}`);
-  console.log(`🎯 Authenticated: ${isUserAuthenticated() ? "Yes" : "No"}`);
-  console.log(`📋 Graph Members (${memberCount}): ${members.join(", ")}`);
-  console.log(
-    `👥 User is member: ${isGraphMember(user.displayName) ? "Yes" : "No"}`
-  );
-
-  console.groupEnd();
+  return user && user.method !== "fallback" && user.method !== "error";
 };
 
 /**
- * Run basic tests
+ * 🔍 2.3 Get current user's display name
+ * Convenience function to get just the display name
+ * @returns {string|null} - Display name or null
  */
-const runBasicTests = async () => {
-  console.group("🧪 Extension 2 Self-Contained Tests");
+const getCurrentUsername = () => {
+  const user = getAuthenticatedUser();
+  return user ? user.displayName : null;
+};
+
+// ===================================================================
+// 🧪 3.0 TESTING AND VALIDATION FUNCTIONS
+// ===================================================================
+
+/**
+ * 🧪 3.1 Test user preferences functionality
+ * Comprehensive test of all preference operations
+ * @param {string} username - Optional username to test (defaults to current user)
+ */
+const testUserPreferences = async (username = null) => {
+  console.group("🧪 TESTING: User Preferences System");
 
   try {
-    console.log("Test 1: User Detection");
-    const user = getAuthenticatedUser();
-    console.log(`  ✅ User: ${user.displayName} (${user.method})`);
+    const currentUser = username || getCurrentUsername();
 
-    console.log("Test 2: Add Current User");
-    const addResult = await addGraphMember(user.displayName);
-    console.log(`  ✅ Add result: ${addResult}`);
+    if (!currentUser) {
+      console.error("❌ No user specified and cannot get current user");
+      return;
+    }
 
-    console.log("Test 3: Check Members");
-    const members = getGraphMembers();
-    console.log(`  ✅ Members: ${members.join(", ")}`);
+    console.log(`🎯 Testing preferences for: ${currentUser}`);
 
-    console.log("Test 4: Verify Membership");
-    const isMember = isGraphMember(user.displayName);
-    console.log(`  ✅ Is member: ${isMember}`);
+    // Test 1: Initialize default preferences
+    console.log("\n1️⃣ Testing initializeUserPreferences...");
+    const initialized = await initializeUserPreferences(currentUser);
+    console.log(`✅ Initialization result: ${initialized}`);
 
-    console.log("✅ All tests completed successfully");
+    // Test 2: Get individual preference
+    console.log("\n2️⃣ Testing getUserPreference...");
+    const loadingPage = await getUserPreference(
+      currentUser,
+      "Loading Page Preference",
+      "Daily Page"
+    );
+    console.log(`✅ Loading Page Preference: ${loadingPage}`);
+
+    // Test 3: Set a preference
+    console.log("\n3️⃣ Testing setUserPreference...");
+    const setResult = await setUserPreference(
+      currentUser,
+      "Test Preference",
+      "Test Value"
+    );
+    console.log(`✅ Set preference result: ${setResult}`);
+
+    // Test 4: Get all preferences
+    console.log("\n4️⃣ Testing getAllUserPreferences...");
+    const allPrefs = await getAllUserPreferences(currentUser);
+    console.log(`✅ All preferences:`, allPrefs);
+
+    // Test 5: Cleanup test preference
+    console.log("\n5️⃣ Cleaning up test preference...");
+    const cleanupResult = await setUserPreference(
+      currentUser,
+      "Test Preference",
+      ""
+    );
+    console.log(`✅ Cleanup result: ${cleanupResult}`);
+
+    console.log("\n🎉 User preferences tests completed!");
   } catch (error) {
-    console.error("❌ Test failed:", error);
+    console.error("❌ User preferences test failed:", error);
   }
 
   console.groupEnd();
 };
 
+/**
+ * 🧪 3.2 Test authentication functionality
+ * Tests user detection and authentication status
+ */
+const testAuthentication = () => {
+  console.group("🧪 TESTING: User Authentication");
+
+  const user = getAuthenticatedUser();
+  const isAuth = isUserAuthenticated();
+  const username = getCurrentUsername();
+
+  console.log(`Current user: ${user?.displayName || "None"}`);
+  console.log(`Detection method: ${user?.method || "None"}`);
+  console.log(`Is authenticated: ${isAuth}`);
+  console.log(`Username: ${username || "Not available"}`);
+  console.log(`Email: ${user?.email || "Not available"}`);
+  console.log(`UID: ${user?.uid || "Not available"}`);
+
+  // Test user detection methods
+  if (user) {
+    console.log("\n📊 Detection details:");
+    console.log(`- Method used: ${user.method}`);
+    console.log(`- Reliability: ${isAuth ? "High" : "Low (fallback)"}`);
+    console.log(`- Can use for preferences: ${username ? "Yes" : "No"}`);
+  }
+
+  console.groupEnd();
+};
+
+/**
+ * 🧪 3.3 Test preference page creation
+ * Tests the preference page creation process
+ */
+const testPreferencePageCreation = async () => {
+  console.group("🧪 TESTING: Preference Page Creation");
+
+  const username = getCurrentUsername();
+  if (!username) {
+    console.error("❌ No current user found for testing");
+    console.groupEnd();
+    return;
+  }
+
+  try {
+    console.log(`🎯 Testing preference page creation for: ${username}`);
+
+    const pageUid = await getUserPreferencesPageUid(username);
+
+    if (pageUid) {
+      console.log(`✅ Preference page UID: ${pageUid}`);
+
+      // Verify page exists
+      const platform = window.RoamExtensionSuite;
+      const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
+      const verifyUid = getPageUidByTitle(`${username}/user preferences`);
+
+      console.log(`✅ Page verification: ${verifyUid ? "Found" : "Not found"}`);
+      console.log(`✅ UIDs match: ${pageUid === verifyUid}`);
+    } else {
+      console.error("❌ Failed to create preference page");
+    }
+  } catch (error) {
+    console.error("❌ Preference page creation test failed:", error);
+  }
+
+  console.groupEnd();
+};
+
+/**
+ * 🧪 3.4 Run all system tests
+ * Comprehensive test suite for Extension 2
+ */
+const runAllTests = async () => {
+  console.group("🧪 Extension 2.0: Complete System Tests");
+
+  console.log("🚀 Starting Extension 2.0 test suite...\n");
+
+  // Test 1: Authentication
+  console.log("=== TEST 1: AUTHENTICATION ===");
+  testAuthentication();
+
+  // Test 2: Preference page creation
+  console.log("\n=== TEST 2: PREFERENCE PAGE CREATION ===");
+  await testPreferencePageCreation();
+
+  // Test 3: Preferences functionality
+  console.log("\n=== TEST 3: PREFERENCES FUNCTIONALITY ===");
+  const user = getAuthenticatedUser();
+  if (user) {
+    await testUserPreferences(user.displayName);
+  }
+
+  console.log("\n✅ All Extension 2.0 tests completed!");
+  console.log("💡 Check console output above for detailed results");
+
+  console.groupEnd();
+};
+
 // ===================================================================
-// 🚀 EXTENSION EXPORT - Ultra Simple
+// 🔧 4.0 UTILITY HELPER FUNCTIONS
+// ===================================================================
+
+/**
+ * 🔧 4.1 Get user preference with fallback chain
+ * Gets a preference with multiple fallback options
+ * @param {string} username - Username
+ * @param {string} key - Preference key
+ * @param {Array} fallbacks - Array of fallback values to try
+ * @returns {any} - First non-null value found
+ */
+const getUserPreferenceWithFallbacks = async (
+  username,
+  key,
+  fallbacks = []
+) => {
+  const primaryValue = await getUserPreference(username, key);
+
+  if (primaryValue !== null) {
+    return primaryValue;
+  }
+
+  // Try fallbacks in order
+  for (const fallback of fallbacks) {
+    if (fallback !== null && fallback !== undefined) {
+      console.log(`🔄 Using fallback for "${key}": ${fallback}`);
+      return fallback;
+    }
+  }
+
+  return null;
+};
+
+/**
+ * 🔧 4.2 Bulk set user preferences
+ * Sets multiple preferences at once
+ * @param {string} username - Username
+ * @param {Object} preferences - Object of key-value pairs
+ * @returns {Object} - Results object with success count and details
+ */
+const bulkSetUserPreferences = async (username, preferences) => {
+  const results = {
+    successCount: 0,
+    failureCount: 0,
+    details: {},
+  };
+
+  for (const [key, value] of Object.entries(preferences)) {
+    try {
+      const success = await setUserPreference(username, key, value);
+      results.details[key] = success ? "success" : "failed";
+
+      if (success) {
+        results.successCount++;
+      } else {
+        results.failureCount++;
+      }
+    } catch (error) {
+      results.details[key] = `error: ${error.message}`;
+      results.failureCount++;
+    }
+  }
+
+  console.log(
+    `🔧 Bulk set completed: ${results.successCount} success, ${results.failureCount} failed`
+  );
+  return results;
+};
+
+/**
+ * 🔧 4.3 Export user preferences
+ * Exports all preferences as a JSON-compatible object
+ * @param {string} username - Username to export preferences for
+ * @returns {Object} - Exportable preferences object
+ */
+const exportUserPreferences = async (username) => {
+  const preferences = await getAllUserPreferences(username);
+
+  const exportData = {
+    username,
+    timestamp: new Date().toISOString(),
+    preferences,
+    version: "2.0.0",
+  };
+
+  console.log(
+    `📤 Exported ${Object.keys(preferences).length} preferences for ${username}`
+  );
+  return exportData;
+};
+
+// ===================================================================
+// 🚀 5.0 ROAM EXTENSION EXPORT - Complete Registration
 // ===================================================================
 
 export default {
-  onload: async () => {
-    console.log("🔐 Ultra Minimal User Authentication starting...");
+  onload: async ({ extensionAPI }) => {
+    console.log(
+      "👥 Extension 2.0: User Authentication + Preferences starting..."
+    );
 
-    // Register our utilities if platform exists
-    if (window.RoamExtensionSuite?.registerUtility) {
-      const utilities = {
-        getAuthenticatedUser,
-        isUserAuthenticated,
-        getGraphMembers,
-        addGraphMember,
-        isGraphMember,
-        getGraphMemberCount,
-        showAuthenticationStatus,
-        runBasicTests,
-      };
-
-      Object.entries(utilities).forEach(([name, utility]) => {
-        window.RoamExtensionSuite.registerUtility(name, utility);
-        console.log(`🔧 Registered: ${name}`);
-      });
+    // Verify Extension 1.5 is loaded
+    if (!window.RoamExtensionSuite) {
+      console.error(
+        "❌ Foundation Registry not found! Please load Extension 1 first."
+      );
+      return;
     }
 
-    // Get current user
-    const user = getAuthenticatedUser();
-    console.log(`👤 Current user: ${user.displayName} (${user.method})`);
+    const platform = window.RoamExtensionSuite;
 
-    // Try to add user to graph members (but don't fail if it doesn't work)
-    if (user.displayName && user.displayName !== "undefined") {
-      try {
-        await addGraphMember(user.displayName);
-      } catch (error) {
-        console.warn("Could not add user to graph members:", error);
+    // Check for required dependency
+    if (!platform.has("utility-library")) {
+      console.error(
+        "❌ utility-library not found! Please load Extension 1.5 first."
+      );
+      return;
+    }
+
+    console.log("✅ Extension 1.5 utilities found");
+
+    // 🔧 Register user preferences utilities with platform
+    const userPreferencesUtilities = {
+      getUserPreferencesPageUid,
+      getUserPreference,
+      setUserPreference,
+      getAllUserPreferences,
+      initializeUserPreferences,
+      getUserPreferenceWithFallbacks,
+      bulkSetUserPreferences,
+      exportUserPreferences,
+    };
+
+    // 🔍 Register authentication utilities
+    const authenticationUtilities = {
+      getAuthenticatedUser,
+      isUserAuthenticated,
+      getCurrentUsername,
+    };
+
+    // 🧪 Register testing utilities
+    const testingUtilities = {
+      testUserPreferences,
+      testAuthentication,
+      testPreferencePageCreation,
+      runAllTests,
+    };
+
+    // Register all utilities with the platform
+    Object.entries({
+      ...userPreferencesUtilities,
+      ...authenticationUtilities,
+      ...testingUtilities,
+    }).forEach(([name, utility]) => {
+      platform.registerUtility(name, utility);
+    });
+
+    // Register self with platform
+    platform.register(
+      "user-authentication",
+      {
+        userPreferences: userPreferencesUtilities,
+        authentication: authenticationUtilities,
+        testing: testingUtilities,
+        version: "2.0.0",
+      },
+      {
+        name: "Extension 2.0: User Authentication + Preferences",
+        description:
+          "Complete user authentication and preferences management system",
+        version: "2.0.0",
+        dependencies: ["utility-library"],
       }
-    }
+    );
 
-    // Register commands if possible
-    try {
-      const commands = [
-        {
-          label: "Auth: Show Status",
-          callback: showAuthenticationStatus,
+    // 📝 Register command palette commands
+    const commands = [
+      {
+        label: "Auth: Test User Preferences",
+        callback: async () => {
+          const currentUser = getCurrentUsername();
+          if (currentUser) {
+            await testUserPreferences(currentUser);
+          } else {
+            console.error("❌ Cannot test - no current user found");
+          }
         },
-        {
-          label: "Auth: Run Tests",
-          callback: runBasicTests,
+      },
+      {
+        label: "Auth: Test Authentication",
+        callback: testAuthentication,
+      },
+      {
+        label: "Auth: Initialize Current User Preferences",
+        callback: async () => {
+          const currentUser = getCurrentUsername();
+          if (currentUser) {
+            const success = await initializeUserPreferences(currentUser);
+            console.log(
+              `🎯 Preference initialization: ${
+                success ? "successful" : "failed"
+              }`
+            );
+            if (success) {
+              console.log(
+                "💡 Check your user preferences page - defaults created"
+              );
+            }
+          } else {
+            console.error("❌ No current user found");
+          }
         },
-      ];
+      },
+      {
+        label: "Auth: Export My Preferences",
+        callback: async () => {
+          const currentUser = getCurrentUsername();
+          if (currentUser) {
+            const exportData = await exportUserPreferences(currentUser);
+            console.log("📤 Exported preferences:", exportData);
+          } else {
+            console.error("❌ No current user found");
+          }
+        },
+      },
+      {
+        label: "Auth: Run All Tests",
+        callback: runAllTests,
+      },
+    ];
 
-      commands.forEach(({ label, callback }) => {
-        window.roamAlphaAPI.ui.commandPalette.addCommand({
-          label: `Extension 2: ${label}`,
-          callback,
-        });
-      });
-    } catch (error) {
-      console.warn("Could not register commands:", error);
+    // Register commands with Roam and extension registry
+    commands.forEach((cmd) => {
+      window.roamAlphaAPI.ui.commandPalette.addCommand(cmd);
+      window._extensionRegistry.commands.push(cmd.label);
+    });
+
+    // 🎉 Startup complete
+    const currentUser = getAuthenticatedUser();
+    console.log("✅ Extension 2.0: User Authentication + Preferences loaded!");
+    console.log("🦊 Features: User preferences + authentication + testing");
+    console.log("🧹 Dependencies: Extension 1.5 utilities only");
+    console.log(
+      `👤 Current user: ${currentUser?.displayName || "Not detected"}`
+    );
+    console.log(
+      `🔐 Authentication status: ${
+        isUserAuthenticated() ? "Authenticated" : "Fallback/Guest"
+      }`
+    );
+    console.log('💡 Try: Cmd+P → "Auth: Run All Tests"');
+
+    // Auto-test on startup if user is detected
+    if (currentUser) {
+      console.log("🔍 Auto-running authentication test...");
+      setTimeout(() => {
+        testAuthentication();
+      }, 1000);
     }
-
-    // Success report
-    const memberCount = getGraphMemberCount();
-    console.log("✅ Ultra Minimal User Authentication loaded!");
-    console.log(`👤 Welcome ${user.displayName}!`);
-    console.log(`📋 Graph has ${memberCount} members`);
-    console.log('💡 Try: Cmd+P → "Extension 2: Auth: Show Status"');
   },
 
   onunload: () => {
-    console.log("🔐 Ultra Minimal User Authentication unloading...");
+    console.log(
+      "👥 Extension 2.0: User Authentication + Preferences unloading..."
+    );
+
+    // Any cleanup would be handled by the extension registry
+
+    console.log(
+      "✅ Extension 2.0: User Authentication + Preferences cleanup complete!"
+    );
   },
 };

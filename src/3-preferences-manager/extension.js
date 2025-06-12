@@ -1,7 +1,7 @@
 // ===================================================================
-// Extension 3: Configuration Manager - Professional Settings Interface
-// Leverages Extension 1.5 (Utilities) + Extension 2 (Authentication)
-// Focus: Configuration UI, validation, workflows, and management interface
+// Extension 3: Configuration Manager - MODERNIZED with Bulletproof Cascading
+// Leverages Extension 1.5 (Bulletproof Utilities) + Extension 2 (Authentication)
+// Focus: Professional configuration UI with battle-tested underlying architecture
 // ===================================================================
 
 // ===================================================================
@@ -71,20 +71,255 @@ const CONFIGURATION_SCHEMAS = {
     default: ["Daily Notes", "Chat Room"],
     validation: (value) => {
       if (!Array.isArray(value)) return "Must be an array of page names";
-      if (value.length > 12) return "Maximum 12 shortcuts recommended";
-      if (value.some((v) => typeof v !== "string" || v.trim() === ""))
-        return "All shortcuts must be non-empty page names";
+      if (value.length > 15) return "Too many shortcuts (max 15)";
+      if (value.some((item) => typeof item !== "string"))
+        return "All shortcuts must be page names (strings)";
       return true;
     },
   },
 };
 
 // ===================================================================
-// 🔧 CONFIGURATION VALIDATION ENGINE
+// 🚀 MODERNIZED PREFERENCE MANAGEMENT - Using Bulletproof Cascading
 // ===================================================================
 
 /**
- * Validate a configuration value against its schema
+ * 🚀 MODERN: Set user preference using bulletproof cascading
+ * Uses proven Extension 1.5 utilities instead of older patterns
+ */
+const setUserPreferenceBulletproof = async (username, key, value) => {
+  try {
+    console.log(
+      `🔧 [MODERN] Setting "${key}" = ${JSON.stringify(value)} for ${username}`
+    );
+
+    const platform = window.RoamExtensionSuite;
+    const cascadeToBlock = platform.getUtility("cascadeToBlock");
+
+    if (!cascadeToBlock) {
+      console.error(
+        "❌ cascadeToBlock utility not found - Extension 1.5 required"
+      );
+      return false;
+    }
+
+    // 1. Ensure user preferences page exists
+    const pageTitle = `${username}/user preferences`;
+    console.log(`📄 Ensuring preferences page exists: ${pageTitle}`);
+
+    const pageUid = await cascadeToBlock(pageTitle, [], true);
+    if (!pageUid) {
+      console.error(`❌ Failed to create preferences page: ${pageTitle}`);
+      return false;
+    }
+
+    // 2. Format the preference key (bold format for visibility)
+    const keyText = `**${key}:**`;
+
+    // 3. Use cascading to create/find the preference key block
+    console.log(`🔗 Creating preference key: ${keyText}`);
+    const keyBlockUid = await cascadeToBlock(pageTitle, [keyText], true);
+
+    if (!keyBlockUid) {
+      console.error(`❌ Failed to create preference key: ${keyText}`);
+      return false;
+    }
+
+    // 4. Clear existing values (clean update)
+    console.log(`🧹 Clearing existing values for "${key}"`);
+    const getDirectChildren = platform.getUtility("getDirectChildren");
+    const existingChildren = getDirectChildren(keyBlockUid);
+
+    for (const child of existingChildren) {
+      await window.roamAlphaAPI.data.block.delete({
+        block: { uid: child.uid },
+      });
+    }
+
+    // 5. Add new value(s) - handle arrays properly
+    const values = Array.isArray(value) ? value : [value];
+    console.log(`📝 Adding ${values.length} value(s)`);
+
+    for (let i = 0; i < values.length; i++) {
+      const val = String(values[i]).trim();
+      if (val === "") continue; // Skip empty values
+
+      console.log(`➕ Adding value ${i + 1}/${values.length}: "${val}"`);
+
+      await window.roamAlphaAPI.data.block.create({
+        location: { "parent-uid": keyBlockUid, order: i },
+        block: { string: val },
+      });
+
+      // Small delay to prevent API overload
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+
+    console.log(`✅ [MODERN] Successfully set "${key}" for ${username}`);
+    return true;
+  } catch (error) {
+    console.error(
+      `❌ [MODERN] Error setting preference "${key}" for ${username}:`,
+      error
+    );
+    return false;
+  }
+};
+
+/**
+ * 🚀 MODERN: Get user preference using Extension 1.5 utilities
+ * More reliable than the older findDataValueExact approach
+ */
+const getUserPreferenceBulletproof = async (
+  username,
+  key,
+  defaultValue = null
+) => {
+  try {
+    console.log(`🔍 [MODERN] Getting "${key}" for ${username}`);
+
+    const platform = window.RoamExtensionSuite;
+    const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
+    const getDirectChildren = platform.getUtility("getDirectChildren");
+    const normalizeHeaderText = platform.getUtility("normalizeHeaderText");
+
+    // 1. Get preferences page UID
+    const pageTitle = `${username}/user preferences`;
+    const pageUid = getPageUidByTitle(pageTitle);
+
+    if (!pageUid) {
+      console.log(`📄 No preferences page found for ${username}`);
+      return defaultValue;
+    }
+
+    // 2. Find the preference key block
+    const pageChildren = getDirectChildren(pageUid);
+    const keyText = `**${key}:**`;
+
+    const keyBlock = pageChildren.find((child) => {
+      const normalized = normalizeHeaderText(child.text);
+      const normalizedKey = normalizeHeaderText(keyText);
+      return normalized === normalizedKey;
+    });
+
+    if (!keyBlock) {
+      console.log(`🔍 Preference "${key}" not found for ${username}`);
+      return defaultValue;
+    }
+
+    // 3. Get the value(s)
+    const valueChildren = getDirectChildren(keyBlock.uid);
+
+    if (valueChildren.length === 0) {
+      return defaultValue;
+    } else if (valueChildren.length === 1) {
+      const result = valueChildren[0].text;
+      console.log(`⚙️ [MODERN] Preference "${key}" for ${username}: ${result}`);
+      return result;
+    } else {
+      // Multiple values - return as array
+      const result = valueChildren.map((child) => child.text);
+      console.log(
+        `⚙️ [MODERN] Preference "${key}" for ${username}: [${result.join(
+          ", "
+        )}]`
+      );
+      return result;
+    }
+  } catch (error) {
+    console.error(
+      `❌ [MODERN] Error getting preference "${key}" for ${username}:`,
+      error
+    );
+    return defaultValue;
+  }
+};
+
+/**
+ * 🚀 MODERN: Get all user preferences as object
+ */
+const getAllUserPreferencesBulletproof = async (username) => {
+  try {
+    console.log(`📊 [MODERN] Loading all preferences for ${username}`);
+
+    const preferences = {};
+    const preferenceKeys = Object.keys(CONFIGURATION_SCHEMAS);
+
+    for (const key of preferenceKeys) {
+      const value = await getUserPreferenceBulletproof(username, key);
+      if (value !== null) {
+        preferences[key] = value;
+      }
+    }
+
+    console.log(
+      `📊 [MODERN] Loaded ${
+        Object.keys(preferences).length
+      } preferences for ${username}`
+    );
+    return preferences;
+  } catch (error) {
+    console.error(
+      `❌ [MODERN] Failed to get all preferences for ${username}:`,
+      error
+    );
+    return {};
+  }
+};
+
+/**
+ * 🚀 MODERN: Initialize user preferences using bulletproof cascading
+ */
+const initializeUserPreferencesBulletproof = async (username) => {
+  try {
+    console.log(
+      `🎯 [MODERN] Initializing default preferences for ${username}...`
+    );
+
+    let successCount = 0;
+    const totalCount = Object.keys(CONFIGURATION_SCHEMAS).length;
+
+    // Set each default preference using bulletproof method
+    for (const [key, schema] of Object.entries(CONFIGURATION_SCHEMAS)) {
+      console.log(
+        `🔧 Setting default: ${key} = ${JSON.stringify(schema.default)}`
+      );
+
+      const success = await setUserPreferenceBulletproof(
+        username,
+        key,
+        schema.default
+      );
+      if (success) {
+        successCount++;
+        console.log(`✅ ${successCount}/${totalCount}: ${key}`);
+      } else {
+        console.error(`❌ Failed to set: ${key}`);
+      }
+
+      // Small delay to prevent overwhelming the API
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
+    console.log(
+      `🎉 [MODERN] Initialized ${successCount}/${totalCount} preferences for ${username}`
+    );
+    return successCount === totalCount;
+  } catch (error) {
+    console.error(
+      `❌ [MODERN] Failed to initialize preferences for ${username}:`,
+      error
+    );
+    return false;
+  }
+};
+
+// ===================================================================
+// 🔧 CONFIGURATION VALIDATION & WORKFLOWS - Modernized
+// ===================================================================
+
+/**
+ * 🔧 Validate individual configuration value
  */
 const validateConfigurationValue = (key, value) => {
   const schema = CONFIGURATION_SCHEMAS[key];
@@ -92,20 +327,16 @@ const validateConfigurationValue = (key, value) => {
     return { valid: false, error: `Unknown configuration key: ${key}` };
   }
 
-  try {
-    const validationResult = schema.validation(value);
-    if (validationResult === true) {
-      return { valid: true };
-    } else {
-      return { valid: false, error: validationResult };
-    }
-  } catch (error) {
-    return { valid: false, error: `Validation error: ${error.message}` };
+  const validationResult = schema.validation(value);
+  if (validationResult === true) {
+    return { valid: true };
+  } else {
+    return { valid: false, error: validationResult };
   }
 };
 
 /**
- * Get default value for a configuration key
+ * 🔧 Get configuration default value
  */
 const getConfigurationDefault = (key) => {
   const schema = CONFIGURATION_SCHEMAS[key];
@@ -113,364 +344,416 @@ const getConfigurationDefault = (key) => {
 };
 
 /**
- * Get configuration schema for a key
+ * 🔧 Get configuration schema
  */
 const getConfigurationSchema = (key) => {
   return CONFIGURATION_SCHEMAS[key] || null;
 };
 
 /**
- * Validate entire configuration object
+ * 🚀 MODERN: Validate and repair user configuration
  */
-const validateConfiguration = (configuration) => {
-  const results = {};
-  const errors = [];
-
-  Object.entries(configuration).forEach(([key, value]) => {
-    const validation = validateConfigurationValue(key, value);
-    results[key] = validation;
-    if (!validation.valid) {
-      errors.push(`${key}: ${validation.error}`);
-    }
-  });
-
-  return {
-    valid: errors.length === 0,
-    results,
-    errors,
-    summary: `${Object.keys(results).length - errors.length}/${
-      Object.keys(results).length
-    } valid`,
-  };
-};
-
-// ===================================================================
-// 🎯 CONFIGURATION WORKFLOWS - High-Level Management
-// ===================================================================
-
-/**
- * Initialize user configuration with validated defaults
- */
-const initializeUserConfiguration = async (username) => {
+const validateAndRepairConfigurationBulletproof = async (username) => {
   try {
-    console.log(`🎯 Initializing validated configuration for ${username}...`);
-
-    const platform = window.RoamExtensionSuite;
-    const setUserPreference = platform.getUtility("setUserPreference");
-
-    let successCount = 0;
-    const errors = [];
-
-    for (const [key, schema] of Object.entries(CONFIGURATION_SCHEMAS)) {
-      try {
-        const success = await setUserPreference(username, key, schema.default);
-        if (success) {
-          successCount++;
-          console.log(`✅ ${key}: ${schema.default}`);
-        } else {
-          errors.push(`Failed to set ${key}`);
-        }
-      } catch (error) {
-        errors.push(`${key}: ${error.message}`);
-      }
-    }
-
-    const total = Object.keys(CONFIGURATION_SCHEMAS).length;
     console.log(
-      `📊 Configuration initialized: ${successCount}/${total} settings`
+      `🔧 [MODERN] Validating and repairing configuration for ${username}...`
     );
 
-    if (errors.length > 0) {
-      console.warn("❌ Configuration errors:", errors);
-    }
-
-    return {
-      success: successCount === total,
-      successCount,
-      total,
-      errors,
-    };
-  } catch (error) {
-    console.error(`Failed to initialize configuration for ${username}:`, error);
-    return { success: false, error: error.message };
-  }
-};
-
-/**
- * Validate and repair user configuration
- */
-const validateAndRepairConfiguration = async (username) => {
-  try {
-    console.log(`🔧 Validating configuration for ${username}...`);
-
-    const platform = window.RoamExtensionSuite;
-    const getAllUserPreferences = platform.getUtility("getAllUserPreferences");
-    const setUserPreference = platform.getUtility("setUserPreference");
-
-    // Get current configuration
-    const currentConfig = await getAllUserPreferences(username);
-
-    // Validate against schemas
-    const validation = validateConfiguration(currentConfig);
-
-    console.log(`📊 Validation results: ${validation.summary}`);
-
-    // Repair invalid values
-    let repairCount = 0;
-    for (const [key, result] of Object.entries(validation.results)) {
-      if (!result.valid) {
-        const defaultValue = getConfigurationDefault(key);
-        if (defaultValue !== null) {
-          try {
-            await setUserPreference(username, key, defaultValue);
-            console.log(
-              `🔧 Repaired ${key}: ${currentConfig[key]} → ${defaultValue}`
-            );
-            repairCount++;
-          } catch (error) {
-            console.warn(`Failed to repair ${key}:`, error.message);
-          }
-        }
-      }
-    }
-
-    // Check for missing configurations
+    let fixedCount = 0;
     let addedCount = 0;
-    for (const key of Object.keys(CONFIGURATION_SCHEMAS)) {
-      if (!(key in currentConfig)) {
-        const defaultValue = getConfigurationDefault(key);
-        try {
-          await setUserPreference(username, key, defaultValue);
-          console.log(`➕ Added missing ${key}: ${defaultValue}`);
+    const issues = [];
+
+    for (const [key, schema] of Object.entries(CONFIGURATION_SCHEMAS)) {
+      console.log(`🔍 Checking: ${key}`);
+
+      const currentValue = await getUserPreferenceBulletproof(username, key);
+
+      if (currentValue === null) {
+        // Missing - add default
+        console.log(
+          `➕ Adding missing ${key}: ${JSON.stringify(schema.default)}`
+        );
+        const success = await setUserPreferenceBulletproof(
+          username,
+          key,
+          schema.default
+        );
+        if (success) {
           addedCount++;
-        } catch (error) {
-          console.warn(`Failed to add missing ${key}:`, error.message);
-        }
-      }
-    }
-
-    return {
-      validation,
-      repairCount,
-      addedCount,
-      success: validation.errors.length === 0,
-    };
-  } catch (error) {
-    console.error(`Failed to validate configuration for ${username}:`, error);
-    return { success: false, error: error.message };
-  }
-};
-
-/**
- * Export user configuration to copyable format
- */
-const exportUserConfiguration = async (username) => {
-  try {
-    const platform = window.RoamExtensionSuite;
-    const getAllUserPreferences = platform.getUtility("getAllUserPreferences");
-
-    const config = await getAllUserPreferences(username);
-    const validation = validateConfiguration(config);
-
-    const exportData = {
-      username,
-      exportedAt: new Date().toISOString(),
-      version: "3.0.0",
-      configuration: config,
-      validation: validation.summary,
-      schemas: CONFIGURATION_SCHEMAS,
-    };
-
-    const exportString = JSON.stringify(exportData, null, 2);
-
-    console.group(`📤 Configuration Export for ${username}`);
-    console.log("Validation:", validation.summary);
-    console.log("Export data:");
-    console.log(exportString);
-    console.groupEnd();
-
-    // Copy to clipboard if available
-    if (navigator.clipboard) {
-      try {
-        await navigator.clipboard.writeText(exportString);
-        console.log("📋 Configuration copied to clipboard!");
-      } catch (error) {
-        console.log("📋 Clipboard copy failed, use console output");
-      }
-    }
-
-    return exportData;
-  } catch (error) {
-    console.error(`Failed to export configuration for ${username}:`, error);
-    throw error;
-  }
-};
-
-/**
- * Import and apply configuration from export data
- */
-const importUserConfiguration = async (username, importData) => {
-  try {
-    console.log(`📥 Importing configuration for ${username}...`);
-
-    const platform = window.RoamExtensionSuite;
-    const setUserPreference = platform.getUtility("setUserPreference");
-
-    // Validate import data structure
-    if (!importData.configuration) {
-      throw new Error("Invalid import data: missing configuration");
-    }
-
-    // Validate configuration values
-    const validation = validateConfiguration(importData.configuration);
-
-    if (!validation.valid) {
-      console.warn("⚠️ Import validation warnings:", validation.errors);
-    }
-
-    // Apply configuration
-    let successCount = 0;
-    const errors = [];
-
-    for (const [key, value] of Object.entries(importData.configuration)) {
-      // Only import known configuration keys
-      if (CONFIGURATION_SCHEMAS[key]) {
-        try {
-          const success = await setUserPreference(username, key, value);
-          if (success) {
-            successCount++;
-            console.log(`✅ Imported ${key}: ${value}`);
-          } else {
-            errors.push(`Failed to import ${key}`);
-          }
-        } catch (error) {
-          errors.push(`${key}: ${error.message}`);
+          console.log(`✅ Added: ${key}`);
+        } else {
+          issues.push(`Failed to add ${key}`);
         }
       } else {
-        console.warn(`⚠️ Skipping unknown configuration key: ${key}`);
+        // Validate existing value
+        const validation = validateConfigurationValue(key, currentValue);
+
+        if (!validation.valid) {
+          console.log(
+            `🔧 Fixing invalid ${key}: ${JSON.stringify(
+              currentValue
+            )} → ${JSON.stringify(schema.default)}`
+          );
+          console.log(`   Reason: ${validation.error}`);
+
+          const success = await setUserPreferenceBulletproof(
+            username,
+            key,
+            schema.default
+          );
+          if (success) {
+            fixedCount++;
+            console.log(`✅ Fixed: ${key}`);
+          } else {
+            issues.push(`Failed to fix ${key}: ${validation.error}`);
+          }
+        } else {
+          console.log(`✅ Valid: ${key} = ${JSON.stringify(currentValue)}`);
+        }
       }
+
+      // Small delay between operations
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
-    const total = Object.keys(importData.configuration).length;
-    console.log(`📊 Import completed: ${successCount}/${total} settings`);
+    const message = `🔧 [MODERN] Repair completed: ${fixedCount} fixed, ${addedCount} added`;
+    console.log(message);
 
     return {
-      success: errors.length === 0,
-      successCount,
-      total,
-      errors,
-      validation,
+      fixedCount,
+      addedCount,
+      totalChecked: Object.keys(CONFIGURATION_SCHEMAS).length,
+      issues,
+      success: true,
     };
   } catch (error) {
-    console.error(`Failed to import configuration for ${username}:`, error);
-    throw error;
+    console.error(
+      `❌ [MODERN] Validation/repair failed for ${username}:`,
+      error
+    );
+    return {
+      fixedCount: 0,
+      addedCount: 0,
+      totalChecked: 0,
+      issues: [error.message],
+      success: false,
+      error: error.message,
+    };
   }
 };
 
-// ===================================================================
-// 🎨 CONFIGURATION UI HELPERS - Professional Interface Support
-// ===================================================================
-
 /**
- * Generate configuration overview for display
+ * 📊 Generate configuration overview
  */
 const generateConfigurationOverview = async (username) => {
   try {
-    const platform = window.RoamExtensionSuite;
-    const getAllUserPreferences = platform.getUtility("getAllUserPreferences");
-
-    const config = await getAllUserPreferences(username);
-    const validation = validateConfiguration(config);
-
-    const overview = {
-      username,
-      totalSettings: Object.keys(CONFIGURATION_SCHEMAS).length,
-      configuredSettings: Object.keys(config).length,
-      validSettings: Object.keys(validation.results).filter(
-        (k) => validation.results[k].valid
-      ).length,
-      invalidSettings: validation.errors.length,
-      missingSettings: Object.keys(CONFIGURATION_SCHEMAS).filter(
-        (k) => !(k in config)
-      ),
-      summary: validation.summary,
-      details: Object.entries(CONFIGURATION_SCHEMAS).map(([key, schema]) => ({
-        key,
-        description: schema.description,
-        type: schema.type,
-        currentValue: config[key],
-        defaultValue: schema.default,
-        isValid: validation.results[key]?.valid ?? false,
-        isConfigured: key in config,
-        error: validation.results[key]?.error,
-      })),
-    };
-
-    return overview;
-  } catch (error) {
-    console.error(
-      `Failed to generate configuration overview for ${username}:`,
-      error
+    const allPreferences = await getAllUserPreferencesBulletproof(username);
+    const totalSettings = Object.keys(CONFIGURATION_SCHEMAS).length;
+    const configuredSettings = Object.keys(allPreferences).length;
+    const missingSettings = Object.keys(CONFIGURATION_SCHEMAS).filter(
+      (key) => !(key in allPreferences)
     );
-    throw error;
+
+    let invalidSettings = 0;
+    const invalidDetails = [];
+
+    for (const [key, value] of Object.entries(allPreferences)) {
+      const validation = validateConfigurationValue(key, value);
+      if (!validation.valid) {
+        invalidSettings++;
+        invalidDetails.push(`${key}: ${validation.error}`);
+      }
+    }
+
+    const summary =
+      invalidSettings === 0 && missingSettings.length === 0
+        ? "✅ Perfect"
+        : invalidSettings > 0 || missingSettings.length > 0
+        ? "⚠️ Needs Repair"
+        : "✅ Good";
+
+    return {
+      username,
+      totalSettings,
+      configuredSettings,
+      missingSettings,
+      invalidSettings,
+      invalidDetails,
+      summary,
+      preferences: allPreferences,
+    };
+  } catch (error) {
+    console.error(`Error generating overview for ${username}:`, error);
+    return {
+      username,
+      error: error.message,
+      summary: "❌ Error",
+    };
   }
 };
 
 /**
- * Display configuration in console with professional formatting
+ * 🎯 Reset user configuration to defaults
  */
-const displayConfigurationStatus = async (username) => {
+const resetUserConfiguration = async (username) => {
+  console.log(`🔄 Resetting configuration to defaults for ${username}...`);
+
   try {
-    const overview = await generateConfigurationOverview(username);
+    const result = await initializeUserPreferencesBulletproof(username);
 
-    console.group(`⚙️ Configuration Status: ${username}`);
-    console.log(`📊 Summary: ${overview.summary}`);
-    console.log(
-      `✅ Valid: ${overview.validSettings}/${overview.totalSettings}`
-    );
-
-    if (overview.invalidSettings > 0) {
-      console.log(`❌ Invalid: ${overview.invalidSettings}`);
+    if (result) {
+      console.log(`✅ Configuration reset completed for ${username}`);
+      return { success: true, message: "Configuration reset to defaults" };
+    } else {
+      console.error(`❌ Configuration reset failed for ${username}`);
+      return {
+        success: false,
+        message: "Reset failed - check console for details",
+      };
     }
-
-    if (overview.missingSettings.length > 0) {
-      console.log(`➖ Missing: ${overview.missingSettings.join(", ")}`);
-    }
-
-    console.group("📋 Configuration Details");
-    overview.details.forEach((detail) => {
-      const status = detail.isValid ? "✅" : detail.isConfigured ? "❌" : "➖";
-      const value =
-        detail.currentValue !== undefined ? detail.currentValue : "Not set";
-      console.log(`${status} ${detail.key}: ${value}`);
-
-      if (detail.error) {
-        console.log(`   Error: ${detail.error}`);
-      }
-    });
-    console.groupEnd();
-
-    console.groupEnd();
-
-    return overview;
   } catch (error) {
-    console.error(
-      `Failed to display configuration status for ${username}:`,
-      error
+    console.error(`Error resetting configuration for ${username}:`, error);
+    return { success: false, message: error.message };
+  }
+};
+
+/**
+ * 📤 Export user configuration
+ */
+const exportUserConfiguration = async (username) => {
+  try {
+    const preferences = await getAllUserPreferencesBulletproof(username);
+
+    const exportData = {
+      username,
+      timestamp: new Date().toISOString(),
+      preferences,
+      schemas: CONFIGURATION_SCHEMAS,
+      version: "3.0.0-modern",
+    };
+
+    console.log(
+      `📤 [MODERN] Exported ${
+        Object.keys(preferences).length
+      } preferences for ${username}`
     );
-    throw error;
+    return exportData;
+  } catch (error) {
+    console.error(`Error exporting configuration for ${username}:`, error);
+    return null;
   }
 };
 
 // ===================================================================
-// 🚀 ROAM EXTENSION EXPORT - Compact Professional Integration
+// 🎯 USER INTERFACE FUNCTIONS - Professional Status Display
+// ===================================================================
+
+/**
+ * 📊 Display configuration status
+ */
+const displayConfigurationStatus = async (username) => {
+  console.group(`⚙️ Configuration Status: ${username}`);
+
+  try {
+    const overview = await generateConfigurationOverview(username);
+
+    console.log(`📊 Overview: ${overview.summary}`);
+    console.log(
+      `📈 Progress: ${overview.configuredSettings}/${overview.totalSettings} settings configured`
+    );
+
+    if (overview.missingSettings.length > 0) {
+      console.log(`❓ Missing settings (${overview.missingSettings.length}):`);
+      overview.missingSettings.forEach((setting) => {
+        const defaultValue = getConfigurationDefault(setting);
+        console.log(
+          `   • ${setting}: will default to ${JSON.stringify(defaultValue)}`
+        );
+      });
+    }
+
+    if (overview.invalidSettings > 0) {
+      console.log(`⚠️ Invalid settings (${overview.invalidSettings}):`);
+      overview.invalidDetails.forEach((detail) => {
+        console.log(`   • ${detail}`);
+      });
+    }
+
+    if (overview.summary === "✅ Perfect") {
+      console.log("🎉 All settings are configured correctly!");
+    } else {
+      console.log('💡 Run "Config: Validate and Repair" to fix issues');
+    }
+
+    console.log("\n📋 Current settings:");
+    Object.entries(overview.preferences).forEach(([key, value]) => {
+      console.log(`   ${key}: ${JSON.stringify(value)}`);
+    });
+  } catch (error) {
+    console.error("❌ Failed to display configuration status:", error);
+  }
+
+  console.groupEnd();
+};
+
+// ===================================================================
+// 🎛️ CONFIGURATION SERVICES - Service Registration
+// ===================================================================
+
+const configurationServices = {
+  // Validation services
+  validateConfigurationValue,
+  getConfigurationDefault,
+  getConfigurationSchema,
+
+  // Core preference operations (modern)
+  setUserPreference: setUserPreferenceBulletproof,
+  getUserPreference: getUserPreferenceBulletproof,
+  getAllUserPreferences: getAllUserPreferencesBulletproof,
+  initializeUserPreferences: initializeUserPreferencesBulletproof,
+
+  // Workflow services (modern)
+  validateAndRepairConfiguration: validateAndRepairConfigurationBulletproof,
+  resetUserConfiguration,
+  exportUserConfiguration,
+
+  // UI services
+  generateConfigurationOverview,
+  displayConfigurationStatus,
+
+  // Schema access
+  getConfigurationSchemas: () => CONFIGURATION_SCHEMAS,
+};
+
+// ===================================================================
+// 🎮 COMMAND PALETTE - Professional Configuration Commands
+// ===================================================================
+
+const createConfigurationCommands = (platform) => {
+  const getAuthenticatedUser = platform.getUtility("getAuthenticatedUser");
+
+  return [
+    {
+      label: "Config: Show My Configuration Status",
+      callback: async () => {
+        const user = getAuthenticatedUser();
+        if (user) {
+          await displayConfigurationStatus(user.displayName);
+        } else {
+          console.error("❌ No authenticated user found");
+        }
+      },
+    },
+    {
+      label: "Config: Validate and Repair",
+      callback: async () => {
+        console.group("🔧 [MODERN] Configuration Validation and Repair");
+
+        const user = getAuthenticatedUser();
+        if (!user) {
+          console.error("❌ No authenticated user found");
+          console.groupEnd();
+          return;
+        }
+
+        console.log(`🎯 Validating configuration for: ${user.displayName}`);
+
+        const result = await validateAndRepairConfigurationBulletproof(
+          user.displayName
+        );
+
+        if (result.success) {
+          console.log(`🎉 Validation complete!`);
+          console.log(`   • ${result.fixedCount} settings fixed`);
+          console.log(`   • ${result.addedCount} settings added`);
+          console.log(`   • ${result.totalChecked} total settings checked`);
+
+          if (result.issues.length > 0) {
+            console.log(`⚠️ Issues encountered:`);
+            result.issues.forEach((issue) => console.log(`   • ${issue}`));
+          }
+        } else {
+          console.error(`❌ Validation failed: ${result.error}`);
+        }
+
+        console.groupEnd();
+      },
+    },
+    {
+      label: "Config: Reset to Defaults",
+      callback: async () => {
+        const user = getAuthenticatedUser();
+        if (user) {
+          console.log(`🔄 Resetting configuration for: ${user.displayName}`);
+          const result = await resetUserConfiguration(user.displayName);
+          if (result.success) {
+            console.log("✅ Configuration reset successfully!");
+          } else {
+            console.error(`❌ Reset failed: ${result.message}`);
+          }
+        }
+      },
+    },
+    {
+      label: "Config: Export Configuration",
+      callback: async () => {
+        const user = getAuthenticatedUser();
+        if (user) {
+          const exportData = await exportUserConfiguration(user.displayName);
+          if (exportData) {
+            console.log("📤 Configuration exported:");
+            console.log(JSON.stringify(exportData, null, 2));
+          }
+        }
+      },
+    },
+    {
+      label: "Config: Initialize Preferences",
+      callback: async () => {
+        const user = getAuthenticatedUser();
+        if (user) {
+          console.log(
+            `🎯 [MODERN] Initializing preferences for: ${user.displayName}`
+          );
+          const success = await initializeUserPreferencesBulletproof(
+            user.displayName
+          );
+          if (success) {
+            console.log("🎉 [MODERN] Preferences initialized successfully!");
+          } else {
+            console.error("❌ [MODERN] Failed to initialize preferences");
+          }
+        }
+      },
+    },
+    {
+      label: "Config: Show All Available Settings",
+      callback: () => {
+        console.group("📋 Available Configuration Settings");
+        Object.entries(CONFIGURATION_SCHEMAS).forEach(([key, schema]) => {
+          console.log(`${key}:`);
+          console.log(`  Type: ${schema.type}`);
+          console.log(`  Default: ${JSON.stringify(schema.default)}`);
+          console.log(`  Description: ${schema.description}`);
+          if (schema.options) {
+            console.log(`  Options: ${schema.options.join(", ")}`);
+          }
+        });
+        console.groupEnd();
+      },
+    },
+  ];
+};
+
+// ===================================================================
+// 🚀 EXTENSION REGISTRATION - Complete Professional Registration
 // ===================================================================
 
 export default {
   onload: async ({ extensionAPI }) => {
-    console.log("⚙️ Configuration Manager starting...");
+    console.log("⚙️ Configuration Manager (Modern) starting...");
 
-    // ✅ VERIFY DEPENDENCIES
+    // Verify dependencies
     if (!window.RoamExtensionSuite) {
       console.error(
         "❌ Foundation Registry not found! Please load Extension 1 first."
@@ -478,154 +761,72 @@ export default {
       return;
     }
 
-    if (!window.RoamExtensionSuite.has("user-authentication")) {
+    const platform = window.RoamExtensionSuite;
+
+    if (!platform.has("utility-library")) {
+      console.error(
+        "❌ Utility Library not found! Please load Extension 1.5 first."
+      );
+      return;
+    }
+
+    if (!platform.has("user-authentication")) {
       console.error(
         "❌ User Authentication not found! Please load Extension 2 first."
       );
       return;
     }
 
-    // 🎯 REGISTER CONFIGURATION SERVICES
-    const platform = window.RoamExtensionSuite;
+    console.log("✅ Dependencies verified - proceeding with registration");
 
-    const configurationServices = {
-      // Validation services
-      validateConfigurationValue: validateConfigurationValue,
-      validateConfiguration: validateConfiguration,
-      getConfigurationDefault: getConfigurationDefault,
-      getConfigurationSchema: getConfigurationSchema,
-
-      // Workflow services
-      initializeUserConfiguration: initializeUserConfiguration,
-      validateAndRepairConfiguration: validateAndRepairConfiguration,
-      exportUserConfiguration: exportUserConfiguration,
-      importUserConfiguration: importUserConfiguration,
-
-      // UI services
-      generateConfigurationOverview: generateConfigurationOverview,
-      displayConfigurationStatus: displayConfigurationStatus,
-
-      // Schema access
-      getConfigurationSchemas: () => CONFIGURATION_SCHEMAS,
-    };
-
+    // Register configuration services
     Object.entries(configurationServices).forEach(([name, service]) => {
       platform.registerUtility(name, service);
     });
 
-    // 📝 REGISTER PROFESSIONAL COMMANDS
-    const commands = [
-      {
-        label: "Config: Show My Configuration Status",
-        callback: async () => {
-          const getAuthenticatedUser = platform.getUtility(
-            "getAuthenticatedUser"
-          );
-          const user = getAuthenticatedUser();
-          if (user) {
-            await displayConfigurationStatus(user.displayName);
-          }
-        },
-      },
-      {
-        label: "Config: Validate and Repair My Configuration",
-        callback: async () => {
-          const getAuthenticatedUser = platform.getUtility(
-            "getAuthenticatedUser"
-          );
-          const user = getAuthenticatedUser();
-          if (user) {
-            const result = await validateAndRepairConfiguration(
-              user.displayName
-            );
-            console.log(
-              `🔧 Repair completed: ${result.repairCount} fixed, ${result.addedCount} added`
-            );
-          }
-        },
-      },
-      {
-        label: "Config: Export My Configuration",
-        callback: async () => {
-          const getAuthenticatedUser = platform.getUtility(
-            "getAuthenticatedUser"
-          );
-          const user = getAuthenticatedUser();
-          if (user) {
-            await exportUserConfiguration(user.displayName);
-          }
-        },
-      },
-      {
-        label: "Config: Initialize Default Configuration",
-        callback: async () => {
-          const getAuthenticatedUser = platform.getUtility(
-            "getAuthenticatedUser"
-          );
-          const user = getAuthenticatedUser();
-          if (user) {
-            const result = await initializeUserConfiguration(user.displayName);
-            console.log(
-              `🎯 Initialization: ${result.successCount}/${result.total} settings configured`
-            );
-          }
-        },
-      },
-      {
-        label: "Config: Show Configuration Schemas",
-        callback: () => {
-          console.group("📋 Available Configuration Schemas");
-          Object.entries(CONFIGURATION_SCHEMAS).forEach(([key, schema]) => {
-            console.log(`${key}:`);
-            console.log(`  Type: ${schema.type}`);
-            console.log(`  Default: ${schema.default}`);
-            console.log(`  Description: ${schema.description}`);
-            if (schema.options) {
-              console.log(`  Options: ${schema.options.join(", ")}`);
-            }
-          });
-          console.groupEnd();
-        },
-      },
-    ];
+    // Initialize command palette
+    if (!window._extensionRegistry) {
+      window._extensionRegistry = { commands: [] };
+    }
 
-    // Add commands and register for cleanup
+    // Register professional commands
+    const commands = createConfigurationCommands(platform);
     commands.forEach((cmd) => {
       window.roamAlphaAPI.ui.commandPalette.addCommand(cmd);
       window._extensionRegistry.commands.push(cmd.label);
     });
 
-    // 🎯 REGISTER SELF WITH PLATFORM
+    // Register self with platform
     platform.register(
       "configuration-manager",
       {
         schemas: CONFIGURATION_SCHEMAS,
         services: configurationServices,
-        version: "3.0.0",
+        version: "3.0.0-modern",
       },
       {
-        name: "Configuration Manager",
+        name: "Configuration Manager (Modern)",
         description:
-          "Professional configuration interface with validation, workflows, and management",
-        version: "3.0.0",
-        dependencies: ["foundation-registry", "user-authentication"],
+          "Professional configuration interface with bulletproof cascading architecture",
+        version: "3.0.0-modern",
+        dependencies: ["utility-library", "user-authentication"],
       }
     );
 
-    // 🎉 STARTUP VALIDATION
+    // Startup validation
     try {
       const getAuthenticatedUser = platform.getUtility("getAuthenticatedUser");
       const user = getAuthenticatedUser();
 
       if (user) {
-        // Quick validation check
+        console.log("🎯 Running startup configuration check...");
         const overview = await generateConfigurationOverview(user.displayName);
 
-        console.log("✅ Configuration Manager loaded successfully!");
+        console.log("✅ Configuration Manager (Modern) loaded successfully!");
         console.log(`⚙️ Configuration status: ${overview.summary}`);
         console.log('💡 Try: Cmd+P → "Config: Show My Configuration Status"');
 
-        // Auto-repair if needed
+        // Auto-repair suggestion if needed
         if (
           overview.invalidSettings > 0 ||
           overview.missingSettings.length > 0
@@ -634,6 +835,11 @@ export default {
             '🔧 Issues detected - consider running "Config: Validate and Repair"'
           );
         }
+      } else {
+        console.log("✅ Configuration Manager (Modern) loaded successfully!");
+        console.log(
+          "ℹ️ No authenticated user detected - commands available when user logs in"
+        );
       }
     } catch (error) {
       console.warn(
@@ -644,7 +850,7 @@ export default {
   },
 
   onunload: () => {
-    console.log("⚙️ Configuration Manager unloading...");
+    console.log("⚙️ Configuration Manager (Modern) unloading...");
     console.log("✅ Configuration Manager cleanup complete!");
   },
 };
