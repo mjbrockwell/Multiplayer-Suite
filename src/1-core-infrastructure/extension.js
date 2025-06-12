@@ -1,6 +1,6 @@
 // ===================================================================
-// Extension 1: Foundation Registry - Professional Architecture
-// Based on David Vargas's enterprise-grade patterns from Roam University
+// Extension 1: Foundation Registry - Professional Architecture (FIXED)
+// Fixed: Registry sync issues that prevented other extensions from working
 // ===================================================================
 
 // ===================================================================
@@ -55,7 +55,7 @@ const generateUID = () => {
 };
 
 // ===================================================================
-// 🌐 GLOBAL EXTENSION PLATFORM - Like David's window.roamjs
+// 🌐 GLOBAL EXTENSION PLATFORM - Like David's window.roamjs (FIXED)
 // ===================================================================
 
 const createExtensionPlatform = () => {
@@ -79,6 +79,11 @@ const createExtensionPlatform = () => {
         },
       });
 
+      // 🔧 SYNC TO REGISTRY (FIXED)
+      if (window._extensionRegistry?.extensions) {
+        window._extensionRegistry.extensions.set(id, api);
+      }
+
       console.log(`✅ Extension registered: ${id}`);
 
       // Notify other extensions
@@ -100,15 +105,26 @@ const createExtensionPlatform = () => {
       return platform.extensions.has(id);
     },
 
-    // 🔧 UTILITY SHARING
+    // 🔧 UTILITY SHARING (FIXED - NOW SYNCS TO REGISTRY)
     registerUtility: (name, utility) => {
+      // Store in platform
       platform.utilities.set(name, utility);
+
+      // 🔧 SYNC TO REGISTRY (CRITICAL FIX)
+      if (window._extensionRegistry?.utilities) {
+        window._extensionRegistry.utilities[name] = utility;
+      }
+
       console.log(`🔧 Utility registered: ${name}`);
       return true;
     },
 
     getUtility: (name) => {
-      return platform.utilities.get(name);
+      // Try platform first, then registry as fallback
+      return (
+        platform.utilities.get(name) ||
+        window._extensionRegistry?.utilities?.[name]
+      );
     },
 
     // 📡 EVENT BUS
@@ -154,6 +170,29 @@ const createExtensionPlatform = () => {
       console.group("🎯 Roam Extension Suite Status");
       console.log("Extensions:", platform.getStatus());
       console.log("Platform object:", platform);
+
+      // 🔧 SYNC STATUS DEBUG (NEW)
+      if (window._extensionRegistry) {
+        console.log(
+          "Registry utilities:",
+          Object.keys(window._extensionRegistry.utilities || {})
+        );
+        console.log(
+          "Platform utilities:",
+          Array.from(platform.utilities.keys())
+        );
+
+        const registryCount = Object.keys(
+          window._extensionRegistry.utilities || {}
+        ).length;
+        const platformCount = platform.utilities.size;
+        console.log(
+          `Sync status: Registry(${registryCount}) Platform(${platformCount}) ${
+            registryCount === platformCount ? "✅" : "❌"
+          }`
+        );
+      }
+
       console.groupEnd();
       return platform.getStatus();
     },
@@ -170,7 +209,7 @@ export default {
   onload: async ({ extensionAPI }) => {
     console.log("🏛️ Foundation Registry starting...");
 
-    // 🎯 AUTOMATIC REGISTRY - The key to everything!
+    // 🎯 COMPLETE REGISTRY STRUCTURE (FIXED)
     window._extensionRegistry = {
       elements: [], // DOM elements (style tags, etc.)
       observers: [], // MutationObservers
@@ -178,15 +217,30 @@ export default {
       commands: [], // Command palette commands
       timeouts: [], // setTimeout IDs
       intervals: [], // setInterval IDs
+      utilities: {}, // 🔧 CRITICAL FIX - Added utilities object
+      extensions: new Map(), // 🔧 CRITICAL FIX - Added extensions map
     };
 
     // 🌐 CREATE GLOBAL PLATFORM
     window.RoamExtensionSuite = createExtensionPlatform();
 
-    // 🔧 REGISTER CORE UTILITIES
+    // 🔧 REGISTER CORE UTILITIES (These will now sync properly)
     window.RoamExtensionSuite.registerUtility("addStyle", addStyle);
     window.RoamExtensionSuite.registerUtility("getCurrentUser", getCurrentUser);
     window.RoamExtensionSuite.registerUtility("generateUID", generateUID);
+
+    // 🧪 VERIFY SYNC (NEW)
+    console.log("🔧 Verifying utility sync:");
+    const testUtils = ["addStyle", "getCurrentUser", "generateUID"];
+    testUtils.forEach((utilName) => {
+      const inPlatform = !!window.RoamExtensionSuite.getUtility(utilName);
+      const inRegistry = !!window._extensionRegistry.utilities[utilName];
+      console.log(
+        `   ${utilName}: Platform(${inPlatform}) Registry(${inRegistry}) ${
+          inPlatform && inRegistry ? "✅" : "❌"
+        }`
+      );
+    });
 
     // 🎨 PROFESSIONAL STYLING
     const foundationStyles = addStyle(
@@ -258,6 +312,12 @@ export default {
               "💡 No extensions loaded yet. Load Extension 2-9 to see coordination!"
             );
           }
+        },
+      },
+      {
+        label: "Extension Suite: Debug Registry Sync",
+        callback: () => {
+          window.RoamExtensionSuite.debug();
         },
       },
     ];
