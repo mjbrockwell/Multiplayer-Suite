@@ -1,8 +1,7 @@
 // ===================================================================
 // Extension 1.5: Enhanced Utility Library - Phase 1 Implementation
-// COMPLETE FIX: Working member list with findBlockByText function
-// NEW: Timezone, Modal, Navigation, Profile Analysis, Enhanced Image Processing
-// FIXED: Member list now correctly finds Directory:: block and its children
+// ROADMAP: Moved utilities from Extension SIX + new capabilities
+// New: Timezone, Modal, Navigation, Profile Analysis, Enhanced Image Processing
 // ===================================================================
 
 // ===================================================================
@@ -309,65 +308,6 @@ const modalUtilities = {
     }
   },
 };
-
-// ===================================================================
-// 🎯 LASER FOCUSED: ONE NEW UTILITY FOR EXTENSION 1.5
-// ===================================================================
-
-/**
- * 🎯 NEW UTILITY: Find block UID by title that starts with given text
- * Handles bold formatting automatically (searches for both "Title" and "**Title")
- * Perfect pair with getBlockListItems() for the common pattern:
- * 1. Find block by title → get UID
- * 2. Get children of that block → get list items
- *
- * @param {string} parentUid - UID of parent block/page to search within
- * @param {string} titleStart - Text that the block title should start with (without :: suffix)
- * @returns {string|null} - UID of the block that starts with titleStart, or null if not found
- */
-
-const findBlockUidByTitle = (parentUid, titleStart) => {
-  if (!parentUid || !titleStart) {
-    console.warn("findBlockUidByTitle requires parentUid and titleStart");
-    return null;
-  }
-
-  try {
-    // Get all direct children of the parent
-    const children = getDirectChildren(parentUid);
-
-    // Search for block that starts with titleStart or **titleStart
-    const found = children.find((child) => {
-      const text = child.text.trim();
-
-      // Check if it starts with the title (with or without bold formatting)
-      return text.startsWith(titleStart) || text.startsWith(`**${titleStart}`);
-    });
-
-    if (found) {
-      console.log(
-        `✅ findBlockUidByTitle: Found "${found.text}" → UID: ${found.uid}`
-      );
-      return found.uid;
-    } else {
-      console.log(
-        `❌ findBlockUidByTitle: No block starting with "${titleStart}" found in ${children.length} children`
-      );
-      return null;
-    }
-  } catch (error) {
-    console.error(`findBlockUidByTitle error for "${titleStart}":`, error);
-    return null;
-  }
-};
-
-// Add the new utility to the UTILITIES object
-
-console.log("🎯 LASER FOCUSED utility ready!");
-console.log("1. Add findBlockUidByTitle function to Extension 1.5");
-console.log("2. Add 'findBlockUidByTitle,' to UTILITIES object");
-console.log("3. Update getGraphMembersFromList to use it");
-console.log("4. Member list problem = SOLVED! 🎉");
 
 // ===================================================================
 // 🧭 NAVIGATION UTILITIES - Extracted from Extension SIX
@@ -703,210 +643,32 @@ const processAvatarImages = async (blockUid, fallbackInitials) => {
 };
 
 // ===================================================================
-// 🔧 CORE UTILITY FUNCTIONS - Enhanced and Fixed
+// 👥 ENHANCED GRAPH MEMBER MANAGEMENT
 // ===================================================================
 
 /**
- * ✅ NEW: Find block UID by text content (THE FIX!)
+ * Get graph members from managed list
  */
-const findBlockByText = (parentUid, blockText) => {
-  if (!parentUid || !blockText) return null;
-
+const getGraphMembersFromList = (listPageTitle = "Graph Members") => {
   try {
-    const children = getDirectChildren(parentUid);
-    const found = children.find((child) => child.text === blockText);
-    console.log(
-      `🔍 findBlockByText: Looking for "${blockText}" in ${children.length} children`
-    );
-    console.log(`   Found: ${found ? `✅ ${found.uid}` : "❌ not found"}`);
-    return found ? found.uid : null;
-  } catch (error) {
-    console.error(`findBlockByText error for ${blockText}:`, error);
-    return null;
-  }
-};
-
-/**
- * Get page UID by title
- */
-const getPageUidByTitle = (title) => {
-  if (!title) return null;
-
-  try {
-    const result = window.roamAlphaAPI.q(
-      `[:find ?uid :where [?p :node/title "${title}"] [?p :block/uid ?uid]]`
-    );
-    return result.length > 0 ? result[0][0] : null;
-  } catch (error) {
-    console.error(`getPageUidByTitle error for "${title}":`, error);
-    return null;
-  }
-};
-
-/**
- * Get direct children of a block
- */
-
-// ✅ FIXED VERSION (uses simple query with correct mapping)
-const getDirectChildren = (parentUid) => {
-  if (!parentUid) return [];
-
-  try {
-    const result = window.roamAlphaAPI.q(`
-      [:find ?uid ?text ?order
-       :where 
-       [?p :block/uid "${parentUid}"]
-       [?p :block/children ?c]
-       [?c :block/uid ?uid]
-       [?c :block/string ?text]
-       [?c :block/order ?order]]
-    `);
-
-    return result
-      .map(([uid, text, order]) => ({
-        uid: uid,
-        text: text || "",
-        order: order || 0,
-      }))
-      .sort((a, b) => a.order - b.order);
-  } catch (error) {
-    console.error(`getDirectChildren error for ${parentUid}:`, error);
-    return [];
-  }
-};
-
-/**
- * Get block list items
- */
-const getBlockListItems = (parentUid) => {
-  if (!parentUid) {
-    console.warn("getBlockListItems requires parentUid");
-    return [];
-  }
-
-  try {
-    const children = getDirectChildren(parentUid);
-    const items = children.map((child) => child.text);
-    console.log(`📋 getBlockListItems: Found ${items.length} items:`, items);
-    return items;
-  } catch (error) {
-    console.error(
-      `❌ getBlockListItems failed for parent ${parentUid}:`,
-      error
-    );
-    return [];
-  }
-};
-
-// ===================================================================
-// 👥 ENHANCED GRAPH MEMBER MANAGEMENT - COMPLETELY FIXED
-// ===================================================================
-
-/**
- * ✅ FIXED: Get graph members from managed list
- */
-const getGraphMembersFromList = (
-  listPageTitle = "Graph Members",
-  blockName = "Directory"
-) => {
-  try {
-    console.log(
-      `🔍 Looking for members in page: "${listPageTitle}", block: "${blockName}"`
-    );
-
     const pageUid = getPageUidByTitle(listPageTitle);
     if (!pageUid) {
-      console.warn(`❌ No managed list found: ${listPageTitle}`);
+      console.warn(`No managed list found: ${listPageTitle}`);
       return [];
     }
 
-    console.log(`✅ Found page UID: ${pageUid}`);
-
-    // ✅ FIX: Add "::" suffix if not present to match Roam block format
-    const blockNameWithSuffix = blockName.endsWith("::")
-      ? blockName
-      : `${blockName}::`;
-    console.log(`🔍 Searching for block: "${blockNameWithSuffix}"`);
-
-    // ✅ THE ACTUAL FIX: Use findBlockByTitle
-    const directoryUid = findBlockUidByTitle(pageUid, blockName);
+    // Look for Directory:: block
+    const directoryUid = findDataValueExact(pageUid, "Directory");
     if (!directoryUid) {
-      console.warn(
-        `❌ No ${blockNameWithSuffix} block found in ${listPageTitle}`
-      );
-      console.log(
-        `💡 Expected structure: Page "${listPageTitle}" → Block "${blockNameWithSuffix}" → Child blocks (members)`
-      );
+      console.warn(`No Directory:: block found in ${listPageTitle}`);
       return [];
     }
 
-    console.log(`✅ Found directory block UID: ${directoryUid}`);
-
-    const members = getBlockListItems(directoryUid);
-    console.log(`📋 Found ${members.length} members:`, members);
-
-    return members;
+    return getBlockListItems(directoryUid);
   } catch (error) {
-    console.error("❌ Error getting graph members from list:", error);
+    console.error("Error getting graph members from list:", error);
     return [];
   }
-};
-
-/**
- * 🧪 ENHANCED DIAGNOSTIC: Check member list structure
- */
-const diagnoseMemberListStructure = () => {
-  console.group("🔍 Diagnosing Member List Structure");
-
-  try {
-    const listPageTitle = "roam/graph members";
-    const pageUid = getPageUidByTitle(listPageTitle);
-    console.log(`📄 Page "${listPageTitle}" UID:`, pageUid);
-
-    if (pageUid) {
-      const allBlocks = window.roamAlphaAPI.data.q(`
-        [:find ?uid ?str
-         :where 
-         [?page :node/title "${listPageTitle}"]
-         [?page :block/children ?block]
-         [?block :block/uid ?uid]
-         [?block :block/string ?str]]
-      `);
-
-      console.log("📋 All blocks on page:", allBlocks);
-
-      // Get direct children for analysis
-      const children = getDirectChildren(pageUid);
-      console.log("👶 Direct children of page:", children);
-
-      // Test different variations
-      ["Directory", "Directory:", "Directory::"].forEach((variation) => {
-        const foundExact = findDataValueExact(pageUid, variation);
-        const foundByText = findBlockByText(pageUid, variation);
-        console.log(`   "${variation}":`);
-        console.log(
-          `      findDataValueExact → ${
-            foundExact ? "✅ FOUND" : "❌ not found"
-          }`
-        );
-        console.log(
-          `      findBlockByText → ${foundByText ? "✅ FOUND" : "❌ not found"}`
-        );
-      });
-
-      // Test the actual function
-      console.log("\n🧪 Testing getGraphMembersFromList:");
-      const members = getGraphMembersFromList(
-        "roam/graph members",
-        "Directory"
-      );
-      console.log(`Result: ${members.length} members found:`, members);
-    }
-  } catch (error) {
-    console.error("❌ Diagnosis failed:", error);
-  }
-
-  console.groupEnd();
 };
 
 /**
@@ -935,7 +697,7 @@ const removeGraphMember = async (username, listPageTitle = "Graph Members") => {
     const pageUid = getPageUidByTitle(listPageTitle);
     if (!pageUid) return false;
 
-    const directoryUid = findBlockByText(pageUid, "Directory::");
+    const directoryUid = findDataValueExact(pageUid, "Directory");
     if (!directoryUid) return false;
 
     return await removeFromBlockList(directoryUid, username);
@@ -1011,6 +773,23 @@ const cascadeToBlock = async (
   } catch (error) {
     console.error(`❌ cascadeToBlock failed for "${pageTitle}":`, error);
     throw error;
+  }
+};
+
+/**
+ * Get page UID by title
+ */
+const getPageUidByTitle = (title) => {
+  if (!title) return null;
+
+  try {
+    const result = window.roamAlphaAPI.q(
+      `[:find ?uid :where [?p :node/title "${title}"] [?p :block/uid ?uid]]`
+    );
+    return result.length > 0 ? result[0][0] : null;
+  } catch (error) {
+    console.error(`getPageUidByTitle error for "${title}":`, error);
+    return null;
   }
 };
 
@@ -1190,6 +969,31 @@ const normalizeCategoryName = (category) => {
 };
 
 /**
+ * Get direct children of a block
+ */
+const getDirectChildren = (parentUid) => {
+  if (!parentUid) return [];
+
+  try {
+    const result = window.roamAlphaAPI.q(
+      `[:find (pull ?c [:block/uid :block/string :block/order])
+        :where [?p :block/uid "${parentUid}"] [?p :block/children ?c]]`
+    );
+
+    return result
+      .map(([block]) => ({
+        uid: block[":block/uid"],
+        text: block[":block/string"] || "",
+        order: block[":block/order"] || 0,
+      }))
+      .sort((a, b) => a.order - b.order);
+  } catch (error) {
+    console.error(`getDirectChildren error for ${parentUid}:`, error);
+    return [];
+  }
+};
+
+/**
  * Find data value using exact attribute match
  */
 const findDataValueExact = (pageUid, fieldName) => {
@@ -1219,126 +1023,45 @@ const findDataValueExact = (pageUid, fieldName) => {
   }
 };
 
-// ===================================================================
-// 🔧 EXTENSION 1.5 FIX: findNestedDataValuesExact Function
-// Replace the broken complex version with this simple working one
-// ===================================================================
-
 /**
- * ✅ FIXED: Extract nested data values using simple queries
- * This replaces the broken version that had complex regex queries
+ * Find nested data values using exact attribute match
  */
 const findNestedDataValuesExact = (pageUid, parentFieldName) => {
   if (!pageUid || !parentFieldName) return {};
 
   try {
-    console.log(
-      `🔍 FIXED: Getting nested data for "${parentFieldName}" on page ${pageUid}`
-    );
-
-    // Step 1: Get all blocks on the page
-    const allBlocks = window.roamAlphaAPI.q(`
-      [:find ?uid ?text ?order
+    const result = window.roamAlphaAPI.q(`
+      [:find ?field-name ?value-string
        :where 
-       [?p :block/uid "${pageUid}"]
-       [?p :block/children ?c]
-       [?c :block/uid ?uid]
-       [?c :block/string ?text]
-       [?c :block/order ?order]]
+       [?page :block/uid "${pageUid}"]
+       [?page :block/children ?parent]
+       [?parent :block/string ?parent-string]
+       [(clojure.string/starts-with? ?parent-string "${parentFieldName}::")]
+       [?parent :block/children ?field]
+       [?field :block/string ?field-string]
+       [(clojure.string/includes? ?field-string "::")]
+       [?field :block/children ?value]
+       [?value :block/string ?value-string]
+       [(re-find #"^(.+)::" ?field-string) [_ ?field-name]]]
     `);
 
-    console.log(`📋 Found ${allBlocks.length} blocks on page`);
+    const data = {};
+    result.forEach(([fieldName, valueString]) => {
+      const key = fieldName.toLowerCase().replace(/\s+/g, "");
+      const keyMap = {
+        aboutme: "aboutMe",
+        avatar: "avatar",
+        location: "location",
+        role: "role",
+        timezone: "timezone",
+      };
+      data[keyMap[key] || key] = valueString;
+    });
 
-    // Step 2: Find the parent block (My Info::, etc.)
-    const parentVariations = [
-      parentFieldName,
-      `${parentFieldName}:`,
-      `${parentFieldName}::`,
-      `**${parentFieldName}:**`,
-      `**${parentFieldName}::**`,
-    ];
-
-    const parentBlock = allBlocks.find(([uid, text, order]) =>
-      parentVariations.some((variation) =>
-        text.toLowerCase().includes(variation.toLowerCase())
-      )
-    );
-
-    if (!parentBlock) {
-      console.log(`❌ Parent block "${parentFieldName}" not found`);
-      return {};
-    }
-
-    const parentUid = parentBlock[0];
-    console.log(`✅ Found parent block: "${parentBlock[1]}" (${parentUid})`);
-
-    // Step 3: Get children of the parent block (Avatar::, Location::, etc.)
-    const childBlocks = window.roamAlphaAPI.q(`
-      [:find ?uid ?text ?order
-       :where 
-       [?p :block/uid "${parentUid}"]
-       [?p :block/children ?c]
-       [?c :block/uid ?uid]
-       [?c :block/string ?text]
-       [?c :block/order ?order]]
-    `);
-
-    console.log(`📋 Found ${childBlocks.length} child blocks`);
-
-    // Step 4: For each child block, extract the field name and value
-    const result = {};
-
-    for (const [childUid, childText, childOrder] of childBlocks) {
-      // Extract field name (everything before :: or :)
-      let fieldName = childText.replace(/\*\*/g, ""); // Remove bold formatting
-
-      if (fieldName.includes("::")) {
-        fieldName = fieldName.split("::")[0];
-      } else if (fieldName.includes(":")) {
-        fieldName = fieldName.split(":")[0];
-      }
-
-      fieldName = fieldName.trim().toLowerCase();
-
-      // Get the value (first child of this field block)
-      const valueBlocks = window.roamAlphaAPI.q(`
-        [:find ?text
-         :where 
-         [?p :block/uid "${childUid}"]
-         [?p :block/children ?c]
-         [?c :block/string ?text]]
-      `);
-
-      if (valueBlocks.length > 0) {
-        const value = valueBlocks[0][0];
-
-        // Map to expected field names
-        const fieldMapping = {
-          avatar: "avatar",
-          location: "location",
-          role: "role",
-          timezone: "timezone",
-          "about me": "aboutMe",
-          aboutme: "aboutMe",
-        };
-
-        const mappedField = fieldMapping[fieldName] || fieldName;
-        result[mappedField] = value;
-
-        console.log(
-          `✅ Found field: ${fieldName} → ${mappedField} = "${value}"`
-        );
-      }
-    }
-
-    console.log(
-      `🎉 FIXED: Extracted ${Object.keys(result).length} fields:`,
-      result
-    );
-    return result;
+    return data;
   } catch (error) {
     console.error(
-      `❌ FIXED findNestedDataValuesExact error for "${parentFieldName}":`,
+      `findNestedDataValuesExact error for ${parentFieldName}:`,
       error
     );
     return {};
@@ -1492,55 +1215,23 @@ const removeFromBlockList = async (parentUid, itemText) => {
 };
 
 /**
- * Get current user using multiple methods
+ * Get block list items
  */
-const getCurrentUser = () => {
+const getBlockListItems = (parentUid) => {
+  if (!parentUid) {
+    console.warn("getBlockListItems requires parentUid");
+    return [];
+  }
+
   try {
-    // Try official API first (new method)
-    if (window.roamAlphaAPI?.user?.uid) {
-      const userUid = window.roamAlphaAPI.user.uid();
-      const userData = window.roamAlphaAPI.pull("[*]", [":user/uid", userUid]);
-      if (userData) {
-        return {
-          displayName: userData[":user/display-name"] || "Unknown User",
-          email: userData[":user/email"] || "",
-          uid: userUid,
-          photoUrl: userData[":user/photo-url"] || "",
-          method: "official-api",
-        };
-      }
-    }
-
-    // Fallback to localStorage method
-    const globalAppState = JSON.parse(
-      localStorage.getItem("globalAppState") || '["","",[]]'
-    );
-    const userIndex = globalAppState.findIndex((s) => s === "~:user");
-    if (userIndex > 0 && globalAppState[userIndex + 1]) {
-      const userData = globalAppState[userIndex + 1];
-      return {
-        displayName: userData[1] || "Unknown User",
-        email: userData[3] || "",
-        uid: userData[0] || "unknown",
-        photoUrl: userData[4] || "",
-        method: "localStorage",
-      };
-    }
-
-    return {
-      displayName: "Unknown User",
-      email: "",
-      uid: "unknown",
-      method: "fallback",
-    };
+    const children = getDirectChildren(parentUid);
+    return children.map((child) => child.text);
   } catch (error) {
-    console.error("getCurrentUser failed:", error);
-    return {
-      displayName: "Error",
-      email: "",
-      uid: "error",
-      method: "error",
-    };
+    console.error(
+      `❌ getBlockListItems failed for parent ${parentUid}:`,
+      error
+    );
+    return [];
   }
 };
 
@@ -1613,6 +1304,210 @@ const getCurrentUserViaDOM = () => {
 const clearUserCache = () => {
   // Implementation for clearing any cached user data
   console.log("User cache cleared");
+};
+
+/**
+ * Test the bulletproof cascading function
+ */
+const testCascadeToBlock = async () => {
+  console.group("🧪 Testing bulletproof cascadeToBlock");
+
+  try {
+    console.log("🎯 Test 1: Creating simple hierarchy...");
+    const result1 = await cascadeToBlock(
+      "Test Page 1",
+      ["Projects", "Web Development", "Roam Extensions"],
+      true
+    );
+    console.log(`✅ Result 1: ${result1}`);
+
+    console.log("\n🎯 Test 2: Adding to existing hierarchy...");
+    const result2 = await cascadeToBlock(
+      "Test Page 1",
+      ["Projects", "Web Development", "Documentation"],
+      true
+    );
+    console.log(`✅ Result 2: ${result2}`);
+
+    console.log("\n🎯 Test 3: Creating user preferences...");
+    const result3 = await cascadeToBlock(
+      "Matt Brockwell/user preferences",
+      ["**Loading Page Preference:**"],
+      true
+    );
+    console.log(`✅ Result 3: ${result3}`);
+  } catch (error) {
+    console.error("❌ Test failed:", error);
+  }
+
+  console.groupEnd();
+};
+
+/**
+ * Quick cascade test for immediate verification
+ */
+const quickCascadeTest = async () => {
+  console.log("🚀 Quick cascade test...");
+  const result = await cascadeToBlock(
+    "Quick Test",
+    ["Level 1", "Level 2"],
+    true
+  );
+  console.log(`✅ Quick test result: ${result}`);
+};
+
+/**
+ * Test the new hierarchical list management utilities
+ */
+const testHierarchicalUtilities = async () => {
+  console.group("🧪 Testing Hierarchical List Management Utilities");
+
+  try {
+    // Test scenario: Managing graph members
+    const pageUid = getPageUidByTitle("roam/graph members");
+    if (!pageUid) {
+      console.log("❌ Test page 'roam/graph members' not found");
+      return;
+    }
+
+    // 1. Test ensureBlockExists
+    console.log("\n1️⃣ Testing ensureBlockExists...");
+    const directoryUid = await ensureBlockExists(pageUid, "Directory::");
+    console.log(`✅ Directory block UID: ${directoryUid}`);
+
+    // 2. Test addToBlockList
+    console.log("\n2️⃣ Testing addToBlockList...");
+    const added = await addToBlockList(directoryUid, "Matt Brockwell");
+    console.log(`✅ Added Matt Brockwell: ${added}`);
+
+    // 3. Test getBlockListItems
+    console.log("\n3️⃣ Testing getBlockListItems...");
+    const items = getBlockListItems(directoryUid);
+    console.log(`✅ Current list items:`, items);
+
+    // 4. Test removeFromBlockList
+    console.log("\n4️⃣ Testing removeFromBlockList...");
+    const removed = await removeFromBlockList(directoryUid, "Matt Brockwell");
+    console.log(`✅ Removed Matt Brockwell: ${removed}`);
+
+    // 5. Check final state
+    console.log("\n5️⃣ Final state check...");
+    const finalItems = getBlockListItems(directoryUid);
+    console.log(`✅ Final list items:`, finalItems);
+
+    console.log("\n🎉 All hierarchical utility tests completed!");
+  } catch (error) {
+    console.error("❌ Hierarchical utilities test failed:", error);
+  }
+
+  console.groupEnd();
+};
+
+/**
+ * Test complete graph members workflow
+ */
+const testGraphMembersWorkflow = async () => {
+  console.group("👥 Testing Graph Members Workflow");
+
+  try {
+    const members = getGraphMembers();
+    console.log(
+      `📋 Found ${members.length} graph members:`,
+      members.slice(0, 5)
+    );
+
+    // Test adding current user to a test list
+    const currentUser = getCurrentUser();
+    console.log(`👤 Current user: ${currentUser.displayName}`);
+
+    console.log("✅ Graph members workflow test completed!");
+  } catch (error) {
+    console.error("❌ Graph members workflow test failed:", error);
+  }
+
+  console.groupEnd();
+};
+
+/**
+ * Test image extraction utility
+ */
+const testImageExtraction = async () => {
+  console.group("🖼️ Testing Image Extraction");
+
+  try {
+    const currentUser = getCurrentUser();
+    const userPageUid = getPageUidByTitle(currentUser.displayName);
+
+    if (userPageUid) {
+      const images = extractImageUrls(userPageUid);
+      console.log(`📸 Found ${images.length} images on user page:`, images);
+
+      if (images.length > 0) {
+        console.log("✅ Image extraction working correctly");
+      } else {
+        console.log("ℹ️ No images found on user page");
+      }
+    } else {
+      console.log("ℹ️ User page not found for testing");
+    }
+  } catch (error) {
+    console.error("❌ Image extraction test failed:", error);
+  }
+
+  console.groupEnd();
+};
+
+/**
+ * Get current user using multiple methods
+ */
+const getCurrentUser = () => {
+  try {
+    // Try official API first (new method)
+    if (window.roamAlphaAPI?.user?.uid) {
+      const userUid = window.roamAlphaAPI.user.uid();
+      const userData = window.roamAlphaAPI.pull("[*]", [":user/uid", userUid]);
+      if (userData) {
+        return {
+          displayName: userData[":user/display-name"] || "Unknown User",
+          email: userData[":user/email"] || "",
+          uid: userUid,
+          photoUrl: userData[":user/photo-url"] || "",
+          method: "official-api",
+        };
+      }
+    }
+
+    // Fallback to localStorage method
+    const globalAppState = JSON.parse(
+      localStorage.getItem("globalAppState") || '["","",[]]'
+    );
+    const userIndex = globalAppState.findIndex((s) => s === "~:user");
+    if (userIndex > 0 && globalAppState[userIndex + 1]) {
+      const userData = globalAppState[userIndex + 1];
+      return {
+        displayName: userData[1] || "Unknown User",
+        email: userData[3] || "",
+        uid: userData[0] || "unknown",
+        photoUrl: userData[4] || "",
+        method: "localStorage",
+      };
+    }
+
+    return {
+      displayName: "Unknown User",
+      email: "",
+      uid: "unknown",
+      method: "fallback",
+    };
+  } catch (error) {
+    console.error("getCurrentUser failed:", error);
+    return {
+      displayName: "Error",
+      email: "",
+      uid: "error",
+      method: "error",
+    };
+  }
 };
 
 /**
@@ -1852,159 +1747,8 @@ const testEnhancedMemberManagement = async () => {
   console.groupEnd();
 };
 
-/**
- * Test the bulletproof cascading function
- */
-const testCascadeToBlock = async () => {
-  console.group("🧪 Testing bulletproof cascadeToBlock");
-
-  try {
-    console.log("🎯 Test 1: Creating simple hierarchy...");
-    const result1 = await cascadeToBlock(
-      "Test Page 1",
-      ["Projects", "Web Development", "Roam Extensions"],
-      true
-    );
-    console.log(`✅ Result 1: ${result1}`);
-
-    console.log("\n🎯 Test 2: Adding to existing hierarchy...");
-    const result2 = await cascadeToBlock(
-      "Test Page 1",
-      ["Projects", "Web Development", "Documentation"],
-      true
-    );
-    console.log(`✅ Result 2: ${result2}`);
-
-    console.log("\n🎯 Test 3: Creating user preferences...");
-    const result3 = await cascadeToBlock(
-      "Matt Brockwell/user preferences",
-      ["**Loading Page Preference:**"],
-      true
-    );
-    console.log(`✅ Result 3: ${result3}`);
-  } catch (error) {
-    console.error("❌ Test failed:", error);
-  }
-
-  console.groupEnd();
-};
-
-/**
- * Quick cascade test for immediate verification
- */
-const quickCascadeTest = async () => {
-  console.log("🚀 Quick cascade test...");
-  const result = await cascadeToBlock(
-    "Quick Test",
-    ["Level 1", "Level 2"],
-    true
-  );
-  console.log(`✅ Quick test result: ${result}`);
-};
-
-/**
- * Test the new hierarchical list management utilities
- */
-const testHierarchicalUtilities = async () => {
-  console.group("🧪 Testing Hierarchical List Management Utilities");
-
-  try {
-    // Test scenario: Managing graph members
-    const pageUid = getPageUidByTitle("roam/graph members");
-    if (!pageUid) {
-      console.log("❌ Test page 'roam/graph members' not found");
-      return;
-    }
-
-    // 1. Test ensureBlockExists
-    console.log("\n1️⃣ Testing ensureBlockExists...");
-    const directoryUid = await ensureBlockExists(pageUid, "Directory::");
-    console.log(`✅ Directory block UID: ${directoryUid}`);
-
-    // 2. Test addToBlockList
-    console.log("\n2️⃣ Testing addToBlockList...");
-    const added = await addToBlockList(directoryUid, "Matt Brockwell");
-    console.log(`✅ Added Matt Brockwell: ${added}`);
-
-    // 3. Test getBlockListItems
-    console.log("\n3️⃣ Testing getBlockListItems...");
-    const items = getBlockListItems(directoryUid);
-    console.log(`✅ Current list items:`, items);
-
-    // 4. Test removeFromBlockList
-    console.log("\n4️⃣ Testing removeFromBlockList...");
-    const removed = await removeFromBlockList(directoryUid, "Matt Brockwell");
-    console.log(`✅ Removed Matt Brockwell: ${removed}`);
-
-    // 5. Check final state
-    console.log("\n5️⃣ Final state check...");
-    const finalItems = getBlockListItems(directoryUid);
-    console.log(`✅ Final list items:`, finalItems);
-
-    console.log("\n🎉 All hierarchical utility tests completed!");
-  } catch (error) {
-    console.error("❌ Hierarchical utilities test failed:", error);
-  }
-
-  console.groupEnd();
-};
-
-/**
- * Test complete graph members workflow
- */
-const testGraphMembersWorkflow = async () => {
-  console.group("👥 Testing Graph Members Workflow");
-
-  try {
-    const members = getGraphMembers();
-    console.log(
-      `📋 Found ${members.length} graph members:`,
-      members.slice(0, 5)
-    );
-
-    // Test adding current user to a test list
-    const currentUser = getCurrentUser();
-    console.log(`👤 Current user: ${currentUser.displayName}`);
-
-    console.log("✅ Graph members workflow test completed!");
-  } catch (error) {
-    console.error("❌ Graph members workflow test failed:", error);
-  }
-
-  console.groupEnd();
-};
-
-/**
- * Test image extraction utility
- */
-const testImageExtraction = async () => {
-  console.group("🖼️ Testing Image Extraction");
-
-  try {
-    const currentUser = getCurrentUser();
-    const userPageUid = getPageUidByTitle(currentUser.displayName);
-
-    if (userPageUid) {
-      const images = extractImageUrls(userPageUid);
-      console.log(`📸 Found ${images.length} images on user page:`, images);
-
-      if (images.length > 0) {
-        console.log("✅ Image extraction working correctly");
-      } else {
-        console.log("ℹ️ No images found on user page");
-      }
-    } else {
-      console.log("ℹ️ User page not found for testing");
-    }
-  } catch (error) {
-    console.error("❌ Image extraction test failed:", error);
-  }
-
-  console.groupEnd();
-};
-
 // ===================================================================
-// 🎛️ ENHANCED UTILITIES REGISTRY - COMPLETE WITH FIX
+// 🎛️ ENHANCED UTILITIES REGISTRY
 // ===================================================================
 
 const UTILITIES = {
@@ -2026,29 +1770,26 @@ const UTILITIES = {
 
   // 👥 ENHANCED: Graph Member Management
   getGraphMembers,
-  getGraphMembersFromList, // ✅ FIXED - now uses findBlockByText
+  getGraphMembersFromList,
   addGraphMember,
   removeGraphMember,
-
-  // 🔧 CORE: Block Management Utilities
-  findBlockByText, // ✅ NEW - THE FIX!
-  findDataValueExact, // Existing
-  findNestedDataValuesExact, // Existing
-  getDirectChildren, // Existing
-  getBlockListItems, // Enhanced with logging
 
   // 🆕 EXISTING: Hierarchical List Management
   ensureBlockExists,
   addToBlockList,
   removeFromBlockList,
+  getBlockListItems,
 
   // 🚀 EXISTING: Bulletproof Cascading
   cascadeToBlock,
 
   // 🔧 EXISTING: Core Functions
+  findDataValueExact,
+  findNestedDataValuesExact,
   setDataValueStructured,
 
   // 🏗️ EXISTING: Helper Functions
+  getDirectChildren,
   getPageUidByTitle,
   createPageIfNotExists,
   generateUID,
@@ -2084,12 +1825,6 @@ const UTILITIES = {
   testProfileAnalysisUtilities,
   testEnhancedImageProcessing,
   testEnhancedMemberManagement,
-
-  // 🔍 DIAGNOSTIC: Debug Functions
-  diagnoseMemberListStructure, // Enhanced diagnostic
-
-  // NEW: given the title, find the block UID
-  findBlockUidByTitle,
 };
 
 // ===================================================================
@@ -2098,9 +1833,7 @@ const UTILITIES = {
 
 export default {
   onload: () => {
-    console.log(
-      "🔧 Extension 1.5 loading with Phase 1 enhancements + MEMBER LIST FIX..."
-    );
+    console.log("🔧 Extension 1.5 loading with Phase 1 enhancements...");
 
     // Initialize extension registry if it doesn't exist
     if (!window._extensionRegistry) {
@@ -2144,11 +1877,6 @@ export default {
       {
         label: "Test: Enhanced Member Management",
         callback: testEnhancedMemberManagement,
-      },
-      // ENHANCED diagnostic
-      {
-        label: "Test: Diagnose Member List Structure (ENHANCED)",
-        callback: diagnoseMemberListStructure,
       },
       // EXISTING original test commands (for backward compatibility)
       {
@@ -2204,13 +1932,13 @@ export default {
           "utility-library",
           {
             utilities: UTILITIES,
-            version: "1.5.2-member-fix",
+            version: "1.5.1-phase1",
           },
           {
-            name: "Enhanced Utility Library + Member List Fix",
+            name: "Enhanced Utility Library",
             description:
-              "Phase 1 enhanced utility library with FIXED member list functionality",
-            version: "1.5.2-member-fix",
+              "Phase 1 enhanced utility library with timezone, modal, navigation, and profile analysis utilities",
+            version: "1.5.1-phase1",
             dependencies: [],
           }
         );
@@ -2218,9 +1946,7 @@ export default {
     }
 
     // ✅ Extension successfully loaded
-    console.log(
-      "✅ Extension 1.5 Phase 1 + MEMBER LIST FIX loaded successfully!"
-    );
+    console.log("✅ Extension 1.5 Phase 1 loaded successfully!");
     console.log(`🔧 Registered ${Object.keys(UTILITIES).length} utilities:`);
     console.log(
       "   🌍 NEW: Timezone Management (TimezoneManager from Extension SIX)"
@@ -2238,23 +1964,22 @@ export default {
       "   🖼️ ENHANCED: Image Processing (Validation and avatar processing)"
     );
     console.log(
-      "   👥 FIXED: Graph Member Management (Now correctly finds Directory:: block and children)"
+      "   👥 ENHANCED: Graph Member Management (Managed member lists)"
     );
-    console.log("   🔧 NEW: findBlockByText utility (THE FIX for member list)");
     console.log("   🚀 EXISTING: All previous utilities maintained");
     console.log(
-      "💡 Try: Cmd+P → 'Test: Diagnose Member List Structure (ENHANCED)' to verify the fix!"
+      "💡 Try the new test commands to see Phase 1 utilities in action!"
     );
 
     return {
       extensionId: "utility-library",
       utilities: UTILITIES,
-      version: "1.5.2-member-fix",
+      version: "1.5.1-phase1",
     };
   },
 
   onunload: () => {
-    console.log("🔧 Extension 1.5 Phase 1 + MEMBER LIST FIX unloading...");
+    console.log("🔧 Extension 1.5 Phase 1 unloading...");
     // Cleanup handled by the registry
   },
 };

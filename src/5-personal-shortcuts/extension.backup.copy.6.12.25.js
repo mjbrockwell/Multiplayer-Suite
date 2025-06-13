@@ -1,16 +1,18 @@
 // ===================================================================
-// Extension 5: Personal Shortcuts Widget - Production Ready
-// Clean, efficient shortcuts widget with original design
-// Features: Personal shortcuts management, add/remove functionality
-// Dependencies: Extensions 1.5, 2
+// Extension 5: Personal Shortcuts Widget - ORIGINAL DESIGN RESTORED
+// Fixed: Reads actual user preferences + matches original UI exactly
+// Features: [x] remove buttons, Add Current Page button, original styling
+// Dependencies: Extensions 1.5, 2 (with robust checking)
 // ===================================================================
 
 (() => {
   "use strict";
 
   // ===================================================================
-  // 🔍 DEPENDENCY CHECKING
+  // 🚨 ENHANCED DEPENDENCY CHECK WITH DIAGNOSTICS
   // ===================================================================
+
+  console.log("🔍 Extension 5: Checking dependencies...");
 
   if (!window.RoamExtensionSuite) {
     console.error(
@@ -21,10 +23,15 @@
 
   const platform = window.RoamExtensionSuite;
 
-  // Check for required utilities
-  const requiredUtilities = ["getCurrentUsername", "getPageUidByTitle"];
-  const missingUtilities = [];
+  // Check for individual utilities we need
+  const requiredUtilities = [
+    "getCurrentUsername",
+    "getUserPreference",
+    "setUserPreference",
+    "getPageUidByTitle",
+  ];
 
+  const missingUtilities = [];
   for (const util of requiredUtilities) {
     if (!platform.getUtility || !platform.getUtility(util)) {
       missingUtilities.push(util);
@@ -33,201 +40,214 @@
 
   if (missingUtilities.length > 0) {
     console.error(
-      `❌ Extension 5: Missing utilities: ${missingUtilities.join(", ")}`
+      `❌ Extension 5: Missing required utilities: ${missingUtilities.join(
+        ", "
+      )}`
+    );
+    console.log(
+      "💡 Extension 5: Make sure Extension 1.5 and Extension 2 are loaded first"
     );
     return;
   }
 
-  // ===================================================================
-  // 🎯 STATE MANAGEMENT
-  // ===================================================================
+  console.log("✅ Extension 5: All required utilities found!");
 
-  let isCollapsed = localStorage.getItem("roam-shortcuts-collapsed") === "true";
-
-  // ===================================================================
-  // 🔧 USER DETECTION
-  // ===================================================================
-
-  const getCurrentUser = async () => {
-    try {
-      const getCurrentUsername = platform.getUtility("getCurrentUsername");
-      if (getCurrentUsername) {
-        const result = await getCurrentUsername();
-        return typeof result === "string" ? result : null;
-      }
-
-      // Fallback to Roam API
-      if (window.roamAlphaAPI?.data?.user) {
-        const user = window.roamAlphaAPI.data.user;
-        return user.displayName || user.email || user.uid;
-      }
-
-      return null;
-    } catch (error) {
-      console.error("❌ Extension 5: Error getting current user:", error);
-      return null;
-    }
-  };
+  // State for collapse/expand
+  let isCollapsed = false;
 
   // ===================================================================
-  // 🔧 SHORTCUTS DATA FUNCTIONS
+  // 🎯 CORE DATA FUNCTIONS - FIXED TO READ ACTUAL PREFERENCES
   // ===================================================================
 
+  /**
+   * 🔧 FIXED: Get user shortcuts with ACTUAL preference reading
+   */
   const getUserShortcuts = async () => {
     try {
-      const currentUser = await getCurrentUser();
+      const getCurrentUsername = platform.getUtility("getCurrentUsername");
+      const getUserPreference = platform.getUtility("getUserPreference");
+
+      const currentUser = getCurrentUsername();
       if (!currentUser) {
-        return ["Daily Notes", "Chat Room"];
+        console.warn("❌ No authenticated user found for shortcuts");
+        return ["Daily Notes", "Chat Room"]; // Fallback
       }
 
-      const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
-      if (!getPageUidByTitle) {
-        return ["Daily Notes", "Chat Room"];
+      // 🔥 BUG FIX: Read ACTUAL user preferences instead of defaults
+      const personalShortcutsValue = await getUserPreference(
+        currentUser,
+        "Personal Shortcuts",
+        ["Daily Notes", "Chat Room"] // Only use as fallback
+      );
+
+      // Parse the shortcuts (handle both string and array formats)
+      let shortcuts;
+      if (typeof personalShortcutsValue === "string") {
+        // Parse from string format: "(Matt Brockwell)(Matt Brockwell/user preferences)"
+        shortcuts = personalShortcutsValue
+          .split(/[()]+/)
+          .filter((s) => s.trim())
+          .map((s) => s.trim());
+      } else if (Array.isArray(personalShortcutsValue)) {
+        shortcuts = personalShortcutsValue;
+      } else {
+        console.warn("⚠️ Invalid shortcuts format, using defaults");
+        shortcuts = ["Daily Notes", "Chat Room"];
       }
 
-      const pageUid = getPageUidByTitle(`${currentUser}/user preferences`);
-      if (!pageUid) {
-        return ["Daily Notes", "Chat Room"];
-      }
-
-      // Find Personal Shortcuts header block
-      const headerQuery = `[:find ?block-uid :where 
-                           [?page :block/uid "${pageUid}"]
-                           [?page :block/children ?child]
-                           [?child :block/string ?content]
-                           [?child :block/uid ?block-uid]
-                           [(clojure.string/includes? ?content "Personal Shortcuts")]]`;
-
-      const headerResults = await window.roamAlphaAPI.data.q(headerQuery);
-
-      if (headerResults && headerResults.length > 0) {
-        const shortcutsBlockUid = headerResults[0][0];
-
-        // Get child blocks (the shortcuts)
-        const childQuery = `[:find ?content :where 
-                           [?parent :block/uid "${shortcutsBlockUid}"]
-                           [?parent :block/children ?child]
-                           [?child :block/string ?content]]`;
-
-        const childResults = await window.roamAlphaAPI.data.q(childQuery);
-
-        if (childResults && childResults.length > 0) {
-          const shortcuts = childResults
-            .map(([content]) => content)
-            .filter((s) => s && s.trim() && s.length > 0);
-
-          return shortcuts.length > 0
-            ? shortcuts
-            : ["Daily Notes", "Chat Room"];
-        }
-      }
-
-      return ["Daily Notes", "Chat Room"];
+      console.log(
+        `📋 FIXED: Personal shortcuts for ${currentUser}:`,
+        shortcuts
+      );
+      return shortcuts;
     } catch (error) {
-      console.error("❌ Extension 5: Error getting shortcuts:", error);
-      return ["Daily Notes", "Chat Room"];
+      console.error("❌ Error getting user shortcuts:", error);
+      return ["Daily Notes", "Chat Room"]; // Fallback
     }
   };
 
+  /**
+   * Add current page to shortcuts
+   */
   const addCurrentPageToShortcuts = async () => {
     try {
-      const currentUser = await getCurrentUser();
-      if (!currentUser) return false;
+      const getCurrentUsername = platform.getUtility("getCurrentUsername");
+      const getUserPreference = platform.getUtility("getUserPreference");
+      const setUserPreference = platform.getUtility("setUserPreference");
 
+      const currentUser = getCurrentUsername();
+      if (!currentUser) {
+        console.error("No authenticated user found");
+        return false;
+      }
+
+      // Get current page title
       const currentPage = document.title.replace(" - Roam", "").trim();
-      if (!currentPage) return false;
+      if (!currentPage) {
+        console.error("Could not determine current page");
+        return false;
+      }
+
+      console.log(`📊 Adding "${currentPage}" to shortcuts for ${currentUser}`);
+
+      // Get existing shortcuts
+      const existingShortcuts = await getUserPreference(
+        currentUser,
+        "Personal Shortcuts",
+        []
+      );
+      const shortcutsArray = Array.isArray(existingShortcuts)
+        ? existingShortcuts
+        : [existingShortcuts].filter(Boolean);
+
+      console.log("📊 Existing shortcuts before adding:", shortcutsArray);
 
       // Check if already exists
-      const existingShortcuts = await getUserShortcuts();
-      if (existingShortcuts.includes(currentPage)) return false;
-
-      const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
-      const pageUid = getPageUidByTitle(`${currentUser}/user preferences`);
-      if (!pageUid) return false;
-
-      // Find Personal Shortcuts header block
-      const headerQuery = `[:find ?block-uid :where 
-                           [?page :block/uid "${pageUid}"]
-                           [?page :block/children ?child]
-                           [?child :block/string ?content]
-                           [?child :block/uid ?block-uid]
-                           [(clojure.string/includes? ?content "Personal Shortcuts")]]`;
-
-      const headerResults = await window.roamAlphaAPI.data.q(headerQuery);
-
-      if (headerResults && headerResults.length > 0) {
-        const shortcutsBlockUid = headerResults[0][0];
-
-        await window.roamAlphaAPI.createBlock({
-          location: { "parent-uid": shortcutsBlockUid, order: "last" },
-          block: { string: currentPage },
-        });
-
-        setTimeout(() => refreshShortcutsUI(), 1000);
-        return true;
+      if (shortcutsArray.includes(currentPage)) {
+        console.log(`"${currentPage}" already in shortcuts`);
+        return false;
       }
 
-      return false;
+      // Add new shortcut
+      const updatedShortcuts = [...shortcutsArray, currentPage];
+      console.log("📊 Updated shortcuts to save:", updatedShortcuts);
+
+      // Save updated shortcuts
+      const success = await setUserPreference(
+        currentUser,
+        "Personal Shortcuts",
+        updatedShortcuts
+      );
+
+      if (success) {
+        console.log(`✅ Added "${currentPage}" to shortcuts`);
+
+        // Refresh UI after a delay
+        setTimeout(async () => {
+          await refreshShortcutsUI();
+        }, 1000);
+
+        return true;
+      } else {
+        console.error("Failed to save shortcuts");
+        return false;
+      }
     } catch (error) {
-      console.error("❌ Extension 5: Error adding shortcut:", error);
+      console.error("Error adding current page to shortcuts:", error);
       return false;
     }
   };
 
+  /**
+   * Remove shortcut from user preferences
+   */
   const removeFromShortcuts = async (shortcutToRemove) => {
     try {
-      const currentUser = await getCurrentUser();
-      if (!currentUser) return false;
+      const getCurrentUsername = platform.getUtility("getCurrentUsername");
+      const getUserPreference = platform.getUtility("getUserPreference");
+      const setUserPreference = platform.getUtility("setUserPreference");
 
-      const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
-      const pageUid = getPageUidByTitle(`${currentUser}/user preferences`);
-      if (!pageUid) return false;
-
-      // Find Personal Shortcuts header block
-      const headerQuery = `[:find ?block-uid :where 
-                           [?page :block/uid "${pageUid}"]
-                           [?page :block/children ?child]
-                           [?child :block/string ?content]
-                           [?child :block/uid ?block-uid]
-                           [(clojure.string/includes? ?content "Personal Shortcuts")]]`;
-
-      const headerResults = await window.roamAlphaAPI.data.q(headerQuery);
-
-      if (headerResults && headerResults.length > 0) {
-        const shortcutsBlockUid = headerResults[0][0];
-
-        // Find the specific shortcut block to remove
-        const shortcutQuery = `[:find ?child-uid :where 
-                               [?parent :block/uid "${shortcutsBlockUid}"]
-                               [?parent :block/children ?child]
-                               [?child :block/string "${shortcutToRemove}"]
-                               [?child :block/uid ?child-uid]]`;
-
-        const shortcutResults = await window.roamAlphaAPI.data.q(shortcutQuery);
-
-        if (shortcutResults && shortcutResults.length > 0) {
-          const shortcutBlockUid = shortcutResults[0][0];
-
-          await window.roamAlphaAPI.deleteBlock({
-            block: { uid: shortcutBlockUid },
-          });
-
-          setTimeout(() => refreshShortcutsUI(), 1000);
-          return true;
-        }
+      const currentUser = getCurrentUsername();
+      if (!currentUser) {
+        console.error("No authenticated user found");
+        return false;
       }
 
-      return false;
+      console.log(
+        `📊 Removing "${shortcutToRemove}" from shortcuts for ${currentUser}`
+      );
+
+      // Get existing shortcuts
+      const existingShortcuts = await getUserPreference(
+        currentUser,
+        "Personal Shortcuts",
+        []
+      );
+      const shortcutsArray = Array.isArray(existingShortcuts)
+        ? existingShortcuts
+        : [existingShortcuts].filter(Boolean);
+
+      console.log("📊 Existing shortcuts before removal:", shortcutsArray);
+
+      // Remove the shortcut
+      const updatedShortcuts = shortcutsArray.filter(
+        (s) => s !== shortcutToRemove
+      );
+      console.log("📊 Updated shortcuts after removal:", updatedShortcuts);
+
+      // Save updated shortcuts
+      const success = await setUserPreference(
+        currentUser,
+        "Personal Shortcuts",
+        updatedShortcuts
+      );
+
+      if (success) {
+        console.log(`✅ Removed "${shortcutToRemove}" from shortcuts`);
+
+        // Refresh UI after a delay
+        setTimeout(async () => {
+          await refreshShortcutsUI();
+        }, 1000);
+
+        return true;
+      } else {
+        console.error("Failed to save shortcuts after removal");
+        return false;
+      }
     } catch (error) {
-      console.error("❌ Extension 5: Error removing shortcut:", error);
+      console.error("Error removing shortcut:", error);
       return false;
     }
   };
 
   // ===================================================================
-  // 🎨 UI CREATION
+  // 🎨 ORIGINAL UI CREATION - EXACT ORIGINAL STYLING RESTORED
   // ===================================================================
 
+  /**
+   * Add custom scrollbar styles for better visual integration
+   */
   const addScrollbarStyles = () => {
     const styleId = "personal-shortcuts-scrollbar-styles";
     if (document.getElementById(styleId)) return;
@@ -254,10 +274,12 @@
         background: rgba(102, 126, 234, 0.5);
       }
       
+      /* Ensure proper sizing for all children */
       .roam-extension-personal-shortcuts * {
         box-sizing: border-box;
       }
       
+      /* Prevent any text overflow issues */
       .roam-extension-personal-shortcuts .shortcuts-list > div {
         overflow: hidden;
       }
@@ -265,16 +287,21 @@
 
     document.head.appendChild(style);
 
+    // Register for cleanup
     if (window._extensionRegistry) {
       window._extensionRegistry.elements.push(style);
     }
   };
 
+  /**
+   * Create the shortcuts section element with ORIGINAL styling
+   */
   const createShortcutsElement = (shortcuts) => {
     const element = document.createElement("div");
     element.className = "roam-extension-personal-shortcuts";
     element.id = "roam-extension-personal-shortcuts";
 
+    // ORIGINAL: Container sizing with exact original styling
     element.style.cssText = `
       margin: 6px 0px 8px 0px;
       padding: 0;
@@ -296,7 +323,10 @@
       flex-direction: column;
     `;
 
-    // Header with collapse button
+    // Check if collapsed from localStorage
+    isCollapsed = localStorage.getItem("roam-shortcuts-collapsed") === "true";
+
+    // ORIGINAL: Header with collapse button
     const header = document.createElement("div");
     header.style.cssText = `
       display: flex;
@@ -336,7 +366,7 @@
     header.appendChild(headerText);
     header.appendChild(collapseButton);
 
-    // Content container
+    // ORIGINAL: Content container with proper flex sizing and overflow
     const content = document.createElement("div");
     content.className = "shortcuts-content";
     content.style.cssText = `
@@ -349,6 +379,7 @@
       box-sizing: border-box;
     `;
 
+    // ORIGINAL: Scrollable container for the actual content
     const scrollContainer = document.createElement("div");
     scrollContainer.style.cssText = `
       padding: 10px;
@@ -358,7 +389,7 @@
       box-sizing: border-box;
     `;
 
-    // Add Current Page Button
+    // ORIGINAL: Add Current Page Button
     const addCurrentButton = document.createElement("button");
     addCurrentButton.style.cssText = `
       width: 100%;
@@ -416,7 +447,7 @@
       }
     });
 
-    // Shortcuts list
+    // ORIGINAL: Shortcuts list with proper sizing
     const list = document.createElement("div");
     list.className = "shortcuts-list";
     list.style.cssText = `
@@ -444,7 +475,14 @@
       emptyMessage.textContent = "No shortcuts configured";
       list.appendChild(emptyMessage);
     } else {
+      console.log(
+        `🎨 Creating UI for ${shortcuts.length} shortcuts:`,
+        shortcuts
+      );
+
       shortcuts.forEach((shortcut, index) => {
+        console.log(`🎨 Creating item ${index + 1}: "${shortcut}"`);
+
         const item = document.createElement("div");
         item.style.cssText = `
           display: flex;
@@ -475,6 +513,7 @@
           text-overflow: ellipsis;
         `;
 
+        // ORIGINAL: Remove button [x] functionality!
         const removeButton = document.createElement("span");
         removeButton.innerHTML = "×";
         removeButton.style.cssText = `
@@ -493,6 +532,7 @@
           border-radius: 50%;
         `;
 
+        // Remove button hover effects
         removeButton.addEventListener("mouseenter", () => {
           removeButton.style.color = "#ff4444";
           removeButton.style.background = "rgba(255, 68, 68, 0.1)";
@@ -503,22 +543,29 @@
           removeButton.style.background = "transparent";
         });
 
+        // Remove button click handler
         removeButton.addEventListener("click", async (e) => {
-          e.stopPropagation();
+          e.stopPropagation(); // Prevent navigation
+          console.log(`🗑️ Removing shortcut: ${shortcut}`);
 
           removeButton.style.color = "#ff6666";
           removeButton.innerHTML = "⟳";
 
           const success = await removeFromShortcuts(shortcut);
 
-          if (!success) {
+          if (success) {
+            console.log(`✅ Successfully removed: ${shortcut}`);
+          } else {
+            console.error(`❌ Failed to remove: ${shortcut}`);
             removeButton.style.color = "#999";
             removeButton.innerHTML = "×";
           }
         });
 
+        // Navigation click handler for the text
         shortcutText.addEventListener("click", () => navigateToPage(shortcut));
 
+        // Item hover effects
         item.addEventListener("mouseenter", () => {
           item.style.background = "rgba(102, 126, 234, 0.08)";
           item.style.borderColor = "rgba(102, 126, 234, 0.2)";
@@ -571,137 +618,129 @@
   };
 
   // ===================================================================
-  // 🧭 NAVIGATION
+  // 🧭 NAVIGATION - Simple Page Navigation
   // ===================================================================
 
   const navigateToPage = async (pageName) => {
     try {
-      window.roamAlphaAPI.ui.mainWindow.openPage({ page: { title: pageName } });
-    } catch (error) {
-      console.error(
-        `❌ Extension 5: Navigation error for "${pageName}":`,
-        error
-      );
-    }
-  };
+      console.log(`🧭 Navigating to: ${pageName}`);
 
-  // ===================================================================
-  // 📍 INJECTION LOGIC
-  // ===================================================================
+      const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
+      let pageUid = getPageUidByTitle(pageName);
 
-  const injectWithFallbacks = (shortcutsElement) => {
-    const methods = [
-      {
-        name: "starred-pages sibling",
-        attempt: () => {
-          const target = document.querySelector("div.starred-pages");
-          if (target && target.parentElement) {
-            target.parentElement.insertBefore(
-              shortcutsElement,
-              target.nextSibling
-            );
-            return true;
-          }
-          return false;
-        },
-      },
-      {
-        name: "sidebar container append",
-        attempt: () => {
-          const target = document.querySelector(
-            ".roam-sidebar-container.noselect"
-          );
-          if (target) {
-            target.appendChild(shortcutsElement);
-            return true;
-          }
-          return false;
-        },
-      },
-      {
-        name: "left sidebar testid",
-        attempt: () => {
-          const target = document.querySelector(
-            '[data-testid="roam-left-sidebar"]'
-          );
-          if (target) {
-            target.appendChild(shortcutsElement);
-            return true;
-          }
-          return false;
-        },
-      },
-      {
-        name: "generic left sidebar",
-        attempt: () => {
-          const target = document.querySelector('[data-testid="left-sidebar"]');
-          if (target) {
-            target.appendChild(shortcutsElement);
-            return true;
-          }
-          return false;
-        },
-      },
-      {
-        name: "body fixed position fallback",
-        attempt: () => {
-          document.body.appendChild(shortcutsElement);
-          shortcutsElement.style.position = "fixed";
-          shortcutsElement.style.bottom = "20px";
-          shortcutsElement.style.left = "20px";
-          shortcutsElement.style.zIndex = "9999";
-          return true;
-        },
-      },
-    ];
-
-    for (const method of methods) {
-      try {
-        if (method.attempt()) {
-          return { success: true, method: method.name };
-        }
-      } catch (error) {
-        continue;
+      if (!pageUid) {
+        console.log(`Page "${pageName}" doesn't exist, creating...`);
       }
-    }
 
-    return { success: false, method: "all methods failed" };
+      window.roamAlphaAPI.ui.mainWindow.openPage({ page: { title: pageName } });
+      console.log(`✅ Successfully navigated to: ${pageName}`);
+    } catch (error) {
+      console.error(`Navigation error for "${pageName}":`, error);
+    }
   };
 
   // ===================================================================
-  // 🔄 MAIN FUNCTIONS
+  // 📍 ORIGINAL INJECTION LOGIC - ABOVE ROAM RESEARCH LOGO
+  // ===================================================================
+
+  /**
+   * Inject with all fallback methods to find the correct location
+   */
+  const injectWithAllFallbacks = (shortcutsElement) => {
+    // Method 1: Look for starred pages container (primary location)
+    let targetContainer = document.querySelector("div.starred-pages");
+    if (targetContainer && targetContainer.parentElement) {
+      targetContainer.parentElement.insertBefore(
+        shortcutsElement,
+        targetContainer.nextSibling
+      );
+      return { success: true, method: "starred-pages sibling injection" };
+    }
+
+    // Method 2: Look for sidebar container
+    targetContainer = document.querySelector(
+      ".roam-sidebar-container.noselect"
+    );
+    if (targetContainer) {
+      targetContainer.appendChild(shortcutsElement);
+      return { success: true, method: "sidebar container append" };
+    }
+
+    // Method 3: Look for left sidebar by test id
+    targetContainer = document.querySelector(
+      '[data-testid="roam-left-sidebar"]'
+    );
+    if (targetContainer) {
+      targetContainer.appendChild(shortcutsElement);
+      return { success: true, method: "test-id left sidebar" };
+    }
+
+    // Method 4: General left sidebar
+    targetContainer = document.querySelector('[data-testid="left-sidebar"]');
+    if (targetContainer) {
+      targetContainer.appendChild(shortcutsElement);
+      return { success: true, method: "generic left sidebar" };
+    }
+
+    // Method 5: Fallback to body
+    document.body.appendChild(shortcutsElement);
+    shortcutsElement.style.position = "fixed";
+    shortcutsElement.style.bottom = "20px";
+    shortcutsElement.style.left = "20px";
+    shortcutsElement.style.zIndex = "9999";
+    return { success: true, method: "body fixed position fallback" };
+  };
+
+  // ===================================================================
+  // 🔄 REFRESH AND MAIN INJECTION
   // ===================================================================
 
   const refreshShortcutsUI = async () => {
+    console.log("🔄 Refreshing shortcuts UI...");
     await injectPersonalShortcuts();
   };
 
+  /**
+   * Main function to inject shortcuts into sidebar with proper styling
+   */
   const injectPersonalShortcuts = async () => {
-    try {
-      addScrollbarStyles();
+    console.log("🔗 Starting Personal Shortcuts injection...");
 
-      const existing = document.getElementById(
-        "roam-extension-personal-shortcuts"
+    // Add scrollbar styles first
+    addScrollbarStyles();
+
+    // Remove any existing shortcuts
+    const existing = document.getElementById(
+      "roam-extension-personal-shortcuts"
+    );
+    if (existing) {
+      existing.remove();
+      console.log("🧹 Removed existing shortcuts element");
+    }
+
+    // Get user shortcuts with retry logic
+    const shortcuts = await getUserShortcuts();
+    console.log(`📊 Found ${shortcuts.length} shortcuts:`, shortcuts);
+
+    // Create shortcuts element with original styling
+    const shortcutsElement = createShortcutsElement(shortcuts);
+
+    // Inject with fallbacks - ORIGINAL LOCATION LOGIC
+    const result = injectWithAllFallbacks(shortcutsElement);
+
+    if (result.success) {
+      console.log(
+        `✅ Personal Shortcuts injected successfully using ${result.method}`
       );
-      if (existing) {
-        existing.remove();
+
+      // Register for cleanup
+      if (window._extensionRegistry) {
+        window._extensionRegistry.elements.push(shortcutsElement);
       }
 
-      const shortcuts = await getUserShortcuts();
-      const shortcutsElement = createShortcutsElement(shortcuts);
-      const result = injectWithFallbacks(shortcutsElement);
-
-      if (result.success) {
-        if (window._extensionRegistry) {
-          window._extensionRegistry.elements.push(shortcutsElement);
-        }
-        return shortcutsElement;
-      } else {
-        console.error("❌ Extension 5: Failed to inject shortcuts widget");
-        return null;
-      }
-    } catch (error) {
-      console.error("❌ Extension 5: Error injecting shortcuts:", error);
+      return shortcutsElement;
+    } else {
+      console.error("❌ Failed to inject Personal Shortcuts with all methods");
       return null;
     }
   };
@@ -712,11 +751,13 @@
 
   const extension5 = {
     onload: async () => {
+      console.log("🎯 Extension 5: Personal Shortcuts Widget loading...");
+
       try {
         // Wait for Roam to be ready
         await new Promise((resolve) => setTimeout(resolve, 1000));
 
-        // Create the widget
+        // Create the widget with original UI
         await injectPersonalShortcuts();
 
         // Register utilities
@@ -754,20 +795,29 @@
           }
         });
 
-        // Register with platform
+        // Register self with platform
         platform.register(
           "personal-shortcuts",
           {
             utilities: personalShortcutsUtilities,
-            version: "1.0.0",
+            version: "1.0.3",
           },
           {
-            name: "Extension 5: Personal Shortcuts Widget",
-            description: "Clean shortcuts widget with add/remove functionality",
-            version: "1.0.0",
-            dependencies: ["utility-library"],
+            name: "Extension 5: Personal Shortcuts Widget (Original Design)",
+            description:
+              "Complete shortcuts widget with original UI design restored",
+            version: "1.0.3",
+            dependencies: ["utility-library", "user-authentication"],
           }
         );
+
+        console.log(
+          "✅ Extension 5: Personal Shortcuts Widget loaded successfully!"
+        );
+        console.log(
+          "💡 Try: Cmd+P → 'Shortcuts: Add Current Page' to add current page"
+        );
+        console.log("💡 Click [×] next to any shortcut to remove it");
 
         // Store cleanup function
         window._shortcutsCleanup = () => {
@@ -776,20 +826,24 @@
           );
           if (existing) {
             existing.remove();
+            console.log("🧹 Shortcuts cleaned up");
           }
         };
-
-        console.log("✅ Extension 5: Personal Shortcuts loaded successfully!");
       } catch (error) {
-        console.error("❌ Extension 5: Failed to load:", error);
+        console.error("❌ Extension 5 failed to load:", error);
       }
     },
 
     onunload: () => {
+      console.log("🔗 Personal Shortcuts unloading...");
+
+      // Custom cleanup
       if (window._shortcutsCleanup) {
         window._shortcutsCleanup();
         delete window._shortcutsCleanup;
       }
+
+      console.log("✅ Personal Shortcuts cleanup complete!");
     },
   };
 
@@ -797,10 +851,13 @@
   // 🚀 AUTO-START
   // ===================================================================
 
+  // Auto-load the extension
   extension5.onload();
 
   // Export for manual control
   window.Extension5 = extension5;
 
-  console.log("🎯 Extension 5: Personal Shortcuts initialized successfully!");
+  console.log(
+    "🎯 Extension 5: Personal Shortcuts Widget initialized with ORIGINAL design restored!"
+  );
 })();

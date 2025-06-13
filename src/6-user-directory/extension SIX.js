@@ -1,9 +1,11 @@
 // ===================================================================
-// Extension 6: User Directory + Timezones - Steps 1+2: Major Refactoring
-// STEP 1: Removed local TimezoneManager, using Extension 1.5 utility (~80 lines saved)
-// STEP 2: Removed manual modal creation, using Extension 1.5 utilities (~50 lines saved)
-// FIX: Using curated [[roam/graph members]] source of truth instead of all pages
-// TOTAL SAVINGS: ~130 lines of code eliminated
+// Extension 6: Clean User Directory + Timezones - Complete Rebuild
+// CLEAN: Uses ONLY Extension 1.5 exact functions, no filtering
+// Focus: Professional UI, clear placeholder distinction, real data display
+// ===================================================================
+
+// ===================================================================
+// 🌍 TIMEZONE INTELLIGENCE ENGINE - Professional Time Management
 // ===================================================================
 
 /**
@@ -25,6 +27,146 @@ const getFormattedGraphName = () => {
     return "Unknown Graph";
   }
 };
+
+/**
+ * Clean timezone parsing and calculation system
+ */
+class TimezoneManager {
+  constructor() {
+    // Common timezone abbreviations to IANA mapping
+    this.timezoneMap = {
+      EST: "America/New_York",
+      EDT: "America/New_York",
+      CST: "America/Chicago",
+      CDT: "America/Chicago",
+      MST: "America/Denver",
+      MDT: "America/Denver",
+      PST: "America/Los_Angeles",
+      PDT: "America/Los_Angeles",
+      GMT: "Europe/London",
+      BST: "Europe/London",
+      CET: "Europe/Paris",
+      CEST: "Europe/Paris",
+      JST: "Asia/Tokyo",
+      AEST: "Australia/Sydney",
+      AEDT: "Australia/Sydney",
+      IST: "Asia/Kolkata",
+      SGT: "Asia/Singapore",
+    };
+  }
+
+  /**
+   * Parse timezone string to IANA identifier
+   */
+  parseTimezone(timezoneString) {
+    if (!timezoneString) return null;
+
+    const cleaned = timezoneString.trim();
+
+    // Check if it's already an IANA identifier
+    if (cleaned.includes("/")) {
+      return this.validateTimezone(cleaned) ? cleaned : null;
+    }
+
+    // Check abbreviation mapping
+    const upperCased = cleaned.toUpperCase();
+    if (this.timezoneMap[upperCased]) {
+      return this.timezoneMap[upperCased];
+    }
+
+    // Handle UTC offsets like "GMT+1", "UTC-5"
+    const offsetMatch = cleaned.match(/^(GMT|UTC)([+-]\d{1,2})$/i);
+    if (offsetMatch) {
+      const offset = parseInt(offsetMatch[2]);
+      const offsetMap = {
+        "-8": "America/Los_Angeles",
+        "-7": "America/Denver",
+        "-6": "America/Chicago",
+        "-5": "America/New_York",
+        0: "UTC",
+        1: "Europe/Paris",
+        8: "Asia/Singapore",
+        9: "Asia/Tokyo",
+      };
+      return offsetMap[offset.toString()] || null;
+    }
+
+    return null;
+  }
+
+  /**
+   * Validate if timezone is supported
+   */
+  validateTimezone(timezone) {
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: timezone });
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Get current time in user's timezone
+   */
+  getCurrentTimeForUser(timezoneString) {
+    const timezone = this.parseTimezone(timezoneString);
+    if (!timezone) {
+      return {
+        timeString: "—",
+        isValid: false,
+        error: "Invalid timezone",
+      };
+    }
+
+    try {
+      const now = new Date();
+      const formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: timezone,
+        weekday: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      });
+
+      return {
+        timeString: formatter.format(now),
+        timezone: timezoneString,
+        ianaTimezone: timezone,
+        isValid: true,
+      };
+    } catch (error) {
+      return {
+        timeString: "—",
+        timezone: timezoneString,
+        isValid: false,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Get common timezones for dropdown
+   */
+  getCommonTimezones() {
+    return [
+      { value: "America/New_York", label: "Eastern Time (EST/EDT)" },
+      { value: "America/Chicago", label: "Central Time (CST/CDT)" },
+      { value: "America/Denver", label: "Mountain Time (MST/MDT)" },
+      { value: "America/Los_Angeles", label: "Pacific Time (PST/PDT)" },
+      { value: "UTC", label: "UTC (Coordinated Universal Time)" },
+      { value: "Europe/London", label: "London (GMT/BST)" },
+      { value: "Europe/Paris", label: "Central European Time" },
+      { value: "Asia/Tokyo", label: "Japan Standard Time" },
+      { value: "Asia/Shanghai", label: "China Standard Time" },
+      { value: "Asia/Kolkata", label: "India Standard Time" },
+      { value: "Australia/Sydney", label: "Australian Eastern Time" },
+    ];
+  }
+}
+
+// Global timezone manager instance
+const timezoneManager = new TimezoneManager();
 
 // ===================================================================
 // 👥 CLEAN USER PROFILE DATA COLLECTION - Using ONLY Extension 1.5 Exact Functions
@@ -98,14 +240,13 @@ const getUserProfileDataClean = async (username) => {
       (realDataFields.length / expectedFields.length) * 100
     );
 
-    // ✅ STEP 1: Get timezone information using Extension 1.5 utility
+    // Get timezone information if timezone exists and is real
     if (
       profileData.timezone &&
       profileData.timezone !== "__missing field__" &&
       profileData.timezone !== "__not yet entered__"
     ) {
-      const timezoneManager = platform.getUtility("timezoneManager");
-      profileData.timezoneInfo = timezoneManager.getCurrentTimeForTimezone(
+      profileData.timezoneInfo = timezoneManager.getCurrentTimeForUser(
         profileData.timezone
       );
     } else {
@@ -179,33 +320,17 @@ const createErrorProfile = (username, errorMessage) => {
 };
 
 /**
- * ✅ FIXED: Get all user profiles using curated member list
+ * Get all user profiles using clean extraction
  */
 const getAllUserProfilesClean = async () => {
   try {
     const platform = window.RoamExtensionSuite;
+    const getGraphMembers = platform.getUtility("getGraphMembers");
 
-    // ✅ FIX: Use curated source of truth instead of all pages
-    const getGraphMembersFromList = platform.getUtility(
-      "getGraphMembersFromList"
-    );
-
-    // Try to get members from [[roam/graph members]] page under Directory:: block
-    let members = getGraphMembersFromList("roam/graph members", "Directory");
-
-    // Fallback to generic detection if curated list is empty
-    if (!members || members.length === 0) {
-      console.warn(
-        "⚠️ No members found in [[roam/graph members]] Directory::, falling back to generic detection"
-      );
-      const getGraphMembers = platform.getUtility("getGraphMembers");
-      members = getGraphMembers();
-    }
-
+    const members = getGraphMembers();
     console.log(
-      `📊 CLEAN: Collecting profiles for ${members.length} curated graph members...`
+      `📊 CLEAN: Collecting profiles for ${members.length} graph members...`
     );
-    console.log("👥 Members:", members);
 
     const profiles = await Promise.all(
       members.map(async (username) => {
@@ -216,9 +341,7 @@ const getAllUserProfilesClean = async () => {
     // Sort by username
     profiles.sort((a, b) => a.username.localeCompare(b.username));
 
-    console.log(
-      `✅ CLEAN: Collected ${profiles.length} user profiles from curated list`
-    );
+    console.log(`✅ CLEAN: Collected ${profiles.length} user profiles`);
     return profiles;
   } catch (error) {
     console.error("❌ CLEAN: Failed to collect user profiles:", error);
@@ -283,74 +406,117 @@ const initializeUserProfile = async (username) => {
 };
 
 // ===================================================================
-// 🎨 PROFESSIONAL USER DIRECTORY MODAL - STEP 2: Using Extension 1.5 Modal Utilities
+// 🎨 PROFESSIONAL USER DIRECTORY MODAL - Clean UI with Placeholder Distinction
 // ===================================================================
 
 /**
- * ✅ STEP 2: Create and display professional user directory modal using Extension 1.5 utilities
+ * Create and display professional user directory modal
  */
 const showUserDirectoryModalClean = async () => {
   try {
-    console.log(
-      "📋 Opening User Directory using Extension 1.5 modal utilities..."
-    );
+    console.log("📋 Opening User Directory...");
 
-    const platform = window.RoamExtensionSuite;
-    const modalUtilities = platform.getUtility("modalUtilities");
-
-    if (!modalUtilities) {
-      console.error(
-        "❌ Modal utilities not found! Please ensure Extension 1.5 Phase 1 is loaded."
-      );
-      return;
+    // Remove existing modal
+    const existingModal = document.getElementById("clean-user-directory-modal");
+    if (existingModal) {
+      existingModal.remove();
     }
 
-    // ✅ STEP 2: Create modal using Extension 1.5 utilities (saves ~30 lines)
-    const modal = modalUtilities.createModal("clean-user-directory-modal", {
-      closeOnEscape: true,
-      closeOnBackdrop: true,
-      zIndex: 10000,
-    });
+    // Create modal container
+    const modal = document.createElement("div");
+    modal.id = "clean-user-directory-modal";
+    modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    `;
 
-    // ✅ STEP 2: Create modal content using utilities (saves ~15 lines)
-    const content = modalUtilities.createModalContent({
-      width: "90%",
-      maxWidth: "1200px",
-      maxHeight: "90%",
-    });
+    // Create modal content
+    const content = document.createElement("div");
+    content.style.cssText = `
+      background: white;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 1200px;
+      max-height: 90%;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+      display: flex;
+      flex-direction: column;
+    `;
 
-    // Show loading state first
-    const graphName = getFormattedGraphName();
+    // Show loading state
     content.innerHTML = `
       <div style="padding: 40px; text-align: center;">
         <div style="font-size: 16px; color: #666;">Loading user directory...</div>
-        <div style="margin-top: 10px; font-size: 14px; color: #999;">Using Extension 1.5 utilities • Modal + Timezone management</div>
+        <div style="margin-top: 10px; font-size: 14px; color: #999;">Using Extension 1.5 exact functions • No filtering</div>
       </div>
     `;
 
-    // Append modal to DOM
     modal.appendChild(content);
     document.body.appendChild(modal);
 
     // Register for cleanup
-    if (window._extensionRegistry && window._extensionRegistry.elements) {
-      window._extensionRegistry.elements.push(modal);
-    }
+    window._extensionRegistry.elements.push(modal);
+
+    // Close modal handlers
+    const closeModal = () => modal.remove();
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeModal();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeModal();
+    });
 
     // Load profiles using clean extraction
     const profiles = await getAllUserProfilesClean();
+    const platform = window.RoamExtensionSuite;
     const currentUser = platform.getUtility("getAuthenticatedUser")();
+    const graphName = getFormattedGraphName();
 
-    // ✅ STEP 2: Create modal header using utilities (saves ~10 lines)
-    const header = modalUtilities.createModalHeader(
-      `👥 User Directory: ${graphName}`,
-      `${
-        profiles.length
-      } curated members • Extension 1.5 utilities • ${new Date().toLocaleTimeString()}`
-    );
-
-    // Create table content
-    const tableContent = `
+    // Render complete modal
+    content.innerHTML = `
+      <div style="
+        padding: 24px 32px 20px;
+        border-bottom: 1px solid #e1e5e9;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      ">
+        <div>
+          <h2 style="margin: 0; font-size: 20px; font-weight: 600; color: #1a202c;">
+            👥 User Directory: ${graphName}
+          </h2>
+          <div style="margin-top: 4px; font-size: 14px; color: #666;">
+            ${
+              profiles.length
+            } graph members • Extension 1.5 exact functions • ${new Date().toLocaleTimeString()}
+          </div>
+        </div>
+        <button 
+          onclick="this.closest('#clean-user-directory-modal').remove()"
+          style="
+            background: none;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #666;
+          "
+        >
+          Close
+        </button>
+      </div>
+      
       <div style="
         flex: 1;
         overflow: auto;
@@ -381,10 +547,7 @@ const showUserDirectoryModalClean = async () => {
           </tbody>
         </table>
       </div>
-    `;
-
-    // Create footer
-    const footer = `
+      
       <div style="
         padding: 16px 32px;
         border-top: 1px solid #e1e5e9;
@@ -393,20 +556,14 @@ const showUserDirectoryModalClean = async () => {
         color: #666;
         text-align: center;
       ">
-        🚀 Extension 1.5 utilities • Modal + Timezone + Curated member list • ~130 lines saved
+        🧹 Extension 1.5 exact functions • No filtering • Clear placeholder distinction
       </div>
     `;
-
-    // Assemble complete modal
-    content.innerHTML = "";
-    content.appendChild(header);
-    content.insertAdjacentHTML("beforeend", tableContent);
-    content.insertAdjacentHTML("beforeend", footer);
 
     // Start real-time clock updates
     startRealtimeClockUpdatesClean(modal);
 
-    console.log("✅ User Directory modal opened using Extension 1.5 utilities");
+    console.log("✅ User Directory modal opened");
   } catch (error) {
     console.error("❌ Failed to show clean user directory:", error);
   }
@@ -518,13 +675,10 @@ const createCompletenessIndicator = (completeness) => {
 };
 
 /**
- * ✅ STEP 1: Start real-time clock updates using Extension 1.5 timezone utility
+ * Start real-time clock updates for the modal
  */
 const startRealtimeClockUpdatesClean = (modal) => {
   const updateClocks = () => {
-    const platform = window.RoamExtensionSuite;
-    const timezoneManager = platform.getUtility("timezoneManager");
-
     const timeElements = modal.querySelectorAll(".clean-timezone-time");
     timeElements.forEach((element) => {
       const timezone = element.getAttribute("data-timezone");
@@ -533,7 +687,7 @@ const startRealtimeClockUpdatesClean = (modal) => {
         timezone !== "__missing field__" &&
         timezone !== "__not yet entered__"
       ) {
-        const timeInfo = timezoneManager.getCurrentTimeForTimezone(timezone);
+        const timeInfo = timezoneManager.getCurrentTimeForUser(timezone);
         if (timeInfo.isValid) {
           element.textContent = timeInfo.timeString;
         }
@@ -663,9 +817,7 @@ const addNavigationButtonsClean = () => {
 
     // Append to target
     targetElement.appendChild(directoryButton);
-    if (window._extensionRegistry && window._extensionRegistry.elements) {
-      window._extensionRegistry.elements.push(directoryButton);
-    }
+    window._extensionRegistry.elements.push(directoryButton);
 
     console.log(`✅ CLEAN: Show Directory button added to: ${selectorUsed}`);
   } catch (error) {
@@ -757,196 +909,49 @@ const showPlaceholderDistinction = async () => {
 };
 
 /**
- * ✅ STEP 1: Test Extension 1.5 timezone integration
+ * Run comprehensive clean system tests
  */
-const testTimezoneIntegration = async () => {
-  console.group("🌍 Testing Extension 1.5 Timezone Integration");
+const runCleanSystemTests = async () => {
+  console.group("🧪 CLEAN: System Tests");
 
   try {
     const platform = window.RoamExtensionSuite;
-    const timezoneManager = platform.getUtility("timezoneManager");
+    const getGraphMembers = platform.getUtility("getGraphMembers");
+    const currentUser = platform.getUtility("getAuthenticatedUser")();
 
-    if (!timezoneManager) {
-      console.error("❌ TimezoneManager utility not found!");
-      return;
+    // Test 1: Graph Members Detection
+    console.log("Test 1: Graph Members Detection");
+    const members = getGraphMembers();
+    console.log(`📋 Found ${members.length} members:`, members);
+
+    // Test 2: Clean Data Extraction
+    console.log("Test 2: Clean Data Extraction");
+    for (const username of members.slice(0, 3)) {
+      // Limit for testing
+      await testCleanDataExtraction(username);
     }
 
-    console.log("✅ TimezoneManager utility loaded successfully");
-
-    // Test timezone parsing
+    // Test 3: Timezone Management
+    console.log("Test 3: Timezone Management");
     const testTimezones = [
       "EST",
       "America/New_York",
       "PST",
       "GMT+1",
       "__not yet entered__",
-      "invalid-timezone",
     ];
-
     testTimezones.forEach((tz) => {
-      const timeInfo = timezoneManager.getCurrentTimeForTimezone(tz);
+      const timeInfo = timezoneManager.getCurrentTimeForUser(tz);
       console.log(
         `🕐 ${tz}: ${timeInfo.timeString} (${
-          timeInfo.isValid ? "✅ valid" : "❌ invalid"
+          timeInfo.isValid ? "valid" : "invalid"
         })`
       );
     });
 
-    // Test common timezones
-    const commonTimezones = timezoneManager.getCommonTimezones();
-    console.log(`📋 Common timezones available: ${commonTimezones.length}`);
-
-    console.log("🎉 Extension 1.5 timezone integration working perfectly!");
+    console.log("✅ Clean system tests completed");
   } catch (error) {
-    console.error("❌ Timezone integration test failed:", error);
-  }
-
-  console.groupEnd();
-};
-
-/**
- * ✅ STEP 2: Test Extension 1.5 modal integration
- */
-const testModalIntegration = async () => {
-  console.group("🪟 Testing Extension 1.5 Modal Integration");
-
-  try {
-    const platform = window.RoamExtensionSuite;
-    const modalUtilities = platform.getUtility("modalUtilities");
-
-    if (!modalUtilities) {
-      console.error("❌ Modal utilities not found!");
-      return;
-    }
-
-    console.log("✅ Modal utilities loaded successfully");
-
-    // Test modal creation
-    const testModal = modalUtilities.createModal("test-modal", {
-      closeOnEscape: true,
-      closeOnBackdrop: true,
-    });
-
-    const testContent = modalUtilities.createModalContent({
-      width: "400px",
-      maxWidth: "500px",
-    });
-
-    const testHeader = modalUtilities.createModalHeader(
-      "🧪 Test Modal",
-      "Extension 1.5 modal utilities test"
-    );
-
-    testContent.appendChild(testHeader);
-    testContent.insertAdjacentHTML(
-      "beforeend",
-      `
-      <div style="padding: 20px; text-align: center;">
-        <p>This modal was created using Extension 1.5 utilities!</p>
-        <button onclick="this.closest('#test-modal').remove()" 
-                style="padding: 8px 16px; background: #06b6d4; color: white; border: none; border-radius: 4px; cursor: pointer;">
-          Close Test Modal
-        </button>
-      </div>
-    `
-    );
-
-    testModal.appendChild(testContent);
-    document.body.appendChild(testModal);
-
-    // Auto-close after 3 seconds
-    setTimeout(() => {
-      if (document.getElementById("test-modal")) {
-        document.getElementById("test-modal").remove();
-      }
-    }, 3000);
-
-    console.log("🎉 Extension 1.5 modal integration working perfectly!");
-    console.log("📝 Test modal created and will auto-close in 3 seconds");
-  } catch (error) {
-    console.error("❌ Modal integration test failed:", error);
-  }
-
-  console.groupEnd();
-};
-
-/**
- * ✅ FIX: Test curated member list functionality
- */
-const testCuratedMemberList = async () => {
-  console.group("👥 Testing Curated Member List");
-
-  try {
-    const platform = window.RoamExtensionSuite;
-    const getGraphMembersFromList = platform.getUtility(
-      "getGraphMembersFromList"
-    );
-
-    if (!getGraphMembersFromList) {
-      console.error("❌ getGraphMembersFromList utility not found!");
-      return;
-    }
-
-    console.log("✅ getGraphMembersFromList utility loaded successfully");
-
-    // Test getting members from curated list
-    const curatedMembers = getGraphMembersFromList(
-      "roam/graph members",
-      "Directory"
-    );
-    console.log(
-      `📋 Found ${curatedMembers.length} curated members:`,
-      curatedMembers
-    );
-
-    // Test fallback to generic detection
-    const getGraphMembers = platform.getUtility("getGraphMembers");
-    const allMembers = getGraphMembers();
-    console.log(
-      `📋 Generic detection found ${allMembers.length} members:`,
-      allMembers.slice(0, 5),
-      "..."
-    );
-
-    console.log("🎉 Curated member list integration working!");
-  } catch (error) {
-    console.error("❌ Curated member list test failed:", error);
-  }
-
-  console.groupEnd();
-};
-
-/**
- * Run comprehensive clean system tests
- */
-const runCleanSystemTests = async () => {
-  console.group("🧪 CLEAN: System Tests (Steps 1+2)");
-
-  try {
-    // Test 1: Curated Member List
-    console.log("Test 1: Curated Member List");
-    await testCuratedMemberList();
-
-    // Test 2: Extension 1.5 Timezone Integration
-    console.log("Test 2: Extension 1.5 Timezone Integration");
-    await testTimezoneIntegration();
-
-    // Test 3: Extension 1.5 Modal Integration
-    console.log("Test 3: Extension 1.5 Modal Integration");
-    await testModalIntegration();
-
-    // Test 4: Clean Data Extraction (limited sample)
-    console.log("Test 4: Clean Data Extraction");
-    const platform = window.RoamExtensionSuite;
-    const currentUser = platform.getUtility("getAuthenticatedUser")();
-    if (currentUser) {
-      await testCleanDataExtraction(currentUser.displayName);
-    }
-
-    console.log("✅ All system tests completed successfully!");
-    console.log("🚀 Steps 1+2 refactoring working perfectly");
-  } catch (error) {
-    console.error("❌ System tests failed:", error);
+    console.error("❌ Clean system test failed:", error);
   }
 
   console.groupEnd();
@@ -958,9 +963,7 @@ const runCleanSystemTests = async () => {
 
 export default {
   onload: async ({ extensionAPI }) => {
-    console.log(
-      "👥 User Directory + Timezones starting (Steps 1+2: Timezone + Modal + Member List)..."
-    );
+    console.log("👥 User Directory + Timezones starting...");
 
     // ✅ VERIFY DEPENDENCIES
     if (!window.RoamExtensionSuite) {
@@ -973,7 +976,7 @@ export default {
     const platform = window.RoamExtensionSuite;
 
     const requiredDependencies = [
-      "utility-library", // Extension 1.5 with enhanced utilities
+      "utility-library", // Extension 1.5 with exact functions
       "user-authentication", // Extension 2
       "configuration-manager", // Extension 3
     ];
@@ -987,30 +990,6 @@ export default {
       }
     }
 
-    // ✅ VERIFY REQUIRED UTILITIES
-    const timezoneManager = platform.getUtility("timezoneManager");
-    const modalUtilities = platform.getUtility("modalUtilities");
-    const getGraphMembersFromList = platform.getUtility(
-      "getGraphMembersFromList"
-    );
-
-    if (!timezoneManager) {
-      console.error("❌ TimezoneManager utility not found in Extension 1.5!");
-      return;
-    }
-    if (!modalUtilities) {
-      console.error("❌ Modal utilities not found in Extension 1.5!");
-      return;
-    }
-    if (!getGraphMembersFromList) {
-      console.error(
-        "❌ getGraphMembersFromList utility not found in Extension 1.5!"
-      );
-      return;
-    }
-
-    console.log("✅ All Extension 1.5 utilities found - using shared logic");
-
     // 🔧 REGISTER CLEAN SERVICES
     const cleanDirectoryServices = {
       // Core data extraction
@@ -1023,12 +1002,12 @@ export default {
       addNavigationButtonsClean: addNavigationButtonsClean,
       startNavigationMonitoringClean: startNavigationMonitoringClean,
 
+      // Timezone management
+      timezoneManager: timezoneManager,
+
       // Testing utilities
       testCleanDataExtraction: testCleanDataExtraction,
       showPlaceholderDistinction: showPlaceholderDistinction,
-      testTimezoneIntegration: testTimezoneIntegration,
-      testModalIntegration: testModalIntegration,
-      testCuratedMemberList: testCuratedMemberList,
       runCleanSystemTests: runCleanSystemTests,
     };
 
@@ -1044,22 +1023,6 @@ export default {
       {
         label: "User Directory: Show User Directory",
         callback: showUserDirectoryModalClean,
-      },
-      {
-        label: "User Directory: Test Extension 1.5 Integration",
-        callback: runCleanSystemTests,
-      },
-      {
-        label: "User Directory: Test Curated Member List",
-        callback: testCuratedMemberList,
-      },
-      {
-        label: "User Directory: Test Modal Integration",
-        callback: testModalIntegration,
-      },
-      {
-        label: "User Directory: Test Timezone Integration",
-        callback: testTimezoneIntegration,
       },
       {
         label: "User Directory: Test My Data Extraction",
@@ -1094,6 +1057,10 @@ export default {
         },
       },
       {
+        label: "User Directory: Run System Tests",
+        callback: runCleanSystemTests,
+      },
+      {
         label: "User Directory: Add Show Directory Button",
         callback: addNavigationButtonsClean,
       },
@@ -1109,40 +1076,35 @@ export default {
       "clean-user-directory",
       {
         services: cleanDirectoryServices,
-        version: "6.6.0-steps-1-2",
+        timezoneManager: timezoneManager,
+        version: "6.4.0",
       },
       {
-        name: "CLEAN User Directory (Steps 1+2: Timezone + Modal + Members)",
+        name: "CLEAN User Directory + Timezones",
         description:
-          "Major refactor: Using Extension 1.5 utilities for timezone, modal, and curated member list",
-        version: "6.6.0-steps-1-2",
+          "Clean rebuild using Extension 1.5 exact functions, clear placeholder distinction",
+        version: "6.4.0",
         dependencies: requiredDependencies,
       }
     );
 
     // 🎉 STARTUP COMPLETE
     const currentUser = platform.getUtility("getAuthenticatedUser")();
-    console.log("✅ User Directory Steps 1+2 loaded successfully!");
-    console.log(
-      "🌍 STEP 1: TimezoneManager using Extension 1.5 (~80 lines saved)"
-    );
-    console.log(
-      "🪟 STEP 2: Modal creation using Extension 1.5 (~50 lines saved)"
-    );
-    console.log("👥 FIX: Using curated [[roam/graph members]] source of truth");
-    console.log("📊 TOTAL: ~130 lines of code eliminated");
-    console.log(
-      "🔄 NEXT: Navigation utilities, profile analysis, avatar processing"
-    );
+    console.log("✅ User Directory loaded successfully!");
+    console.log("🧹 CLEAN: Uses ONLY Extension 1.5 exact functions");
+    console.log("🧹 CLEAN: No filtering - shows actual data");
+    console.log("🧹 CLEAN: Clear placeholder distinction");
     console.log(`👤 Current user: ${currentUser?.displayName}`);
     console.log(
-      '💡 Try: Cmd+P → "User Directory: Test Extension 1.5 Integration"'
+      '💡 Try: Cmd+P → "User Directory: Show Placeholder Distinction"'
     );
 
-    // Auto-test integration
+    // Show current user's profile structure
     setTimeout(async () => {
-      console.log("🔍 Auto-testing Steps 1+2 integration...");
-      await runCleanSystemTests();
+      if (currentUser) {
+        console.log("🔍 Auto-testing current user data extraction...");
+        await testCleanDataExtraction(currentUser.displayName);
+      }
     }, 2000);
   },
 
@@ -1150,9 +1112,7 @@ export default {
     console.log("👥 User Directory unloading...");
 
     // Clean up modals
-    const modals = document.querySelectorAll(
-      "#clean-user-directory-modal, #test-modal"
-    );
+    const modals = document.querySelectorAll("#clean-user-directory-modal");
     modals.forEach((modal) => modal.remove());
 
     // Navigation helper cleanup
