@@ -313,134 +313,131 @@ async function extension65_deployCompleteAvatarSystem() {
 async function deploySyncAvatarFunction() {
   console.log("   🔧 Creating syncAvatar function...");
 
-  async function deploySyncAvatarFunction() {
-    console.log("   🔧 Creating syncAvatar function...");
+  try {
+    // Create the WORKING syncAvatar function
+    window.syncAvatar = async function () {
+      console.log("🚀 STARTING FULL syncAvatar - Clean Slate Version");
 
-    try {
-      // Create the WORKING syncAvatar function
-      window.syncAvatar = async function () {
-        console.log("🚀 STARTING FULL syncAvatar - Clean Slate Version");
+      try {
+        // Get current user data
+        const userUID = roamAlphaAPI.user.uid();
+        const userInfo = roamAlphaAPI.pull("[*]", [":user/uid", userUID]);
+        const userDisplayName = userInfo[":user/display-name"];
 
-        try {
-          // Get current user data
-          const userUID = roamAlphaAPI.user.uid();
-          const userInfo = roamAlphaAPI.pull("[*]", [":user/uid", userUID]);
-          const userDisplayName = userInfo[":user/display-name"];
+        const displayPage = userInfo[":user/display-page"];
+        const pageDbId = displayPage[":db/id"];
+        const fullPageData = roamAlphaAPI.pull("[*]", pageDbId);
+        const homePageUid = fullPageData[":block/uid"];
 
-          const displayPage = userInfo[":user/display-page"];
-          const pageDbId = displayPage[":db/id"];
-          const fullPageData = roamAlphaAPI.pull("[*]", pageDbId);
-          const homePageUid = fullPageData[":block/uid"];
+        console.log("✅ User:", userDisplayName);
+        console.log("✅ Home page UID:", homePageUid);
 
-          console.log("✅ User:", userDisplayName);
-          console.log("✅ Home page UID:", homePageUid);
+        // Extract fresh avatar image URL
+        const platform = window.RoamExtensionSuite;
+        const findNestedDataValuesExact = platform.getUtility(
+          "findNestedDataValuesExact"
+        );
+        const myInfoData = findNestedDataValuesExact(homePageUid, "My Info");
 
-          // Extract fresh avatar image URL
-          const platform = window.RoamExtensionSuite;
-          const findNestedDataValuesExact = platform.getUtility(
-            "findNestedDataValuesExact"
-          );
-          const myInfoData = findNestedDataValuesExact(homePageUid, "My Info");
+        if (!myInfoData || !myInfoData.avatar) {
+          throw new Error("No avatar found in My Info structure");
+        }
 
-          if (!myInfoData || !myInfoData.avatar) {
-            throw new Error("No avatar found in My Info structure");
-          }
-
-          // Navigate to avatar block and extract image URL
-          const myInfoChildren = roamAlphaAPI.data
-            .q(
+        // Navigate to avatar block and extract image URL
+        const myInfoChildren = roamAlphaAPI.data
+          .q(
+            `
+                [:find ?uid ?string ?order
+                 :where 
+                 [?parent :block/uid "${homePageUid}"]
+                 [?parent :block/children ?child]
+                 [?child :block/uid ?uid]
+                 [?child :block/string ?string]
+                 [?child :block/order ?order]]
               `
-                  [:find ?uid ?string ?order
-                   :where 
-                   [?parent :block/uid "${homePageUid}"]
-                   [?parent :block/children ?child]
-                   [?child :block/uid ?uid]
-                   [?child :block/string ?string]
-                   [?child :block/order ?order]]
-                `
-            )
-            .sort((a, b) => a[2] - b[2]);
+          )
+          .sort((a, b) => a[2] - b[2]);
 
-          const myInfoBlock = myInfoChildren.find(([uid, text]) =>
-            text.toLowerCase().includes("my info")
-          );
+        const myInfoBlock = myInfoChildren.find(([uid, text]) =>
+          text.toLowerCase().includes("my info")
+        );
 
-          const avatarParentChildren = roamAlphaAPI.data
-            .q(
+        const avatarParentChildren = roamAlphaAPI.data
+          .q(
+            `
+                [:find ?uid ?string ?order
+                 :where 
+                 [?parent :block/uid "${myInfoBlock[0]}"]
+                 [?parent :block/children ?child]
+                 [?child :block/uid ?uid]
+                 [?child :block/string ?string]
+                 [?child :block/order ?order]]
               `
-                  [:find ?uid ?string ?order
-                   :where 
-                   [?parent :block/uid "${myInfoBlock[0]}"]
-                   [?parent :block/children ?child]
-                   [?child :block/uid ?uid]
-                   [?child :block/string ?string]
-                   [?child :block/order ?order]]
-                `
-            )
-            .sort((a, b) => a[2] - b[2]);
+          )
+          .sort((a, b) => a[2] - b[2]);
 
-          const avatarBlock = avatarParentChildren.find(([uid, text]) =>
-            text.toLowerCase().includes("avatar")
-          );
+        const avatarBlock = avatarParentChildren.find(([uid, text]) =>
+          text.toLowerCase().includes("avatar")
+        );
 
-          const avatarChildren = roamAlphaAPI.data
-            .q(
+        const avatarChildren = roamAlphaAPI.data
+          .q(
+            `
+                [:find ?uid ?string ?order
+                 :where 
+                 [?parent :block/uid "${avatarBlock[0]}"]
+                 [?parent :block/children ?child]
+                 [?child :block/uid ?uid]
+                 [?child :block/string ?string]
+                 [?child :block/order ?order]]
               `
-                  [:find ?uid ?string ?order
-                   :where 
-                   [?parent :block/uid "${avatarBlock[0]}"]
-                   [?parent :block/children ?child]
-                   [?child :block/uid ?uid]
-                   [?child :block/string ?string]
-                   [?child :block/order ?order]]
-                `
-            )
-            .sort((a, b) => a[2] - b[2]);
+          )
+          .sort((a, b) => a[2] - b[2]);
 
-          const avatarChildUid = avatarChildren[0][0];
-          const extractImageUrls = platform.getUtility("extractImageUrls");
-          const imageUrls = extractImageUrls(avatarChildUid);
-          const imageURL = imageUrls[0];
+        const avatarChildUid = avatarChildren[0][0];
+        const extractImageUrls = platform.getUtility("extractImageUrls");
+        const imageUrls = extractImageUrls(avatarChildUid);
+        const imageURL = imageUrls[0];
 
-          console.log(
-            "✅ Fresh image URL extracted:",
-            imageURL.substring(0, 50) + "..."
-          );
+        console.log(
+          "✅ Fresh image URL extracted:",
+          imageURL.substring(0, 50) + "..."
+        );
 
-          // Clean slate CSS update
-          const cascadeToBlock = platform.getUtility("cascadeToBlock");
-          const parentBlockUid = await cascadeToBlock(
-            "roam/css",
-            ["**User Avatars:**", `${userDisplayName}:`],
-            true
-          );
+        // Clean slate CSS update
+        const cascadeToBlock = platform.getUtility("cascadeToBlock");
+        const parentBlockUid = await cascadeToBlock(
+          "roam/css",
+          ["**User Avatars:**", `${userDisplayName}:`],
+          true
+        );
 
-          console.log("✅ CSS parent block:", parentBlockUid);
+        console.log("✅ CSS parent block:", parentBlockUid);
 
-          // Delete all existing CSS blocks (CLEAN SLATE)
-          const existingChildren = roamAlphaAPI.data.q(`
-                  [:find ?uid ?string
-                   :where 
-                   [?parent :block/uid "${parentBlockUid}"]
-                   [?parent :block/children ?child]
-                   [?child :block/uid ?uid]
-                   [?child :block/string ?string]]
-                `);
+        // Delete all existing CSS blocks (CLEAN SLATE)
+        const existingChildren = roamAlphaAPI.data.q(`
+                [:find ?uid ?string
+                 :where 
+                 [?parent :block/uid "${parentBlockUid}"]
+                 [?parent :block/children ?child]
+                 [?child :block/uid ?uid]
+                 [?child :block/string ?string]]
+              `);
 
-          console.log(
-            `🗑️  Deleting ${existingChildren.length} existing CSS blocks...`
-          );
+        console.log(
+          `🗑️  Deleting ${existingChildren.length} existing CSS blocks...`
+        );
 
-          // Delete all existing blocks
-          for (const [blockUid, content] of existingChildren) {
-            await roamAlphaAPI.data.block.delete({ block: { uid: blockUid } });
-            console.log(`🗑️  Deleted: ${blockUid}`);
-          }
+        // Delete all existing blocks
+        for (const [blockUid, content] of existingChildren) {
+          await roamAlphaAPI.data.block.delete({ block: { uid: blockUid } });
+          console.log(`🗑️  Deleted: ${blockUid}`);
+        }
 
-          // Create fresh CSS with NEW image URL
-          console.log("📝 Creating fresh CSS block with NEW image...");
+        // Create fresh CSS with NEW image URL
+        console.log("📝 Creating fresh CSS block with NEW image...");
 
-          const cssTemplate = `/* Updated CSS - Complete Avatar Styling */
+        const cssTemplate = `/* Updated CSS - Complete Avatar Styling */
 span.rm-page-ref--tag[data-tag="[USERNAME]"] {
     display: inline-flex !important;
     color: transparent !important;
@@ -478,64 +475,62 @@ span.rm-page-ref--tag[data-tag="[USERNAME]"]:hover::before {
     transform: scale(1.02) !important;
 }`;
 
-          const finalCSS = cssTemplate
-            .replace(/\[USERNAME\]/g, userDisplayName)
-            .replace(/\[IMAGE_URL\]/g, imageURL);
+        const finalCSS = cssTemplate
+          .replace(/\[USERNAME\]/g, userDisplayName)
+          .replace(/\[IMAGE_URL\]/g, imageURL);
 
-          const codeBlockContent = `\`\`\`css
+        const codeBlockContent = `\`\`\`css
 ${finalCSS}
 \`\`\``;
 
-          // Create ONE fresh block with NEW image
-          await roamAlphaAPI.data.block.create({
-            location: {
-              "parent-uid": parentBlockUid,
-              order: 0,
-            },
-            block: {
-              string: codeBlockContent,
-            },
-          });
+        // Create ONE fresh block with NEW image
+        await roamAlphaAPI.data.block.create({
+          location: {
+            "parent-uid": parentBlockUid,
+            order: 0,
+          },
+          block: {
+            string: codeBlockContent,
+          },
+        });
 
-          console.log("✅ Fresh CSS block created with NEW image!");
+        console.log("✅ Fresh CSS block created with NEW image!");
 
-          console.log("\n🎉 FULL SYNC COMPLETE!");
-          console.log("✅ User:", userDisplayName);
-          console.log("✅ Fresh Image URL:", imageURL.substring(0, 50) + "...");
-          console.log(
-            "🧪 Try typing #[[" +
-              userDisplayName +
-              "]] to see your UPDATED avatar!"
-          );
-          console.log("🧹 Old CSS blocks deleted, fresh block created!");
+        console.log("\n🎉 FULL SYNC COMPLETE!");
+        console.log("✅ User:", userDisplayName);
+        console.log("✅ Fresh Image URL:", imageURL.substring(0, 50) + "...");
+        console.log(
+          "🧪 Try typing #[[" +
+            userDisplayName +
+            "]] to see your UPDATED avatar!"
+        );
+        console.log("🧹 Old CSS blocks deleted, fresh block created!");
 
-          return {
-            success: true,
-            userDisplayName,
-            imageURL,
-            clearedBlocks: existingChildren.length,
-          };
-        } catch (error) {
-          console.log("\n❌ FULL SYNC FAILED:", error.message);
-          console.log("Stack:", error.stack);
-          return {
-            success: false,
-            error: error.message,
-          };
-        }
-      };
+        return {
+          success: true,
+          userDisplayName,
+          imageURL,
+          clearedBlocks: existingChildren.length,
+        };
+      } catch (error) {
+        console.log("\n❌ FULL SYNC FAILED:", error.message);
+        console.log("Stack:", error.stack);
+        return {
+          success: false,
+          error: error.message,
+        };
+      }
+    };
 
-      console.log("   ✅ syncAvatar function attached to window object");
-      return true;
-    } catch (functionCreationError) {
-      console.log(
-        "   ❌ Error creating syncAvatar function:",
-        functionCreationError
-      );
-      return false;
-    }
+    console.log("   ✅ syncAvatar function attached to window object");
+    return true;
+  } catch (functionCreationError) {
+    console.log(
+      "   ❌ Error creating syncAvatar function:",
+      functionCreationError
+    );
+    return false;
   }
-  console.log("   ✅ syncAvatar function attached to window object");
 }
 
 // =================================================================
@@ -1078,7 +1073,6 @@ function createBulletproofTooltipsFor_${userDisplayName.replace(
     /\s+/g,
     "_"
   )}() {
-    console.log("🛡️ Creating BULLETPROOF tooltips for ${userDisplayName}...");
     
     // Global tooltip registry for tracking
     window.activeTooltips = window.activeTooltips || new Set();

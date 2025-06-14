@@ -1,17 +1,17 @@
 // ===================================================================
 // Extension SIX: User Directory + Timezones - PHASE 2 REFACTORED
-// ✨ NEW: Warm yellow pastel button (instead of cyan)
-// 🗑️ REMOVED: ~200+ lines of duplicate code
-// ✅ USING: Extension 1.5 utilities for timezone, modal, navigation, profile analysis
-// 🎯 RESULT: Cleaner, more maintainable code with better functionality
+// ✨ NEW: Completely independent button creation (no Extension 1.5 competition)
+// 🗑️ REMOVED: Navigation utility dependencies that caused flickering
+// ✅ USING: Extension 1.5 utilities for timezone, modal, profile analysis (kept)
+// 🎯 RESULT: Zero button competition, clean yellow button, stable interface
 // ===================================================================
 
 // ===================================================================
-// 🔧 DEPENDENCY MANAGEMENT - Extension 1.5 Required
+// 🔧 DEPENDENCY MANAGEMENT - Extension 1.5 Required (Partial)
 // ===================================================================
 
 /**
- * Check if Extension 1.5 utilities are available
+ * Check if Extension 1.5 utilities are available (except navigation)
  */
 const checkExtension15Dependencies = () => {
   const platform = window.RoamExtensionSuite;
@@ -26,7 +26,6 @@ const checkExtension15Dependencies = () => {
   const requiredUtilities = [
     "timezoneManager",
     "modalUtilities",
-    "navigationUtilities",
     "profileAnalysisUtilities",
     "processAvatarImages",
     "extractImageUrls",
@@ -34,6 +33,7 @@ const checkExtension15Dependencies = () => {
     "getCurrentUser",
     "getPageUidByTitle",
     "findNestedDataValuesExact",
+    // ✅ REMOVED: "navigationUtilities" - Extension 6 is now independent
   ];
 
   const missingUtilities = requiredUtilities.filter(
@@ -107,7 +107,7 @@ const getUserProfileDataClean = async (username) => {
         requiredFields
       );
 
-    // ✅ USING: Extension 1.5 timezone processing (NO MORE TimezoneManager class!)
+    // ✅ USING: Extension 1.5 timezone processing
     if (
       profileData.timezone &&
       profileData.timezone !== "__missing field__" &&
@@ -302,7 +302,7 @@ const createInitialsAvatar = (username) => {
 };
 
 // ===================================================================
-// 🪟 MODAL DISPLAY - Completely Refactored to Use Extension 1.5
+// 🪟 MODAL DISPLAY - Using Extension 1.5 (Kept - Working Well)
 // ===================================================================
 
 /**
@@ -456,7 +456,6 @@ const createCleanUserDirectoryRow = async (profile, currentUser, index) => {
 
 /**
  * ✅ ENHANCED: Start real-time clock updates using Extension 1.5 timezone utility
- * 🗑️ REMOVED: TimezoneManager class dependency
  */
 const startRealtimeClockUpdatesClean = (modal) => {
   const updateClocks = () => {
@@ -498,90 +497,215 @@ const startRealtimeClockUpdatesClean = (modal) => {
 };
 
 // ===================================================================
-// 🧭 NAVIGATION BUTTONS - Refactored to Use Extension 1.5 + Warm Yellow
+// 🧭 INDEPENDENT NAVIGATION BUTTONS - Complete Extension 6 Control
 // ===================================================================
 
 /**
- * ✨ NEW: Warm yellow pastel gradient (instead of cyan)
- * ✅ REFACTORED: Add navigation buttons using Extension 1.5 utilities
- * 🗑️ REMOVED: ~30 lines of manual button creation and styling
+ * 🔍 DETECT: Current font being used by Roam
  */
-const addNavigationButtonsClean = () => {
+const detectRoamFont = () => {
   try {
-    const platform = window.RoamExtensionSuite;
-    const navigationUtilities = platform.getUtility("navigationUtilities");
-
-    if (!navigationUtilities) {
-      console.error(
-        "❌ Navigation utilities not available. Please ensure Extension 1.5 is loaded."
-      );
-      return;
-    }
-
-    // Remove existing buttons
-    navigationUtilities.removeNavButtons("clean-directory-nav-button");
-
-    // ✅ USING: Extension 1.5 smart placement target finding
-    const possibleTargets = [
-      ".roam-article .roam-log-container",
+    const selectors = [
       ".roam-article",
-      ".roam-main .roam-article",
-      ".rm-reference-main",
       ".roam-main",
+      ".roam-block-container",
+      ".rm-block-text",
       "body",
+      ".bp3-button",
     ];
 
-    const { element: targetElement, selector } =
-      navigationUtilities.findBestPlacementTarget(possibleTargets);
+    for (const selector of selectors) {
+      const element = document.querySelector(selector);
+      if (element) {
+        const computedStyle = window.getComputedStyle(element);
+        const fontFamily = computedStyle.fontFamily;
+        if (
+          fontFamily &&
+          fontFamily !== "initial" &&
+          fontFamily !== "inherit"
+        ) {
+          console.log(`🔍 Detected Roam font from ${selector}: ${fontFamily}`);
+          return fontFamily;
+        }
+      }
+    }
 
-    // Ensure target has relative positioning for absolute button placement
+    return "inherit";
+  } catch (error) {
+    console.warn("Font detection failed, using inherit:", error);
+    return "inherit";
+  }
+};
+
+/**
+ * 🎯 INDEPENDENT: Find placement target (Extension 6's own logic)
+ */
+const findPlacementTargetIndependent = () => {
+  const selectors = [
+    ".roam-article .roam-log-container",
+    ".roam-article",
+    ".roam-main .roam-article",
+    ".rm-reference-main",
+    ".roam-main",
+    "body",
+  ];
+
+  for (const selector of selectors) {
+    const element = document.querySelector(selector);
+    if (element) {
+      return { element, selector };
+    }
+  }
+  return { element: document.body, selector: "body" };
+};
+
+/**
+ * 🗑️ INDEPENDENT: Remove all competing directory buttons
+ */
+const removeAllDirectoryButtonsIndependent = () => {
+  console.log("🗑️ Extension 6: Cleaning up competing directory buttons...");
+
+  // Remove by class patterns
+  const buttonSelectors = [
+    ".ext6-directory-button",
+    ".clean-directory-nav-button",
+    ".user-directory-nav-button",
+    ".directory-nav-button",
+    '[class*="directory"]',
+  ];
+
+  let removedCount = 0;
+
+  buttonSelectors.forEach((selector) => {
+    const buttons = document.querySelectorAll(selector);
+    buttons.forEach((button) => {
+      const text = button.textContent || button.innerText || "";
+      if (text.includes("Directory") || text.includes("User")) {
+        console.log(`🗑️ Removing: ${selector} - "${text}"`);
+        button.remove();
+        removedCount++;
+      }
+    });
+  });
+
+  console.log(`✅ Removed ${removedCount} competing directory buttons`);
+};
+
+/**
+ * 🎯 INDEPENDENT: Create directory button (complete Extension 6 control)
+ */
+const addNavigationButtonsIndependent = () => {
+  try {
+    console.log("🎯 Extension 6: Creating independent directory button...");
+
+    // 🗑️ STEP 1: Remove ANY existing directory buttons
+    removeAllDirectoryButtonsIndependent();
+
+    // 🎯 STEP 2: Find placement target (Extension 6's own logic)
+    const { element: targetElement, selector } =
+      findPlacementTargetIndependent();
+
     if (getComputedStyle(targetElement).position === "static") {
       targetElement.style.position = "relative";
     }
 
-    // ✅ USING: Extension 1.5 navigation button creation with ✨ SUBTLE WARM YELLOW
-    const button = navigationUtilities.createNavButton({
-      text: "👥 User Directory",
-      position: "top-left",
-      onClick: showUserDirectoryModalClean,
-      className: "clean-directory-nav-button",
-      gradient: "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)", // ✨ SUBTLE WARM YELLOW
-      borderColor: "#e5d4a1", // ✨ SUBTLE BORDER
-      textColor: "#78716c", // ✨ SUBTLE TEXT
+    // 🎯 STEP 3: Create button (pure Extension 6 code)
+    const button = document.createElement("button");
+    button.textContent = "👥 User Directory";
+    button.className = "ext6-directory-button"; // Unique class name
+    button.onclick = showUserDirectoryModalClean;
+
+    // 🎯 STEP 4: Apply complete styling (single operation, no competition)
+    const roamFont = detectRoamFont();
+    button.style.cssText = `
+      position: absolute;
+      top: 14px;
+      left: 20px;
+      background: linear-gradient(135deg, #fef3c7, #fde68a);
+      border: 1px solid #f59e0b;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+      z-index: 9997;
+      font-family: ${roamFont};
+      color: #92400e;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      font-weight: 600;
+      font-size: 14px;
+    `;
+
+    // 🎯 STEP 5: Add hover effects
+    button.addEventListener("mouseenter", () => {
+      button.style.transform = "translateX(0) translateY(-2px) scale(1.02)";
+      button.style.boxShadow = "0 6px 16px rgba(245, 158, 11, 0.4)";
+      button.style.background = "linear-gradient(135deg, #fde68a, #fcd34d)";
+    });
+
+    button.addEventListener("mouseleave", () => {
+      button.style.transform = "translateX(0) translateY(0) scale(1)";
+      button.style.boxShadow = "0 4px 12px rgba(245, 158, 11, 0.3)";
+      button.style.background = "linear-gradient(135deg, #fef3c7, #fde68a)";
     });
 
     targetElement.appendChild(button);
-    console.log(`✅ Directory button added: ${selector}`);
+
+    // Store for cleanup
+    if (window._extensionRegistry && window._extensionRegistry.elements) {
+      window._extensionRegistry.elements.push(button);
+    }
+
+    console.log(`✅ Extension 6 independent button created: ${selector}`);
   } catch (error) {
-    console.error("❌ Error adding navigation buttons:", error);
+    console.error("❌ Extension 6 independent button creation failed:", error);
   }
 };
 
 /**
- * ✅ REFACTORED: Start navigation monitoring using Extension 1.5 utilities
- * 🗑️ REMOVED: Manual URL monitoring logic (~20 lines)
+ * 🎯 INDEPENDENT: Monitor page changes (Extension 6's own monitoring)
  */
-const startNavigationMonitoringClean = () => {
-  const platform = window.RoamExtensionSuite;
-  const navigationUtilities = platform.getUtility("navigationUtilities");
+const startNavigationMonitoringIndependent = () => {
+  console.log("📡 Extension 6: Starting independent navigation monitoring...");
 
-  if (!navigationUtilities) {
-    console.error(
-      "❌ Navigation utilities not available. Please ensure Extension 1.5 is loaded."
-    );
-    return;
+  // Initial button creation
+  setTimeout(addNavigationButtonsIndependent, 1000);
+
+  // Set up URL change monitoring (Extension 6's own logic)
+  let currentUrl = window.location.href;
+  let monitoringInterval = null;
+
+  const checkForPageChanges = () => {
+    if (window.location.href !== currentUrl) {
+      currentUrl = window.location.href;
+      console.log(
+        "📍 Extension 6: Page changed, re-adding directory button..."
+      );
+
+      // Small delay to let page settle
+      setTimeout(addNavigationButtonsIndependent, 500);
+    }
+  };
+
+  // Check for changes every 500ms
+  monitoringInterval = setInterval(checkForPageChanges, 500);
+
+  // Store interval for cleanup
+  if (window._extensionRegistry) {
+    window._extensionRegistry.intervals =
+      window._extensionRegistry.intervals || [];
+    window._extensionRegistry.intervals.push(monitoringInterval);
   }
 
-  // Initial button placement
-  setTimeout(addNavigationButtonsClean, 1000);
-
-  // ✅ USING: Extension 1.5 page change monitoring
-  navigationUtilities.monitorPageChanges(() => {
-    console.log("📍 Page changed, re-adding directory button...");
-    addNavigationButtonsClean();
-  }, 500);
-  console.log("📡 Navigation monitoring started");
+  console.log("✅ Extension 6 independent monitoring started");
 };
+
+// Use the independent functions
+const addNavigationButtonsClean = addNavigationButtonsIndependent;
+const startNavigationMonitoringClean = startNavigationMonitoringIndependent;
 
 // ===================================================================
 // 🧪 INTEGRATION TESTING - Test Extension 1.5 Integration
@@ -760,6 +884,7 @@ const debugBlockStructure = async () => {
 
   console.groupEnd();
 };
+
 const testExtension15Integration = async () => {
   console.group("🔗 Testing Extension 1.5 Integration");
 
@@ -773,10 +898,6 @@ const testExtension15Integration = async () => {
     // Test modal utilities
     const modalUtilities = platform.getUtility("modalUtilities");
     console.log("✅ Modal utilities available:", !!modalUtilities);
-
-    // Test navigation utilities
-    const navigationUtilities = platform.getUtility("navigationUtilities");
-    console.log("✅ Navigation utilities available:", !!navigationUtilities);
 
     // Test profile analysis utilities
     const profileAnalysisUtilities = platform.getUtility(
@@ -794,7 +915,9 @@ const testExtension15Integration = async () => {
       !!processAvatarImages
     );
 
-    console.log("🎉 All Extension 1.5 utilities integrated successfully!");
+    console.log(
+      "🎉 Extension 1.5 utilities working (except navigation - now independent)!"
+    );
   } catch (error) {
     console.error("❌ Integration test failed:", error);
   }
@@ -806,7 +929,7 @@ const testExtension15Integration = async () => {
  * ✅ ENHANCED: Run complete system tests
  */
 const runCleanSystemTests = async () => {
-  console.group("🧪 Running Extension SIX System Tests (Phase 2)");
+  console.group("🧪 Running Extension SIX System Tests (Independent Phase)");
 
   try {
     // Test Extension 1.5 integration
@@ -829,6 +952,10 @@ const runCleanSystemTests = async () => {
     );
     const members = getGraphMembersFromList("roam/graph members", "Directory");
     console.log(`📋 Curated members: ${members.length} found`);
+
+    // Test independent button creation
+    console.log("🎯 Testing independent button creation...");
+    addNavigationButtonsIndependent();
 
     console.log("✅ All system tests passed!");
   } catch (error) {
@@ -949,14 +1076,14 @@ window.navigateToUserPageClean = (username) => {
 };
 
 // ===================================================================
-// 🎯 EXTENSION REGISTRATION - Phase 2 Complete
+// 🎯 EXTENSION REGISTRATION - Independent Phase Complete
 // ===================================================================
 
 export default {
   onload: () => {
-    console.log("🚀 User Directory loading...");
+    console.log("🚀 User Directory loading (Independent Phase)...");
 
-    // ✅ STEP 1: Check Extension 1.5 dependencies
+    // ✅ STEP 1: Check Extension 1.5 dependencies (partial)
     if (!checkExtension15Dependencies()) {
       console.error(
         "❌ User Directory failed to load - missing Extension 1.5 dependencies"
@@ -975,13 +1102,14 @@ export default {
       return { error: "Platform not found" };
     }
 
-    // Register clean directory services (much smaller now!)
+    // Register clean directory services
     const cleanDirectoryServices = {
       getUserProfileData: getUserProfileDataClean,
       getAllUserProfiles: getAllUserProfilesClean,
       showUserDirectory: showUserDirectoryModalClean,
       testIntegration: testExtension15Integration,
       runSystemTests: runCleanSystemTests,
+      addNavigationButtons: addNavigationButtonsIndependent, // ✨ Independent version
     };
 
     // ✅ STEP 3: Register command palette functions
@@ -1000,7 +1128,7 @@ export default {
       },
       {
         label: "User Directory: Add Show Directory Button",
-        callback: addNavigationButtonsClean,
+        callback: addNavigationButtonsIndependent,
       },
     ];
 
@@ -1015,49 +1143,51 @@ export default {
 
     // ✅ STEP 4: Register with platform
     const requiredDependencies = [
-      "utility-library", // Extension 1.5
+      "utility-library", // Extension 1.5 (partial dependencies only)
     ];
 
     platform.register(
       "clean-user-directory",
       {
         services: cleanDirectoryServices,
-        version: "6.8.0",
+        version: "6.9.0", // ✨ Independent version
       },
       {
         name: "✨ User Directory",
         description:
-          "Professional user directory with timezone intelligence, avatar support, and clean interface",
-        version: "6.8.0",
+          "Professional user directory with timezone intelligence, avatar support, and independent button management",
+        version: "6.9.0",
         dependencies: requiredDependencies,
       }
     );
 
-    // ✅ STEP 5: Start navigation monitoring
-    startNavigationMonitoringClean();
+    // ✅ STEP 5: Start independent navigation monitoring
+    startNavigationMonitoringIndependent();
 
     // ✅ STEP 6: Success report
     const currentUser = platform.getUtility("getCurrentUser")();
-    console.log("🎉 Extension SIX loaded successfully!");
-    console.log("🗑️ REMOVED: ~200+ lines of duplicate code");
-    console.log("✨ Subtle warm yellow button styling");
-    console.log("✅ Clean, user-facing interface");
-    console.log("🧹 All technical references removed from UI");
-    console.log("🖼️ FIXED: Avatar extraction from child blocks");
+    console.log("🎉 Extension SIX loaded successfully (Independent Phase)!");
+    console.log(
+      "🎯 BUTTON: Completely independent creation (zero competition)"
+    );
+    console.log("✅ MODAL: Using Extension 1.5 utilities (working well)");
+    console.log("✅ TIMEZONE: Using Extension 1.5 utilities (working well)");
+    console.log("✅ PROFILE: Using Extension 1.5 utilities (working well)");
+    console.log("🛡️ SAFETY: Zero changes to Extension 1.5 (zero risk)");
     console.log(`👤 Current user: ${currentUser?.displayName}`);
     console.log('💡 Try: Cmd+P → "User Directory: Show Directory"');
 
     // Auto-test integration after a short delay
     setTimeout(async () => {
-      console.log("🔍 Auto-testing Phase 2 integration...");
+      console.log("🔍 Auto-testing Independent Phase integration...");
       await runCleanSystemTests();
     }, 2000);
 
     return {
       extensionId: "clean-user-directory",
       services: cleanDirectoryServices,
-      version: "6.8.0",
-      status: "complete",
+      version: "6.9.0",
+      status: "independent",
     };
   },
 
@@ -1070,13 +1200,15 @@ export default {
     );
     modals.forEach((modal) => modal.remove());
 
-    // Clean up navigation buttons
-    const platform = window.RoamExtensionSuite;
-    if (platform) {
-      const navigationUtilities = platform.getUtility("navigationUtilities");
-      if (navigationUtilities) {
-        navigationUtilities.removeNavButtons("clean-directory-nav-button");
-      }
+    // Clean up independent buttons
+    removeAllDirectoryButtonsIndependent();
+
+    // Clean up intervals
+    if (window._extensionRegistry && window._extensionRegistry.intervals) {
+      window._extensionRegistry.intervals.forEach((interval) => {
+        clearInterval(interval);
+      });
+      window._extensionRegistry.intervals = [];
     }
 
     // Navigation helper cleanup

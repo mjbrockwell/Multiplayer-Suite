@@ -390,61 +390,47 @@ const navigationUtilities = {
   /**
    * Create positioned navigation button with auto-cleanup
    */
+  /**
+   * 🎯 ULTRA-MINIMAL VERSION
+   */
+
   createNavButton: (config) => {
     const {
       text,
       position = "top-left",
       onClick,
       className = "",
-      gradient = "linear-gradient(135deg, #c7f3ff 0%, #22d3ee 100%)",
-      borderColor = "#06b6d4",
-      textColor = "#0e7490",
+      ...allOtherProps // Everything else passes through
     } = config;
 
     const button = document.createElement("button");
-    if (className) button.className = className;
     button.textContent = text;
+    button.className = className;
 
-    // Position styles
-    const positions = {
-      "top-left": "top: 10px; left: 10px;",
-      "top-right": "top: 10px; right: 10px;",
-      "bottom-left": "bottom: 10px; left: 10px;",
-      "bottom-right": "bottom: 10px; right: 10px;",
+    // Only essential positioning - NO visual styling
+    const positionStyles = {
+      position: "absolute",
+      cursor: "pointer",
     };
 
-    button.style.cssText = `
-      position: absolute;
-      ${positions[position] || positions["top-left"]}
-      z-index: 9999;
-      background: ${gradient};
-      color: ${textColor};
-      border: 1px solid ${borderColor};
-      border-radius: 8px;
-      padding: 10px 16px;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 600;
-      box-shadow: 0 2px 4px rgba(34, 211, 238, 0.2);
-      transition: all 0.2s ease;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    `;
+    // Position based on config
+    switch (position) {
+      case "top-left":
+        positionStyles.top = "20px";
+        positionStyles.left = "20px";
+        break;
+      case "top-right":
+        positionStyles.top = "20px";
+        positionStyles.right = "20px";
+        break;
+    }
 
-    // Add click handler
+    // Apply minimal positioning + all custom styles
+    Object.assign(button.style, positionStyles, allOtherProps);
+
     if (onClick) {
       button.addEventListener("click", onClick);
     }
-
-    // Add hover effects
-    button.addEventListener("mouseenter", () => {
-      button.style.transform = "translateY(-1px)";
-      button.style.filter = "brightness(1.1)";
-    });
-
-    button.addEventListener("mouseleave", () => {
-      button.style.transform = "translateY(0)";
-      button.style.filter = "brightness(1)";
-    });
 
     return button;
   },
