@@ -604,7 +604,7 @@ const profileAnalysisUtilities = {
 // ===================================================================
 
 /**
- * Enhanced image extraction with validation
+ * Enhanced image extraction with validation - FIXED DUPLICATE URL BUG
  */
 const extractImageUrls = (blockUid, options = {}) => {
   const { validateUrls = false, includeEmbeds = true } = options;
@@ -633,27 +633,34 @@ const extractImageUrls = (blockUid, options = {}) => {
       markdownMatches.forEach((match) => {
         const urlMatch = match.match(/!\[.*?\]\((.*?)\)/);
         if (urlMatch && urlMatch[1]) {
-          imageUrls.push(urlMatch[1]);
+          const cleanUrl = urlMatch[1].trim();
+          if (cleanUrl && !imageUrls.includes(cleanUrl)) {
+            imageUrls.push(cleanUrl);
+          }
         }
       });
     }
 
-    // Extract direct URLs (if includeEmbeds)
+    // Extract direct URLs (if includeEmbeds) - FIXED REGEX
     if (includeEmbeds) {
+      // Fixed: Exclude ) and other punctuation that might follow URLs
       const urlPattern =
-        /https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|svg)(\?[^\s]*)?/gi;
+        /https?:\/\/[^\s)]+\.(jpg|jpeg|png|gif|webp|svg)(?:\?[^\s)]*)?/gi;
       const urlMatches = blockString.match(urlPattern);
       if (urlMatches) {
-        imageUrls.push(...urlMatches);
+        urlMatches.forEach((url) => {
+          // Clean any trailing punctuation that might have been captured
+          const cleanUrl = url.replace(/[)\]}]+$/, "").trim();
+          if (cleanUrl && !imageUrls.includes(cleanUrl)) {
+            imageUrls.push(cleanUrl);
+          }
+        });
       }
     }
 
-    // Remove duplicates
-    const uniqueUrls = [...new Set(imageUrls)];
-
     // Validate URLs if requested
     if (validateUrls) {
-      return uniqueUrls.filter((url) => {
+      return imageUrls.filter((url) => {
         try {
           new URL(url);
           return true;
@@ -663,7 +670,7 @@ const extractImageUrls = (blockUid, options = {}) => {
       });
     }
 
-    return uniqueUrls;
+    return imageUrls;
   } catch (error) {
     console.error(`extractImageUrls error for ${blockUid}:`, error);
     return [];

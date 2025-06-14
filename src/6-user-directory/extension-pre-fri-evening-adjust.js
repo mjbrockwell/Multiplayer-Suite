@@ -171,124 +171,47 @@ const getAllUserProfilesClean = async () => {
 // ===================================================================
 
 /**
- * ✨ DIRECT ROAM API: Create avatar display using fresh data queries
- * 🗑️ BYPASSES: All caching layers for real-time avatar updates
- * 🎯 SOLVES: Avatar not updating when image changes mid-session
+ * ✅ WORKING: Create avatar display using proper child block extraction
  */
 const createAvatarDisplay = async (profile) => {
   try {
-    console.log(`🖼️ Fresh avatar extraction for: ${profile.username}`);
+    const platform = window.RoamExtensionSuite;
+    const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
+    const findBlockByText = platform.getUtility("findBlockByText");
+    const getDirectChildren = platform.getUtility("getDirectChildren");
+    const extractImageUrls = platform.getUtility("extractImageUrls");
 
-    // ✅ STEP 1: Direct query for user page UID (no caching)
-    const userPageQuery = `
-      [:find ?uid 
-       :where 
-       [?page :node/title "${profile.username}"]
-       [?page :block/uid ?uid]]
-    `;
-    const userPageResult = window.roamAlphaAPI.data.fast.q(userPageQuery);
-    const userPageUid = userPageResult?.[0]?.[0];
-
+    const userPageUid = getPageUidByTitle(profile.username);
     if (!userPageUid) {
-      console.log(`❌ No page found for user: ${profile.username}`);
       return createInitialsAvatar(profile.username);
     }
 
-    // ✅ STEP 2: Direct query for "My Info::" block (fresh data)
-    const myInfoQuery = `
-      [:find ?uid 
-       :where 
-       [?block :block/page ?page]
-       [?page :block/uid "${userPageUid}"]
-       [?block :block/string ?text]
-       [?block :block/uid ?uid]
-       [(clojure.string/includes? ?text "My Info::")]]
-    `;
-    const myInfoResult = window.roamAlphaAPI.data.fast.q(myInfoQuery);
-    const myInfoUid = myInfoResult?.[0]?.[0];
-
-    if (!myInfoUid) {
-      console.log(`❌ No "My Info::" block found for: ${profile.username}`);
+    // Find "My Info::" block
+    const myInfoBlockUid = findBlockByText(userPageUid, "My Info::");
+    if (!myInfoBlockUid) {
       return createInitialsAvatar(profile.username);
     }
 
-    // ✅ STEP 3: Direct query for "Avatar::" block under My Info (fresh data)
-    const avatarQuery = `
-      [:find ?uid 
-       :where 
-       [?block :block/parents ?parent]
-       [?parent :block/uid "${myInfoUid}"]
-       [?block :block/string ?text]
-       [?block :block/uid ?uid]
-       [(clojure.string/includes? ?text "Avatar::")]]
-    `;
-    const avatarResult = window.roamAlphaAPI.data.fast.q(avatarQuery);
-    const avatarUid = avatarResult?.[0]?.[0];
-
-    if (!avatarUid) {
-      console.log(`❌ No "Avatar::" block found for: ${profile.username}`);
+    // Find "Avatar::" block under "My Info::"
+    const avatarBlockUid = findBlockByText(myInfoBlockUid, "Avatar::");
+    if (!avatarBlockUid) {
       return createInitialsAvatar(profile.username);
     }
 
-    // ✅ STEP 4: Direct query for image content in Avatar children (REAL-TIME DATA!)
-    const imageQuery = `
-      [:find ?text ?uid
-       :where 
-       [?child :block/parents ?parent]
-       [?parent :block/uid "${avatarUid}"]
-       [?child :block/string ?text]
-       [?child :block/uid ?uid]
-       [(clojure.string/includes? ?text "!")]]
-    `;
-    const imageResults = window.roamAlphaAPI.data.fast.q(imageQuery);
-
-    // ✅ STEP 5: Extract image URLs from fresh block content
-    for (const [blockText, blockUid] of imageResults) {
-      if (blockText && blockText.includes("![")) {
-        // Extract image URLs using regex (fresh parsing)
-        const imageRegex = /!\[.*?\]\((.*?)\)/g;
-        const matches = Array.from(blockText.matchAll(imageRegex));
-
-        for (const match of matches) {
-          const imageUrl = match[1];
-          if (imageUrl && imageUrl.startsWith("http")) {
-            console.log(
-              `✅ Fresh avatar found for ${
-                profile.username
-              }: ${imageUrl.substring(0, 50)}...`
-            );
-            return `<img src="${imageUrl}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;" alt="${profile.username}">`;
-          }
-        }
-      }
-
-      // Also check for direct image links
-      if (
-        blockText &&
-        blockText.startsWith("http") &&
-        (blockText.includes(".jpg") ||
-          blockText.includes(".png") ||
-          blockText.includes(".gif") ||
-          blockText.includes(".jpeg"))
-      ) {
-        console.log(
-          `✅ Fresh direct image found for ${
-            profile.username
-          }: ${blockText.substring(0, 50)}...`
-        );
-        return `<img src="${blockText}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;" alt="${profile.username}">`;
+    // ✅ THE FIX: Extract images from children of Avatar:: block (not Avatar:: itself)
+    const avatarChildren = getDirectChildren(avatarBlockUid);
+    for (const child of avatarChildren) {
+      const childImages = extractImageUrls(child.uid, { validateUrls: true });
+      if (childImages.length > 0) {
+        const imageUrl = childImages[0];
+        return `<img src="${imageUrl}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;" alt="${profile.username}">`;
       }
     }
 
-    console.log(
-      `📋 No images found in Avatar children for: ${profile.username}`
-    );
+    // Fallback to initials if no images found
     return createInitialsAvatar(profile.username);
   } catch (error) {
-    console.error(
-      `❌ Fresh avatar extraction failed for ${profile.username}:`,
-      error
-    );
+    console.error(`Avatar creation failed for ${profile.username}:`, error);
     return createInitialsAvatar(profile.username);
   }
 };
