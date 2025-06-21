@@ -21,7 +21,7 @@ const MULTIUSER_EXTENSIONS = [
   {
     id: "user-authentication",
     name: "User Authentication",
-    url: "https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/refs/heads/main/src/2.0-user-authentication/extension.js",
+    url: "https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/refs/heads/main/src/2-user-authentication/extension.js",
     description: "User login and identity management",
     critical: false,
     exportPattern: "standard",
