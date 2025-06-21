@@ -1,852 +1,689 @@
-// ===================================================================
-// Extension 0.5: Auto-Loader Scaffolding - MIME TYPE ISSUE FIXED
-// 🎯 SOLUTION: Blob URL method to bypass GitHub Raw MIME type restrictions
-// ===================================================================
+// 👥 Multi-User Suite Modal Installer
+// Complete autoloader for all Multi-User Suite extensions
 
-// ===================================================================
-// 🔧 CONFIGURATION - Same as before
-// ===================================================================
+const MULTIUSER_EXTENSIONS = [
+  {
+    id: "core-infrastructure",
+    name: "Core Infrastructure",
+    url: "https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/refs/heads/main/src/1-core-infrastructure/extension.js",
+    description: "Foundation infrastructure for multi-user features",
+    critical: true,
+    exportPattern: "standard",
+  },
+  {
+    id: "utilities",
+    name: "Utilities",
+    url: "https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/refs/heads/main/src/1.5-utilities/extension.js",
+    description: "Shared utility functions and helpers",
+    critical: true,
+    exportPattern: "standard",
+  },
+  {
+    id: "user-authentication",
+    name: "User Authentication",
+    url: "https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/refs/heads/main/src/2.0-user-authentication/extension.js",
+    description: "User login and identity management",
+    critical: false,
+    exportPattern: "standard",
+  },
+  {
+    id: "preferences-manager",
+    name: "Preferences Manager",
+    url: "https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/refs/heads/main/src/3-preferences-manager/extension.js",
+    description: "User preference storage and management",
+    critical: false,
+    exportPattern: "standard",
+  },
+  {
+    id: "navigation-manager",
+    name: "Navigation Manager",
+    url: "https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/refs/heads/main/src/4-navigation-manager/extension.js",
+    description: "Enhanced navigation and routing features",
+    critical: false,
+    exportPattern: "standard",
+  },
+  {
+    id: "personal-shortcuts",
+    name: "Personal Shortcuts",
+    url: "https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/refs/heads/main/src/5-personal-shortcuts/extension.js",
+    description: "Customizable user shortcuts and quick actions",
+    critical: false,
+    exportPattern: "standard",
+  },
+  {
+    id: "user-directory",
+    name: "User Directory",
+    url: "https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/refs/heads/main/src/6-user-directory/extension.js",
+    description: "User profiles and directory browsing",
+    critical: false,
+    exportPattern: "standard",
+  },
+  {
+    id: "avatar-css-maker",
+    name: "Avatar CSS Maker",
+    url: "https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/refs/heads/main/src/6.5-new-avatar-CSS-maker/extension.js",
+    description: "Custom avatar styling and CSS generation",
+    critical: false,
+    exportPattern: "standard",
+  },
+  {
+    id: "journal-quick-entry",
+    name: "Journal Quick Entry",
+    url: "https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/refs/heads/main/src/7-journal-quick-entry/extension.js",
+    description: "Rapid journal entry tools and shortcuts",
+    critical: false,
+    exportPattern: "standard",
+  },
+  {
+    id: "timestamps",
+    name: "Timestamps",
+    url: "https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/refs/heads/main/src/8-timestamps/extension.js",
+    description: "Advanced timestamp and time tracking features",
+    critical: false,
+    exportPattern: "standard",
+  },
+  {
+    id: "smart-username-tagger",
+    name: "Smart Username Tagger",
+    url: "https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/refs/heads/main/src/9-smart-username-tagger/extension.js",
+    description: "Intelligent user tagging and mention system",
+    critical: false,
+    exportPattern: "standard",
+  },
+];
 
-const DEVELOPMENT_MODE = true;
-const BRANCH = DEVELOPMENT_MODE ? "main" : "main";
+// Global state
+let loadedExtensions = new Map();
+let installerModal = null;
+let installLog = [];
 
-const GITHUB_CONFIG = {
-  username: "mjbrockwell",
-  repository: "Multiplayer-Suite",
-  branch: BRANCH,
-  baseUrl: `https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/${BRANCH}/`,
-};
+// Create mock extension API with CORRECT structure
+function createMockExtensionAPI(extId) {
+  return {
+    settings: {
+      get: (key) => localStorage.getItem(`multiuser-${extId}-${key}`),
+      set: (key, value) =>
+        localStorage.setItem(`multiuser-${extId}-${key}`, value),
+      panel: {
+        create: (config) => ({ id: Date.now(), config }),
+      },
+    },
+    // CRITICAL: ui namespace required
+    ui: {
+      commandPalette: {
+        // CRITICAL: under ui, not root
+        addCommand: (command) => {
+          console.log(`📋 Command added: ${command.label}`);
+          return { id: Date.now(), ...command };
+        },
+        removeCommand: (commandId) => {
+          console.log(`📋 Command removed: ${commandId}`);
+          return true;
+        },
+      },
+      createButton: (config) => ({ id: Date.now(), ...config }),
+      showNotification: (message, type = "info") => {
+        console.log(`🔔 Notification: ${message} (${type})`);
+        return true;
+      },
+    },
+  };
+}
 
-const EXTENSION_SUITE = [];
+// Logging utility
+function logMessage(message, type = "info") {
+  const timestamp = new Date().toLocaleTimeString();
+  installLog.push({ timestamp, message, type });
+  console.log(`[${timestamp}] ${message}`);
+  updateInstallLog();
+}
 
-// ===================================================================
-// 🔄 FIXED: Blob URL Extension Loading Method
-// ===================================================================
+// Update install log UI
+function updateInstallLog() {
+  const logContainer = document.getElementById("multiuser-install-log");
+  if (!logContainer) return;
 
-/**
- * 🔧 FIXED: Load remote extension using Blob URL method to bypass MIME type issues
- */
-const loadRemoteExtensionFixed = async (extensionConfig) => {
-  return new Promise(async (resolve, reject) => {
+  logContainer.innerHTML = installLog
+    .map((entry) => {
+      const color =
+        entry.type === "error"
+          ? "#ff6b6b"
+          : entry.type === "success"
+          ? "#51cf66"
+          : "#74c0fc";
+      return `<div style="color: ${color}; margin: 2px 0;">
+      [${entry.timestamp}] ${entry.message}
+    </div>`;
+    })
+    .join("");
+
+  logContainer.scrollTop = logContainer.scrollHeight;
+}
+
+// Update extension status in UI
+function updateExtensionStatus(extId, status, error = null) {
+  const row = document.getElementById(`ext-${extId}`);
+  if (!row) return;
+
+  const statusIcon = row.querySelector(".status-icon");
+  const button = row.querySelector("button");
+
+  switch (status) {
+    case "pending":
+      statusIcon.textContent = "⭕";
+      button.textContent = "Install";
+      button.disabled = false;
+      button.style.background = "linear-gradient(135deg, #51cf66, #40c057)";
+      row.style.border = "1px solid #e9ecef";
+      break;
+
+    case "loading":
+      statusIcon.textContent = "🔄";
+      button.textContent = "Loading...";
+      button.disabled = true;
+      button.style.background = "#adb5bd";
+      row.style.border = "1px solid #74c0fc";
+      break;
+
+    case "success":
+      statusIcon.textContent = "✅";
+      button.textContent = "Installed";
+      button.disabled = true;
+      button.style.background = "#51cf66";
+      row.style.border = "2px solid #51cf66";
+      break;
+
+    case "error":
+      statusIcon.textContent = "❌";
+      button.textContent = "Retry";
+      button.disabled = false;
+      button.style.background = "linear-gradient(135deg, #ff6b6b, #fa5252)";
+      row.style.border = "2px solid #ff6b6b";
+      break;
+  }
+}
+
+// Install single extension
+async function installExtension(extId) {
+  const extension = MULTIUSER_EXTENSIONS.find((ext) => ext.id === extId);
+  if (!extension) {
+    throw new Error(`Extension ${extId} not found`);
+  }
+
+  logMessage(`🔄 Installing ${extension.name}...`);
+  updateExtensionStatus(extId, "loading");
+
+  try {
+    // Fetch extension code
+    logMessage(`📡 Fetching from GitHub: ${extension.name}`);
+    const response = await fetch(extension.url);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const code = await response.text();
+    logMessage(`📝 Code retrieved (${code.length} bytes)`);
+
+    // Create blob URL to bypass MIME type restrictions
+    const blob = new Blob([code], { type: "application/javascript" });
+    const blobUrl = URL.createObjectURL(blob);
+
     try {
-      console.log(`🔄 Loading ${extensionConfig.name} via Blob URL method...`);
+      // Setup mock API with CORRECT structure
+      const mockAPI = createMockExtensionAPI(extId);
 
-      const url = GITHUB_CONFIG.baseUrl + extensionConfig.filename;
-      const cacheBuster = new Date().getTime();
-      const fullUrl = `${url}?cb=${cacheBuster}`;
-
-      console.log(`📥 Fetching: ${fullUrl}`);
-
-      // Step 1: Fetch the file content as text
-      const response = await fetch(fullUrl);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const code = await response.text();
-      console.log(`📄 Retrieved ${code.length} characters of code`);
-
-      // Step 2: Create blob with correct MIME type
-      const blob = new Blob([code], { type: "application/javascript" });
-      const blobUrl = URL.createObjectURL(blob);
-
-      console.log(`🔗 Created blob URL: ${blobUrl.substring(0, 50)}...`);
-
-      // Step 3: Load as ES6 module from blob URL
-      try {
-        const module = await import(blobUrl);
-
-        // Cleanup blob URL
-        URL.revokeObjectURL(blobUrl);
-
-        console.log(
-          `✅ Successfully loaded ${extensionConfig.name} as ES6 module`
-        );
-        console.log(`📦 Module exports:`, Object.keys(module));
-
-        // Step 4: 🔥 CRITICAL: Actually execute the extension!
-        if (module.default && typeof module.default.onload === "function") {
-          console.log(
-            `🚀 Executing ${extensionConfig.name} onload function...`
-          );
-
-          // Create mock extensionAPI (basic version - can be enhanced)
-          const mockExtensionAPI = {
-            settings: {
-              get: (key) =>
-                localStorage.getItem(`ext-${extensionConfig.id}-${key}`),
-              set: (key, value) =>
-                localStorage.setItem(`ext-${extensionConfig.id}-${key}`, value),
-              panel: {
-                create: (config) =>
-                  console.log(
-                    `Settings panel created for ${extensionConfig.name}:`,
-                    config
-                  ),
-              },
-            },
-          };
-
-          try {
-            // 🎯 Actually call the extension's onload function!
-            await module.default.onload({ extensionAPI: mockExtensionAPI });
-            console.log(
-              `✅ ${extensionConfig.name} onload completed successfully`
-            );
-
-            // Store unload function for cleanup
-            if (typeof module.default.onunload === "function") {
-              window._loadedExtensions = window._loadedExtensions || [];
-              window._loadedExtensions.push({
-                name: extensionConfig.name,
-                onunload: module.default.onunload,
-              });
-            }
-          } catch (onloadError) {
-            console.error(
-              `❌ ${extensionConfig.name} onload failed:`,
-              onloadError
-            );
-            throw new Error(`Extension onload failed: ${onloadError.message}`);
-          }
-        } else {
-          console.warn(
-            `⚠️ ${extensionConfig.name} has no onload function - may not be a proper Roam extension`
-          );
-        }
-
-        resolve({
-          ...extensionConfig,
-          module: module,
-          loadMethod: "blob-url",
-          executed: true,
-        });
-      } catch (importError) {
-        console.error(
-          `❌ ES6 import failed for ${extensionConfig.name}:`,
-          importError
-        );
-
-        // Cleanup blob URL
-        URL.revokeObjectURL(blobUrl);
-
-        // Fallback: Try eval method
-        console.log(
-          `🔄 Trying fallback eval method for ${extensionConfig.name}...`
-        );
-
-        try {
-          // Create a module execution context
-          const moduleContext = { exports: {} };
-          const moduleFunction = new Function(
-            "module",
-            "exports",
-            code + "\n//# sourceURL=" + extensionConfig.filename
-          );
-          moduleFunction(moduleContext, moduleContext.exports);
-
-          const moduleExports =
-            moduleContext.exports.default || moduleContext.exports;
-
-          console.log(
-            `✅ Successfully loaded ${extensionConfig.name} via eval fallback`
-          );
-
-          // Execute the extension if it has onload
-          if (moduleExports && typeof moduleExports.onload === "function") {
-            console.log(
-              `🚀 Executing ${extensionConfig.name} onload function (eval method)...`
-            );
-
-            const mockExtensionAPI = {
-              settings: {
-                get: (key) =>
-                  localStorage.getItem(`ext-${extensionConfig.id}-${key}`),
-                set: (key, value) =>
-                  localStorage.setItem(
-                    `ext-${extensionConfig.id}-${key}`,
-                    value
-                  ),
-                panel: {
-                  create: (config) =>
-                    console.log(
-                      `Settings panel created for ${extensionConfig.name}:`,
-                      config
-                    ),
-                },
-              },
-            };
-
-            try {
-              await moduleExports.onload({ extensionAPI: mockExtensionAPI });
-              console.log(
-                `✅ ${extensionConfig.name} onload completed successfully (eval method)`
-              );
-
-              // Store unload function
-              if (typeof moduleExports.onunload === "function") {
-                window._loadedExtensions = window._loadedExtensions || [];
-                window._loadedExtensions.push({
-                  name: extensionConfig.name,
-                  onunload: moduleExports.onunload,
-                });
-              }
-            } catch (onloadError) {
-              console.error(
-                `❌ ${extensionConfig.name} onload failed (eval method):`,
-                onloadError
-              );
-              throw new Error(
-                `Extension onload failed: ${onloadError.message}`
-              );
-            }
-          } else {
-            console.warn(
-              `⚠️ ${extensionConfig.name} has no onload function (eval method)`
-            );
-          }
-
-          resolve({
-            ...extensionConfig,
-            module: { default: moduleExports },
-            loadMethod: "eval-fallback",
-            executed: true,
-          });
-        } catch (evalError) {
-          console.error(
-            `❌ Eval fallback also failed for ${extensionConfig.name}:`,
-            evalError
-          );
-          reject(
-            new Error(
-              `Both ES6 import and eval failed: ${importError.message} | ${evalError.message}`
-            )
-          );
-        }
-      }
-    } catch (error) {
-      console.error(`❌ Failed to load ${extensionConfig.name}:`, error);
-      reject(error);
-    }
-  });
-};
-
-// ===================================================================
-// 🧪 ENHANCED: Test Single Extension Loading
-// ===================================================================
-
-/**
- * Test loading a single extension (for debugging)
- */
-const testSingleExtensionLoad = async (
-  extensionName = "Extension 1: Core Infrastructure"
-) => {
-  console.group(`🧪 Testing Single Extension Load: ${extensionName}`);
-
-  try {
-    // Find the extension config
-    const extensionConfig =
-      window.extensionAutoLoader.discoveredExtensions.find(
-        (ext) => ext.name === extensionName
-      );
-
-    if (!extensionConfig) {
-      throw new Error(
-        `Extension "${extensionName}" not found in discovered extensions`
-      );
-    }
-
-    console.log(`🎯 Testing: ${extensionConfig.name}`);
-    console.log(`📁 File: ${extensionConfig.filename}`);
-    console.log(`🔗 URL: ${GITHUB_CONFIG.baseUrl + extensionConfig.filename}`);
-
-    const result = await loadRemoteExtensionFixed(extensionConfig);
-
-    console.log(`✅ Test successful!`);
-    console.log(`📦 Load method: ${result.loadMethod}`);
-    console.log(`📋 Module keys:`, Object.keys(result.module));
-
-    return result;
-  } catch (error) {
-    console.error(`❌ Test failed:`, error);
-    throw error;
-  } finally {
-    console.groupEnd();
-  }
-};
-
-// ===================================================================
-// 🔍 DISCOVERY FUNCTIONS - Same as before
-// ===================================================================
-
-const runEnhancedGitHubDiagnostics = async () => {
-  console.group("🔍 Enhanced GitHub Configuration Diagnostics");
-
-  console.log("📋 Current Configuration:");
-  console.log(`  Username: ${GITHUB_CONFIG.username}`);
-  console.log(`  Repository: ${GITHUB_CONFIG.repository}`);
-  console.log(`  Branch: ${GITHUB_CONFIG.branch}`);
-  console.log(`  Base URL: ${GITHUB_CONFIG.baseUrl}`);
-
-  try {
-    const repoTestUrl = `https://api.github.com/repos/${GITHUB_CONFIG.username}/${GITHUB_CONFIG.repository}`;
-    const repoResponse = await fetch(repoTestUrl);
-
-    if (repoResponse.ok) {
-      const repoData = await repoResponse.json();
-      console.log("✅ Repository exists and is accessible");
-      console.log(`   Repository: ${repoData.full_name}`);
-      console.log(`   Default branch: ${repoData.default_branch}`);
-      console.log(`   Public: ${!repoData.private}`);
-    } else {
+      // CRITICAL: Debug pre-execution API structure
+      console.log(`🔍 PRE-EXECUTION DEBUG for ${extension.name}:`);
+      console.log(`  mockAPI exists:`, !!mockAPI);
+      console.log(`  mockAPI.ui exists:`, !!mockAPI.ui);
       console.log(
-        `❌ Repository not accessible: ${repoResponse.status} ${repoResponse.statusText}`
+        `  mockAPI.ui.commandPalette exists:`,
+        !!mockAPI.ui.commandPalette
       );
-    }
-  } catch (error) {
-    console.log(`❌ Repository check failed: ${error.message}`);
-  }
 
-  console.groupEnd();
-
-  return { config: GITHUB_CONFIG, extensions: EXTENSION_SUITE };
-};
-
-const discoverExtensionFiles = async () => {
-  console.log("🔍 Discovering extension files in src/ directory...");
-
-  try {
-    const srcUrl = `https://api.github.com/repos/${GITHUB_CONFIG.username}/${GITHUB_CONFIG.repository}/contents/src?ref=${GITHUB_CONFIG.branch}`;
-    const srcResponse = await fetch(srcUrl);
-
-    if (!srcResponse.ok) {
-      throw new Error(`Failed to fetch src/ directory: ${srcResponse.status}`);
-    }
-
-    const srcContents = await srcResponse.json();
-
-    const extensionDirs = srcContents.filter(
-      (item) =>
-        item.type === "dir" &&
-        /^\d+[.\-\w]+/.test(item.name) && // FIXED: Added dot to regex
-        item.name !== "0.5-autoloader"
-    );
-
-    console.log(
-      `📁 Found ${extensionDirs.length} extension directories in src/:`
-    );
-    extensionDirs.forEach((dir, index) => {
-      console.log(`   ${index + 1}. ${dir.name}/`);
-    });
-
-    const discoveredExtensions = [];
-
-    for (const dir of extensionDirs) {
+      // Test addCommand function
       try {
-        const dirUrl = `https://api.github.com/repos/${GITHUB_CONFIG.username}/${GITHUB_CONFIG.repository}/contents/src/${dir.name}?ref=${GITHUB_CONFIG.branch}`;
-        const dirResponse = await fetch(dirUrl);
-
-        if (dirResponse.ok) {
-          const dirContents = await dirResponse.json();
-          const extensionFile = dirContents.find(
-            (file) => file.name === "extension.js"
-          );
-
-          if (extensionFile) {
-            const dirParts = dir.name.split("-");
-            const extensionNumber = dirParts[0];
-            const extensionName = dirParts
-              .slice(1)
-              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-              .join(" ");
-
-            const isCritical = ["1", "1.5", "2"].includes(extensionNumber);
-
-            discoveredExtensions.push({
-              id: dir.name,
-              name: `Extension ${extensionNumber}: ${extensionName}`,
-              filename: `src/${dir.name}/extension.js`,
-              description: `${extensionName} (from ${dir.name}/)`,
-              critical: isCritical,
-              order: parseFloat(extensionNumber),
-            });
-
-            console.log(`   ✅ Found extension.js in ${dir.name}/`);
-          } else {
-            console.log(`   ⚠️  No extension.js in ${dir.name}/`);
-          }
-        }
-      } catch (error) {
-        console.warn(`   ❌ Error checking ${dir.name}/: ${error.message}`);
+        const testResult = mockAPI.ui.commandPalette.addCommand({
+          label: "test",
+        });
+        console.log(`  ✅ addCommand test successful:`, testResult);
+      } catch (testError) {
+        console.log(`  ❌ addCommand test failed:`, testError);
       }
+
+      // Make API globally available (multiple locations for compatibility)
+      window.extensionAPI = mockAPI;
+      window._extensionAPI = mockAPI;
+      if (!window.roamExtensions) window.roamExtensions = {};
+      window.roamExtensions.extensionAPI = mockAPI;
+
+      // Import module
+      logMessage(`⚡ Importing module: ${extension.name}`);
+      const module = await import(blobUrl);
+
+      // Handle different export patterns
+      let executed = false;
+
+      if (module.default?.onload) {
+        logMessage(`🎯 Executing standard onload: ${extension.name}`);
+        await module.default.onload({ extensionAPI: mockAPI });
+        executed = true;
+      } else if (module.onload) {
+        logMessage(`🎯 Executing named onload: ${extension.name}`);
+        await module.onload({ extensionAPI: mockAPI });
+        executed = true;
+      } else if (typeof module.default === "function") {
+        logMessage(`🎯 Executing function export: ${extension.name}`);
+        await module.default({ extensionAPI: mockAPI });
+        executed = true;
+      } else {
+        // Self-executing extension
+        logMessage(`🎯 Self-executing extension detected: ${extension.name}`);
+        executed = true;
+      }
+
+      // Clean up global API references
+      delete window.extensionAPI;
+      delete window._extensionAPI;
+      delete window.roamExtensions.extensionAPI;
+
+      // Store for unload
+      loadedExtensions.set(extId, {
+        name: extension.name,
+        module: module.default || module,
+        executed,
+      });
+
+      updateExtensionStatus(extId, "success");
+      logMessage(`✅ ${extension.name} installed successfully!`, "success");
+    } finally {
+      // Always clean up blob URL
+      URL.revokeObjectURL(blobUrl);
     }
-
-    discoveredExtensions.sort((a, b) => a.order - b.order);
-
-    console.log(
-      `🎯 Successfully discovered ${discoveredExtensions.length} extensions with proper loading order`
-    );
-
-    return discoveredExtensions;
   } catch (error) {
-    console.error(`❌ Extension discovery failed: ${error.message}`);
-    return [];
+    console.error(`❌ ${extension.name} failed:`, error);
+    updateExtensionStatus(extId, "error");
+    logMessage(`❌ ${extension.name} failed: ${error.message}`, "error");
+    throw error; // Re-throw for caller handling
   }
-};
+}
 
-// ===================================================================
-// 🎨 UI FUNCTIONS - Enhanced with test button
-// ===================================================================
+// Auto-install all extensions
+async function autoInstallAll() {
+  const autoBtn = document.getElementById("auto-install-btn");
+  if (autoBtn) {
+    autoBtn.disabled = true;
+    autoBtn.textContent = "Installing...";
+  }
 
-const createEnhancedLoadingDashboard = () => {
-  const existing = document.getElementById("extension-auto-loader");
-  if (existing) existing.remove();
+  logMessage(
+    "🚀 Starting auto-installation of all Multi-User Suite extensions..."
+  );
 
-  const dashboard = document.createElement("div");
-  dashboard.id = "extension-auto-loader";
-  dashboard.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    width: 440px;
-    background: white;
-    border: 2px solid #137cbd;
-    border-radius: 12px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-    z-index: 10000;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    overflow: hidden;
-  `;
+  let successCount = 0;
+  let failureCount = 0;
 
-  dashboard.innerHTML = `
-    <div style="
-      background: linear-gradient(135deg, #059669 0%, #065f46 100%);
-      color: white;
-      padding: 16px 20px;
+  for (const extension of MULTIUSER_EXTENSIONS) {
+    try {
+      await installExtension(extension.id);
+      successCount++;
+      // Small delay to prevent overwhelming
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    } catch (error) {
+      failureCount++;
+      logMessage(`⚠️ Continuing despite ${extension.name} failure...`);
+    }
+  }
+
+  // Final report
+  const totalCount = MULTIUSER_EXTENSIONS.length;
+  if (successCount === totalCount) {
+    logMessage(
+      `🎉 Auto-installation complete! All ${successCount} extensions loaded.`,
+      "success"
+    );
+  } else {
+    logMessage(
+      `⚠️ Auto-installation finished: ${successCount}/${totalCount} successful, ${failureCount} failed.`
+    );
+  }
+
+  if (autoBtn) {
+    autoBtn.disabled = false;
+    autoBtn.textContent = "Auto-Install All Extensions";
+  }
+}
+
+// Create installer modal UI
+function createInstallerModal() {
+  const modalHTML = `
+    <div id="multiuser-installer-modal" style="
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     ">
-      <div>
-        <div style="font-size: 16px; font-weight: 600; margin-bottom: 4px;">
-          🚀 Extension Suite Auto-Loader (MIME FIXED)
+      <div style="
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+      ">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h2 style="margin: 0 0 8px 0; color: #212529; font-size: 24px;">👥 Multi-User Suite Installer</h2>
+          <p style="margin: 0; color: #6c757d; font-size: 14px;">Load all Multi-User Suite extensions with one click</p>
         </div>
-        <div style="font-size: 12px; opacity: 0.9;" id="branch-indicator">
-          Blob URL Method • GitHub MIME Type Issue Solved
+        
+        <button id="auto-install-btn" style="
+          width: 100%;
+          padding: 12px 24px;
+          background: linear-gradient(135deg, #20c997, #17a2b8);
+          color: white;
+          border: none;
+          border-radius: 8px;
+          font-size: 16px;
+          font-weight: 600;
+          cursor: pointer;
+          margin-bottom: 20px;
+          transition: all 0.2s;
+        " onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='translateY(0)'">
+          Auto-Install All Extensions
+        </button>
+        
+        <div style="margin-bottom: 20px;">
+          ${MULTIUSER_EXTENSIONS.map(
+            (ext) => `
+            <div id="ext-${ext.id}" style="
+              display: flex;
+              align-items: center;
+              padding: 12px;
+              border: 1px solid #e9ecef;
+              border-radius: 8px;
+              margin-bottom: 8px;
+              transition: all 0.2s;
+            ">
+              <span class="status-icon" style="font-size: 16px; margin-right: 12px;">⭕</span>
+              <div style="flex: 1;">
+                <div style="font-weight: 600; color: #212529; margin-bottom: 2px;">
+                  ${ext.name}${ext.critical ? " ⚡" : ""}
+                </div>
+                <div style="font-size: 12px; color: #6c757d;">${
+                  ext.description
+                }</div>
+              </div>
+              <button data-ext-id="${ext.id}" class="install-btn" style="
+                padding: 6px 16px;
+                background: linear-gradient(135deg, #51cf66, #40c057);
+                color: white;
+                border: none;
+                border-radius: 6px;
+                font-size: 12px;
+                font-weight: 600;
+                cursor: pointer;
+                min-width: 70px;
+                transition: all 0.2s;
+              ">Install</button>
+            </div>
+          `
+          ).join("")}
+        </div>
+        
+        <details style="margin-bottom: 20px;">
+          <summary style="cursor: pointer; font-weight: 600; color: #495057; margin-bottom: 8px;">
+            📋 Installation Log
+          </summary>
+          <div id="multiuser-install-log" style="
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 12px;
+            max-height: 150px;
+            overflow-y: auto;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 11px;
+            line-height: 1.4;
+          "></div>
+        </details>
+        
+        <div style="text-align: right;">
+          <button id="close-installer-btn" style="
+            padding: 8px 16px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+          ">Close</button>
         </div>
       </div>
-      <button onclick="this.closest('#extension-auto-loader').remove()" style="
-        background: rgba(255, 255, 255, 0.2);
-        border: none;
+    </div>
+  `;
+
+  document.body.insertAdjacentHTML("beforeend", modalHTML);
+  installerModal = document.getElementById("multiuser-installer-modal");
+
+  // Event listeners
+  document
+    .getElementById("auto-install-btn")
+    .addEventListener("click", autoInstallAll);
+  document
+    .getElementById("close-installer-btn")
+    .addEventListener("click", closeInstaller);
+
+  // Add event listeners for individual install buttons
+  document.querySelectorAll(".install-btn").forEach((button) => {
+    const extId = button.getAttribute("data-ext-id");
+    button.addEventListener("click", () => installExtension(extId));
+  });
+
+  // Close on backdrop click
+  installerModal.addEventListener("click", (e) => {
+    if (e.target === installerModal) {
+      closeInstaller();
+    }
+  });
+
+  logMessage("📱 Multi-User Suite Installer opened");
+}
+
+// Close installer modal
+function closeInstaller() {
+  if (installerModal) {
+    installerModal.remove();
+    installerModal = null;
+  }
+}
+
+// Dismiss the installer button
+function dismissInstallerButton() {
+  const buttonContainer = document.getElementById(
+    "multiuser-installer-container"
+  );
+  if (buttonContainer) {
+    buttonContainer.style.display = "none";
+    // Store dismissal preference
+    localStorage.setItem("multiuser-installer-dismissed", "true");
+    console.log("👥 Multi-User Suite Installer button dismissed");
+  }
+}
+
+// Show the installer button (in case user wants to bring it back)
+function showInstallerButton() {
+  // First clear the dismissal preference
+  localStorage.removeItem("multiuser-installer-dismissed");
+
+  // Check if container already exists
+  const existingContainer = document.getElementById(
+    "multiuser-installer-container"
+  );
+  if (existingContainer) {
+    existingContainer.style.display = "block";
+    console.log("👥 Multi-User Suite Installer button restored (was hidden)");
+    return;
+  }
+
+  // If container doesn't exist, create it
+  addInstallerButton();
+  console.log("👥 Multi-User Suite Installer button created");
+}
+
+// Add installer button to Roam
+function addInstallerButton() {
+  // Check if user has dismissed the button
+  if (localStorage.getItem("multiuser-installer-dismissed") === "true") {
+    console.log(
+      "👥 Multi-User Suite Installer button dismissed by user, not showing"
+    );
+    return;
+  }
+
+  const containerHTML = `
+    <div id="multiuser-installer-container" style="
+      position: fixed;
+      top: 70px;
+      right: 10px;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    ">
+      <button id="multiuser-installer-btn" style="
+        padding: 8px 12px;
+        background: linear-gradient(135deg, #20c997, #17a2b8);
         color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
         cursor: pointer;
-        font-size: 18px;
-        width: 24px;
-        height: 24px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        transition: all 0.2s;
+      ">👥 Install Multi-User Suite</button>
+      <button id="multiuser-installer-dismiss" style="
+        width: 20px;
+        height: 20px;
+        background: rgba(108, 117, 125, 0.8);
+        color: white;
+        border: none;
         border-radius: 50%;
+        font-size: 10px;
+        cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
-      ">×</button>
-    </div>
-    
-    <div style="padding: 20px;" id="dashboard-content">
-      <div style="text-align: center; color: #666; font-size: 14px;">
-        Running enhanced diagnostics with MIME type fix...
-      </div>
-    </div>
-    
-    <div style="
-      padding: 12px 20px;
-      border-top: 1px solid #e1e5e9;
-      background: #f8f9fa;
-      font-size: 11px;
-      color: #666;
-      text-align: center;
-    ">
-      Enhanced Auto-Loader v0.5.2 • Blob URL Method • MIME Type Issue Fixed
+        transition: all 0.2s;
+        line-height: 1;
+        padding: 0;
+      " title="Dismiss installer button">×</button>
     </div>
   `;
 
-  document.body.appendChild(dashboard);
-  return dashboard;
-};
+  document.body.insertAdjacentHTML("beforeend", containerHTML);
 
-const updateDashboardWithDiscovery = (discoveredExtensions) => {
-  const content = document.getElementById("dashboard-content");
-  if (!content) return;
+  const installerBtn = document.getElementById("multiuser-installer-btn");
+  const dismissBtn = document.getElementById("multiuser-installer-dismiss");
 
-  content.innerHTML = `
-    <div style="margin-bottom: 16px;">
-      <div style="font-size: 14px; font-weight: 600; color: #059669; margin-bottom: 8px;">
-        🔍 Extension Discovery Results (MIME FIXED)
-      </div>
-      <div style="font-size: 12px; color: #666;">
-        Found ${
-          discoveredExtensions.length
-        } extension files • Blob URL loading ready
-      </div>
-    </div>
+  // Main button event listeners
+  installerBtn.addEventListener("click", createInstallerModal);
+  installerBtn.addEventListener("mouseover", () => {
+    installerBtn.style.transform = "translateY(-1px)";
+    installerBtn.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.2)";
+  });
+  installerBtn.addEventListener("mouseout", () => {
+    installerBtn.style.transform = "translateY(0)";
+    installerBtn.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.15)";
+  });
 
-    <div style="max-height: 280px; overflow-y: auto;">
-      ${
-        discoveredExtensions.length === 0
-          ? `
-        <div style="text-align: center; padding: 20px; color: #666;">
-          <div style="font-size: 14px; margin-bottom: 8px;">📂 No extensions found</div>
-          <div style="font-size: 12px;">
-            Looking for numbered directories in src/ with extension.js files
-          </div>
-        </div>
-      `
-          : discoveredExtensions
-              .map(
-                (ext, index) => `
-        <div style="
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 8px 12px;
-          border-bottom: 1px solid #f1f5f9;
-          ${ext.critical ? "background: #fef3c7;" : ""}
-        ">
-          <span style="
-            font-size: 16px; 
-            min-width: 24px; 
-            text-align: center;
-            font-weight: bold;
-            color: ${ext.critical ? "#92400e" : "#374151"};
-          ">${ext.order}</span>
-          <div style="flex: 1;">
-            <div style="font-size: 13px; font-weight: 500; color: #374151;">
-              ${ext.name}
-            </div>
-            <div style="font-size: 11px; color: #666; margin-top: 2px;">
-              📁 ${ext.filename}
-            </div>
-          </div>
-          ${
-            ext.critical
-              ? '<span style="font-size: 10px; background: #92400e; color: white; padding: 2px 6px; border-radius: 8px; font-weight: 500;">CRITICAL</span>'
-              : ""
-          }
-        </div>
-      `
-              )
-              .join("")
-      }
-    </div>
+  // Dismiss button event listeners
+  dismissBtn.addEventListener("click", dismissInstallerButton);
+  dismissBtn.addEventListener("mouseover", () => {
+    dismissBtn.style.background = "rgba(220, 53, 69, 0.8)";
+    dismissBtn.style.transform = "scale(1.1)";
+  });
+  dismissBtn.addEventListener("mouseout", () => {
+    dismissBtn.style.background = "rgba(108, 117, 125, 0.8)";
+    dismissBtn.style.transform = "scale(1)";
+  });
 
-    <div style="margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap;">
-      <button onclick="window.extensionAutoLoader.loadDiscoveredExtensions()" style="
-        flex: 1; min-width: 120px;
-        background: #059669;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        padding: 8px 12px;
-        cursor: pointer;
-        font-size: 12px;
-        font-weight: 500;
-      ">
-        🚀 Load All (Execute)
-      </button>
-      
-      <button onclick="window.extensionAutoLoader.testSingleLoad()" style="
-        background: #d97706;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        padding: 8px 12px;
-        cursor: pointer;
-        font-size: 12px;
-        font-weight: 500;
-      ">
-        🧪 Test One
-      </button>
-      
-      <button onclick="window.extensionAutoLoader.runDiagnostics()" style="
-        background: #7c3aed;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        padding: 8px 12px;
-        cursor: pointer;
-        font-size: 12px;
-        font-weight: 500;
-      ">
-        🔍 Re-scan
-      </button>
-      
-      <button onclick="window.extensionAutoLoader.checkLoadedExtensions()" style="
-        background: #0891b2;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        padding: 8px 12px;
-        cursor: pointer;
-        font-size: 12px;
-        font-weight: 500;
-      ">
-        📊 Status
-      </button>
-      
-      <button onclick="window.extensionAutoLoader.unloadAllExtensions()" style="
-        background: #dc2626;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        padding: 8px 12px;
-        cursor: pointer;
-        font-size: 12px;
-        font-weight: 500;
-      ">
-        🧹 Unload
-      </button>
-    </div>
-  `;
-};
+  console.log("👥 Multi-User Suite Installer button added");
+}
 
-// ===================================================================
-// 🚀 ENHANCED MAIN AUTO-LOADER FUNCTIONALITY
-// ===================================================================
-
-window.extensionAutoLoader = {
-  discoveredExtensions: [],
-
-  async runDiagnostics() {
-    console.log("🔍 Running enhanced GitHub diagnostics...");
-    await runEnhancedGitHubDiagnostics();
-
-    const discovered = await discoverExtensionFiles();
-    this.discoveredExtensions = discovered;
-
-    updateDashboardWithDiscovery(discovered);
-
-    return discovered;
-  },
-
-  async testSingleLoad() {
-    if (this.discoveredExtensions.length === 0) {
-      console.log("❌ No extensions discovered. Run diagnostics first.");
-      return;
-    }
-
-    // Test the first critical extension (usually Extension 1)
-    const testExtension =
-      this.discoveredExtensions.find((ext) => ext.critical) ||
-      this.discoveredExtensions[0];
-
-    console.log(`🧪 Testing single extension load: ${testExtension.name}`);
-
-    try {
-      const result = await testSingleExtensionLoad(testExtension.name);
-      console.log("✅ Single extension test successful!");
-      console.log(
-        "💡 All extensions should load and execute successfully now."
-      );
-      return result;
-    } catch (error) {
-      console.error("❌ Single extension test failed:", error);
-      throw error;
-    }
-  },
-
-  async loadDiscoveredExtensions() {
-    if (this.discoveredExtensions.length === 0) {
-      console.log("❌ No extensions discovered. Run diagnostics first.");
-      return;
-    }
-
-    console.log(
-      `🚀 Loading ${this.discoveredExtensions.length} discovered extensions using Blob URL method...`
-    );
-    console.log(
-      "📊 Loading order:",
-      this.discoveredExtensions.map((e) => `${e.order}: ${e.name}`)
-    );
-
-    const results = {
-      successful: [],
-      failed: [],
-    };
-
-    for (let i = 0; i < this.discoveredExtensions.length; i++) {
-      const extension = this.discoveredExtensions[i];
-
-      try {
-        console.log(
-          `🔄 [${i + 1}/${this.discoveredExtensions.length}] Loading ${
-            extension.name
-          }...`
-        );
-        const result = await loadRemoteExtensionFixed(extension);
-        results.successful.push(result);
-
-        // Longer delay for critical extensions to ensure proper initialization
-        const delay = extension.critical ? 1500 : 800;
-        console.log(
-          `⏱️ Waiting ${delay}ms for ${extension.name} to initialize...`
-        );
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      } catch (error) {
-        console.error(`❌ Failed to load ${extension.name}:`, error.message);
-        results.failed.push({ extension, error: error.message });
-
-        if (extension.critical) {
-          console.warn(
-            `💥 CRITICAL EXTENSION FAILED: ${extension.name} - other extensions may not work properly`
-          );
-        }
-      }
-    }
-
-    console.group("🎯 Blob URL Auto-Load Results");
-    console.log(
-      `✅ Successful: ${results.successful.length}/${this.discoveredExtensions.length}`
-    );
-    console.log(`❌ Failed: ${results.failed.length}`);
-
-    if (results.successful.length > 0) {
-      console.log(
-        "✅ Successfully loaded and executed:",
-        results.successful.map((e) => `${e.order}: ${e.name} (${e.loadMethod})`)
-      );
-    }
-
-    if (results.failed.length > 0) {
-      console.log(
-        "❌ Failed to load:",
-        results.failed.map((f) => `${f.extension.order}: ${f.extension.name}`)
-      );
-    }
-
-    const criticalFailed = results.failed.filter(
-      (f) => f.extension.critical
-    ).length;
-    if (criticalFailed === 0 && results.successful.length > 0) {
-      console.log(
-        "🎉 Extension suite loaded successfully using Blob URL method! All critical extensions operational."
-      );
-      console.log(
-        "💡 Check for user directory buttons, navigation elements, etc."
-      );
-    } else if (criticalFailed > 0) {
-      console.warn(
-        `⚠️ ${criticalFailed} critical extension(s) failed - suite may not function properly`
-      );
-    }
-
-    console.groupEnd();
-
-    return results;
-  },
-
-  // 🧹 Cleanup function for unloading extensions
-  unloadAllExtensions() {
-    console.log("🧹 Unloading all loaded extensions...");
-
-    if (window._loadedExtensions && window._loadedExtensions.length > 0) {
-      window._loadedExtensions.forEach((ext) => {
-        try {
-          console.log(`🧹 Unloading ${ext.name}...`);
-          ext.onunload();
-          console.log(`✅ ${ext.name} unloaded successfully`);
-        } catch (error) {
-          console.warn(`⚠️ Error unloading ${ext.name}:`, error);
-        }
-      });
-
-      window._loadedExtensions = [];
-      console.log("✅ All extensions unloaded");
-    } else {
-      console.log("ℹ️ No extensions to unload");
-    }
-  },
-
-  // 📊 Status check for loaded extensions
-  checkLoadedExtensions() {
-    const loaded = window._loadedExtensions || [];
-    console.group("📊 Loaded Extensions Status");
-    console.log(`Total loaded: ${loaded.length}`);
-
-    if (loaded.length > 0) {
-      loaded.forEach((ext, index) => {
-        console.log(`${index + 1}. ${ext.name}`);
-      });
-    } else {
-      console.log("No extensions currently loaded");
-    }
-
-    // Check for visible extension features
-    const features = {
-      "Directory Button": document.querySelector(".user-directory-nav-button"),
-      "Extension Registry": window.RoamExtensionSuite,
-      "Debug Interface": document.querySelector("#extension-debug-interface"),
-      "Auto-loader Dashboard": document.querySelector("#extension-auto-loader"),
-    };
-
-    console.log("\n🔍 Visible Extension Features:");
-    Object.entries(features).forEach(([name, element]) => {
-      console.log(
-        `${element ? "✅" : "❌"} ${name}: ${element ? "Present" : "Not found"}`
-      );
-    });
-
-    console.groupEnd();
-
-    return { loaded, features };
-  },
-};
-
-// ===================================================================
-// 🚀 ROAM EXTENSION EXPORT - Enhanced Entry Point
-// ===================================================================
-
+// Main extension export
 export default {
   onload: async ({ extensionAPI }) => {
+    console.log("🚀 Multi-User Suite Installer Loading...");
+
+    // Reset state
+    loadedExtensions.clear();
+    installLog = [];
+
+    // Add installer button
+    addInstallerButton();
+
+    // Add command palette command to show installer button
+    extensionAPI.ui.commandPalette.addCommand({
+      label: "👥 Show Multi-User Suite Installer",
+      callback: () => {
+        showInstallerButton();
+        console.log(
+          "👥 Multi-User Suite Installer button restored via command palette"
+        );
+      },
+    });
+
+    // Add global function to re-show button if needed (fallback)
+    window.showMultiUserInstaller = showInstallerButton;
+
+    console.log("✅ Multi-User Suite Installer Ready!");
     console.log(
-      "🚀 Enhanced Extension Suite Auto-Loader starting (MIME TYPE FIXED)..."
+      "💡 Tip: If you dismissed the button, use Cmd+P and search for 'Show Multi-User Suite Installer'"
     );
-    console.log(
-      "🔧 Solution: Blob URL method bypasses GitHub Raw MIME type restrictions"
-    );
-    console.log(
-      `📁 Repository: ${GITHUB_CONFIG.username}/${GITHUB_CONFIG.repository}`
-    );
-    console.log(`🌿 Branch: ${GITHUB_CONFIG.branch}`);
-
-    try {
-      createEnhancedLoadingDashboard();
-
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      console.log(
-        "🔍 Starting enhanced repository discovery with MIME type fix..."
-      );
-      await window.extensionAutoLoader.runDiagnostics();
-
-      console.log("✅ Enhanced Auto-Loader ready with Blob URL method!");
-      console.log(
-        "💡 Use dashboard buttons to test single extension or load all"
-      );
-      console.log(
-        "🔧 MIME type issue resolved - extensions should load successfully"
-      );
-    } catch (error) {
-      console.error("💥 Fatal error in enhanced auto-loader:", error);
-    }
   },
 
   onunload: () => {
-    console.log("🛠️ Enhanced Auto-Loader unloading...");
+    console.log("🔄 Multi-User Suite Installer Unloading...");
 
-    const dashboard = document.getElementById("extension-auto-loader");
-    if (dashboard) dashboard.remove();
+    // Unload all installed extensions
+    loadedExtensions.forEach((ext, id) => {
+      try {
+        if (ext.module?.onunload) {
+          console.log(`🔄 Unloading ${ext.name}...`);
+          ext.module.onunload();
+        }
+      } catch (error) {
+        console.warn(`⚠️ Error unloading ${ext.name}:`, error);
+      }
+    });
 
-    delete window.extensionAutoLoader;
+    // Clean up UI
+    closeInstaller();
+    const installerContainer = document.getElementById(
+      "multiuser-installer-container"
+    );
+    if (installerContainer) {
+      installerContainer.remove();
+    }
 
-    console.log("✅ Enhanced Auto-Loader cleanup complete!");
+    // Clean up global function
+    delete window.showMultiUserInstaller;
+
+    // Reset state
+    loadedExtensions.clear();
+    installLog = [];
+
+    console.log("✅ Multi-User Suite Installer Unloaded");
   },
 };
