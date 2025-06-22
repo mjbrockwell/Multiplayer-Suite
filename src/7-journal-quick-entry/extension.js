@@ -409,11 +409,16 @@ const journalEntryCreator = (() => {
     }
   };
 
-  // 🌟 Create daily banner in chat room (with smart placement)
+  // 🌟 Create daily banner in chat room (with smart placement + debug logging)
   const createChatRoomEntry = async (pageName) => {
     try {
-      log("Creating daily banner for chat room", "INFO");
+      log(
+        `🚀 STARTING chat room banner creation for page: "${pageName}"`,
+        "INFO"
+      );
 
+      // Step 1: Get page UID (following username pattern)
+      log("Step 1: Finding page UID...", "DEBUG");
       const pageUid = window.roamAlphaAPI.data.q(`
         [:find ?uid .
          :where 
@@ -421,157 +426,141 @@ const journalEntryCreator = (() => {
          [?page :block/uid ?uid]]
       `);
 
-      if (!pageUid) throw new Error("Could not find Chat Room page UID");
+      if (!pageUid) {
+        log(`❌ ERROR: Could not find page UID for "${pageName}"`, "ERROR");
+        throw new Error(`Could not find Chat Room page UID for "${pageName}"`);
+      }
+      log(`✅ Found page UID: ${pageUid}`, "SUCCESS");
 
+      // Step 2: Build banner content (following username pattern)
       const todaysDate = getTodaysRoamDate();
       const bannerContent = `#st0 #clr-wht-act [[${todaysDate}]]`;
+      log(`📅 Banner content: "${bannerContent}"`, "DEBUG");
 
-      // Step 1: Find all existing date banners on the page
-      const allBlocks = window.roamAlphaAPI.data.q(`
-        [:find ?uid ?string ?order
-         :where 
-         [?page :node/title "${pageName}"]
-         [?page :block/children ?child]
-         [?descendant :block/parents ?child]
-         [?descendant :block/uid ?uid]
-         [?descendant :block/string ?string]
-         [?descendant :block/order ?order]]
-      `);
-
-      // Filter for blocks that are date banners (#st0 + date link pattern)
-      const dateBanners = allBlocks.filter(([uid, blockString, order]) => {
-        const lowerString = blockString.toLowerCase();
-        const hasStTag = lowerString.includes("#st0");
-
-        // Look for any date link pattern [[...]]
-        const hasDateLink = /\[\[.*\]\]/.test(blockString);
-
-        return hasStTag && hasDateLink;
-      });
-
-      let insertLocation;
-
-      if (dateBanners.length === 0) {
-        // No existing date banners - insert at BOTTOM of page
-        log(
-          "No existing date banners found, placing at bottom of page",
-          "INFO"
-        );
-
-        insertLocation = {
-          "parent-uid": pageUid,
-          order: "last",
-        };
-      } else {
-        // Find the topmost date banner (lowest order number or closest to page top)
-        log(
-          `Found ${dateBanners.length} existing date banners, finding topmost`,
-          "INFO"
-        );
-
-        // Get all direct children of the page to find the topmost banner
+      // Step 3: Find existing date banners for placement logic
+      log("Step 3: Finding existing date banners...", "DEBUG");
+      try {
+        // Simplified approach: get all direct children of the page first
         const pageChildren = window.roamAlphaAPI.data.q(`
-          [:find ?uid ?order
+          [:find ?uid ?string ?order
            :where 
            [?page :node/title "${pageName}"]
            [?page :block/children ?child]
            [?child :block/uid ?uid]
+           [?child :block/string ?string]
            [?child :block/order ?order]]
         `);
 
-        // Find which direct child contains our topmost date banner
-        let topmostBannerParent = null;
-        let topmostOrder = Infinity;
+        log(`Found ${pageChildren.length} direct children of page`, "DEBUG");
 
-        for (const [bannerUid, bannerString, bannerOrder] of dateBanners) {
-          // Check if this banner is a direct child of the page
-          const isDirectChild = pageChildren.some(
-            ([childUid]) => childUid === bannerUid
-          );
+        // Filter for date banners among direct children only
+        const dateBanners = pageChildren.filter(([uid, blockString, order]) => {
+          const lowerString = blockString.toLowerCase();
+          const hasStTag = lowerString.includes("#st0");
+          const hasDateLink = /\[\[.*\]\]/.test(blockString);
+          const isDateBanner = hasStTag && hasDateLink;
 
-          if (isDirectChild) {
-            const childOrder =
-              pageChildren.find(([childUid]) => childUid === bannerUid)?.[1] ||
-              Infinity;
-            if (childOrder < topmostOrder) {
-              topmostOrder = childOrder;
-              topmostBannerParent = bannerUid;
-            }
-          } else {
-            // Find the parent that is a direct child of the page
-            const parentUid = window.roamAlphaAPI.data.q(`
-              [:find ?parent-uid .
-               :where 
-               [?banner :block/uid "${bannerUid}"]
-               [?banner :block/parents ?parent]
-               [?parent :block/uid ?parent-uid]
-               [?page :node/title "${pageName}"]
-               [?page :block/children ?parent]]
-            `);
-
-            if (parentUid) {
-              const parentOrder =
-                pageChildren.find(
-                  ([childUid]) => childUid === parentUid
-                )?.[1] || Infinity;
-              if (parentOrder < topmostOrder) {
-                topmostOrder = parentOrder;
-                topmostBannerParent = parentUid;
-              }
-            }
+          if (isDateBanner) {
+            log(
+              `📋 Found date banner: "${blockString}" (order: ${order})`,
+              "DEBUG"
+            );
           }
-        }
 
-        if (topmostBannerParent) {
-          // Insert above the topmost banner
-          insertLocation = {
-            "parent-uid": pageUid,
-            order: topmostOrder,
-          };
-          log(
-            `Placing banner above topmost existing banner (order: ${topmostOrder})`,
-            "INFO"
-          );
-        } else {
-          // Fallback to bottom if we can't determine order
+          return isDateBanner;
+        });
+
+        log(`Found ${dateBanners.length} existing date banners`, "INFO");
+
+        // Step 4: Determine placement
+        let insertLocation;
+        if (dateBanners.length === 0) {
+          log("📍 No existing banners - placing at BOTTOM of page", "INFO");
           insertLocation = {
             "parent-uid": pageUid,
             order: "last",
           };
-          log("Could not determine topmost banner, placing at bottom", "WARN");
+        } else {
+          // Find banner with lowest order (topmost)
+          const sortedBanners = dateBanners.sort(([, , a], [, , b]) => a - b);
+          const topmostOrder = sortedBanners[0][2];
+
+          log(
+            `📍 Placing ABOVE topmost banner (order: ${topmostOrder})`,
+            "INFO"
+          );
+          insertLocation = {
+            "parent-uid": pageUid,
+            order: topmostOrder,
+          };
         }
+
+        log(
+          `📍 Insert location: parent=${insertLocation["parent-uid"]}, order=${insertLocation.order}`,
+          "DEBUG"
+        );
+      } catch (placementError) {
+        log(
+          `⚠️ Placement detection failed: ${placementError.message}, defaulting to bottom`,
+          "WARN"
+        );
+        insertLocation = {
+          "parent-uid": pageUid,
+          order: "last",
+        };
       }
 
-      // Step 2: Create the banner block
-      await window.roamAlphaAPI.data.block.create({
-        location: insertLocation,
-        block: { string: bannerContent },
-      });
+      // Step 5: Create the banner block (following username pattern)
+      log("Step 5: Creating banner block...", "DEBUG");
+      try {
+        await window.roamAlphaAPI.data.block.create({
+          location: insertLocation,
+          block: { string: bannerContent },
+        });
+        log("✅ Banner block created successfully", "SUCCESS");
+      } catch (createError) {
+        log(`❌ Banner creation failed: ${createError.message}`, "ERROR");
+        throw createError;
+      }
 
-      // Wait for creation to complete
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      // Step 6: Wait and find the newly created banner (following username pattern)
+      log("Step 6: Finding newly created banner...", "DEBUG");
+      await new Promise((resolve) => setTimeout(resolve, 300));
 
-      // Step 3: Find the newly created banner
       const newBannerUid = window.roamAlphaAPI.data.q(`
         [:find ?uid .
          :where 
-         [?page :node/title "${pageName}"]
-         [?page :block/children ?child]
-         [?descendant :block/parents ?child]
-         [?descendant :block/uid ?uid]
-         [?descendant :block/string "${bannerContent}"]]
+         [?parent :block/uid "${pageUid}"]
+         [?parent :block/children ?child]
+         [?child :block/uid ?uid]
+         [?child :block/string "${bannerContent}"]]
       `);
 
-      if (!newBannerUid) throw new Error("Could not find newly created banner");
+      if (!newBannerUid) {
+        log(
+          `❌ Could not find newly created banner with content: "${bannerContent}"`,
+          "ERROR"
+        );
+        throw new Error("Could not find newly created banner");
+      }
+      log(`✅ Found new banner UID: ${newBannerUid}`, "SUCCESS");
 
-      // Step 4: Create empty child block under the banner
-      await window.roamAlphaAPI.data.block.create({
-        location: { "parent-uid": newBannerUid, order: 0 },
-        block: { string: "" },
-      });
+      // Step 7: Create child block (following username pattern)
+      log("Step 7: Creating child block...", "DEBUG");
+      try {
+        await window.roamAlphaAPI.data.block.create({
+          location: { "parent-uid": newBannerUid, order: 0 },
+          block: { string: "" },
+        });
+        log("✅ Child block created successfully", "SUCCESS");
+      } catch (childError) {
+        log(`❌ Child block creation failed: ${childError.message}`, "ERROR");
+        throw childError;
+      }
 
-      // Step 5: Focus on the empty child block
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      // Step 8: Focus on child block (following username pattern)
+      log("Step 8: Setting focus on child block...", "DEBUG");
+      await new Promise((resolve) => setTimeout(resolve, 300));
 
       const childUid = window.roamAlphaAPI.data.q(`
         [:find ?uid .
@@ -582,19 +571,31 @@ const journalEntryCreator = (() => {
       `);
 
       if (childUid) {
-        window.roamAlphaAPI.ui.setBlockFocusAndSelection({
-          location: {
-            "block-uid": childUid,
-            "window-id": "main-window",
-          },
-        });
-        log("Cursor positioned in new banner's child block", "SUCCESS");
+        try {
+          window.roamAlphaAPI.ui.setBlockFocusAndSelection({
+            location: {
+              "block-uid": childUid,
+              "window-id": "main-window",
+            },
+          });
+          log(`✅ Focus set on child block: ${childUid}`, "SUCCESS");
+        } catch (focusError) {
+          log(`⚠️ Focus setting failed: ${focusError.message}`, "WARN");
+          // Don't throw - banner was created successfully
+        }
+      } else {
+        log("⚠️ Could not find child block for focus", "WARN");
+        // Don't throw - banner was created successfully
       }
 
-      log("Daily banner created successfully with smart placement", "SUCCESS");
+      log(
+        "🎉 Daily banner created successfully with smart placement!",
+        "SUCCESS"
+      );
       return true;
     } catch (error) {
-      log(`Error creating chat room banner: ${error.message}`, "ERROR");
+      log(`💥 FATAL ERROR in createChatRoomEntry: ${error.message}`, "ERROR");
+      log(`💥 Error stack: ${error.stack}`, "ERROR");
       throw error;
     }
   };
