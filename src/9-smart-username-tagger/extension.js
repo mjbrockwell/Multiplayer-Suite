@@ -170,7 +170,7 @@ const smartUsernameTagger = (() => {
     return false;
   };
 
-  // 🆕 1.7 - NEW: Check chat room date context (ENHANCED DEBUG)
+  // 🆕 1.7 - NEW: Check chat room date context (ENHANCED with roam/comments exclusion)
   const isInChatRoomDateContext = (blockElement) => {
     debug(`🔍 === CHAT ROOM DATE CONTEXT DEBUG START ===`);
 
@@ -194,7 +194,32 @@ const smartUsernameTagger = (() => {
 
       debug(`✅ Confirmed chat room page!`);
 
-      // 2. Analyze block structure in detail
+      // 🆕 2. EXCLUSION: Check if block is under [[roam/comments]]
+      debug(`🚫 Checking for roam/comments exclusion...`);
+      let current = blockElement;
+      while (current && current !== document.body) {
+        const textElement = current.querySelector(".rm-block-text");
+        if (textElement) {
+          const content = textElement.textContent || "";
+          if (
+            content.includes("[[roam/comments]]") ||
+            content.includes("roam/comments")
+          ) {
+            debug(
+              `🚫 ❌ Block is under [[roam/comments]], EXCLUDING from tagging`
+            );
+            debug(`🚫 Comments block content: "${content}"`);
+            debug(
+              `🔍 === CHAT ROOM DATE CONTEXT DEBUG END (EXCLUDED: ROAM COMMENTS) ===`
+            );
+            return false;
+          }
+        }
+        current = current.parentElement?.closest(".rm-block");
+      }
+      debug(`🚫 ✅ Not under roam/comments, proceeding...`);
+
+      // 3. Analyze block structure in detail
       debug(`🧱 Block element:`, blockElement);
       debug(`🧱 Block classes:`, blockElement.className);
       debug(`🧱 Block parent:`, blockElement.parentElement);
@@ -234,7 +259,7 @@ const smartUsernameTagger = (() => {
 
       debug(`✅ Parent block found:`, parentBlockElement);
 
-      // 3. Check if parent block contains [[date]] pattern - multiple approaches
+      // 4. Check if parent block contains [[date]] pattern - multiple approaches
       let parentContent = "";
 
       // Method 1: .rm-block-text
@@ -279,7 +304,7 @@ const smartUsernameTagger = (() => {
 
       debug(`✅ Date references found!`);
 
-      // 4. Validate that we're exactly one level deeper than the parent
+      // 5. Validate that we're exactly one level deeper than the parent
       debug(`🔍 Validating parent-child relationship...`);
 
       const blockChildren = blockElement.parentElement;
@@ -567,8 +592,9 @@ const smartUsernameTagger = (() => {
         if (blockUid && !processedBlocks.has(blockUid)) {
           debug(`⌨️ Processing block ${blockUid} immediately (Enter key)`);
 
+          // 🆕 INCREASED TIMEOUT: Give Roam more time to create block metadata
           setTimeout(async () => {
-            debug(`⌨️ 100ms timeout expired, processing block ${blockUid}`);
+            debug(`⌨️ 500ms timeout expired, processing block ${blockUid}`);
 
             const blockData = window.roamAlphaAPI.pull(`[:block/string]`, [
               ":block/uid",
@@ -582,24 +608,80 @@ const smartUsernameTagger = (() => {
               return;
             }
 
-            debug(`⌨️ Getting block author...`);
-            const authorName = getBlockAuthor(blockUid);
-            debug(`⌨️ Block author: ${authorName}`);
+            debug(`⌨️ Getting block author (attempt 1)...`);
+            let authorName = getBlockAuthor(blockUid);
+            debug(`⌨️ Block author (attempt 1): ${authorName}`);
 
-            if (authorName) {
-              debug(`⌨️ Adding username tag...`);
+            // 🆕 RETRY LOGIC: If no author found, wait and try again
+            if (!authorName) {
+              debug(
+                `⌨️ No author found on first attempt, retrying in 1 second...`
+              );
+              setTimeout(async () => {
+                debug(`⌨️ Getting block author (attempt 2)...`);
+                authorName = getBlockAuthor(blockUid);
+                debug(`⌨️ Block author (attempt 2): ${authorName}`);
+
+                if (!authorName) {
+                  debug(
+                    `⌨️ Still no author found on second attempt, retrying in 2 seconds...`
+                  );
+                  setTimeout(async () => {
+                    debug(`⌨️ Getting block author (attempt 3 - final)...`);
+                    authorName = getBlockAuthor(blockUid);
+                    debug(`⌨️ Block author (attempt 3): ${authorName}`);
+
+                    if (authorName) {
+                      debug(`⌨️ Adding username tag (attempt 3)...`);
+                      const success = await addUsernameTag(
+                        blockUid,
+                        authorName
+                      );
+                      if (success) {
+                        processedBlocks.add(blockUid);
+                        pendingBlocks.delete(blockUid);
+                        debug(
+                          `⌨️ ✅ Successfully tagged block ${blockUid} (attempt 3)`
+                        );
+                      } else {
+                        debug(
+                          `⌨️ ❌ Failed to tag block ${blockUid} (attempt 3)`
+                        );
+                      }
+                    } else {
+                      debug(
+                        `⌨️ ❌ Final attempt failed - no author found for block ${blockUid}`
+                      );
+                    }
+                  }, 2000);
+                } else {
+                  debug(`⌨️ Adding username tag (attempt 2)...`);
+                  const success = await addUsernameTag(blockUid, authorName);
+                  if (success) {
+                    processedBlocks.add(blockUid);
+                    pendingBlocks.delete(blockUid);
+                    debug(
+                      `⌨️ ✅ Successfully tagged block ${blockUid} (attempt 2)`
+                    );
+                  } else {
+                    debug(`⌨️ ❌ Failed to tag block ${blockUid} (attempt 2)`);
+                  }
+                }
+              }, 1000);
+            } else {
+              debug(`⌨️ Adding username tag (attempt 1)...`);
               const success = await addUsernameTag(blockUid, authorName);
               if (success) {
                 processedBlocks.add(blockUid);
                 pendingBlocks.delete(blockUid);
-                debug(`⌨️ ✅ Successfully tagged block ${blockUid}`);
+                debug(
+                  `⌨️ ✅ Successfully tagged block ${blockUid} (attempt 1)`
+                );
               } else {
-                debug(`⌨️ ❌ Failed to tag block ${blockUid}`);
+                debug(`⌨️ ❌ Failed to tag block ${blockUid} (attempt 1)`);
               }
-            } else {
-              debug(`⌨️ ❌ No author found for block ${blockUid}`);
             }
-          }, 100);
+          }, 500); // 🆕 INCREASED from 100ms to 500ms
         }
       } else {
         debug(`⌨️ Block not in taggable context or no block element`);
