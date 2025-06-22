@@ -292,44 +292,10 @@ const journalEntryCreator = (() => {
     }
   };
 
-  // 🌟 Check if today's daily banner exists (Chat Room page)
+  // 🌟 Chat room button always shows (for threaded conversations)
   const shouldShowChatRoomButton = (pageName) => {
-    try {
-      const todaysDate = getTodaysRoamDate();
-
-      const allBlocks = window.roamAlphaAPI.data.q(`
-        [:find ?string
-         :where 
-         [?page :node/title "${pageName}"]
-         [?page :block/children ?child]
-         [?descendant :block/parents ?child]
-         [?descendant :block/string ?string]]
-      `);
-
-      // Check if today's banner exists (contains #st0 and today's date link)
-      const todaysBannerExists = allBlocks.some(([blockString]) => {
-        const lowerString = blockString.toLowerCase();
-        const hasStTag = lowerString.includes("#st0");
-
-        // Check for today's date in various formats
-        const dateVariations = [
-          `[[${todaysDate}]]`,
-          `[[${todaysDate.toLowerCase()}]]`,
-          `[[${todaysDate.toUpperCase()}]]`,
-        ];
-
-        const hasDateLink = dateVariations.some((dateFormat) =>
-          lowerString.includes(dateFormat.toLowerCase())
-        );
-
-        return hasStTag && hasDateLink;
-      });
-
-      return !todaysBannerExists;
-    } catch (error) {
-      log(`Error checking chat room button: ${error.message}`, "ERROR");
-      return false;
-    }
+    // Always show button for threaded conversation support
+    return true;
   };
 
   // ═══════════════════════════════════════════════════════════════
@@ -409,10 +375,10 @@ const journalEntryCreator = (() => {
     }
   };
 
-  // 🌟 Create daily banner in chat room (with smart placement)
+  // 🌟 Create chat room entry (find or create header + add as last child)
   const createChatRoomEntry = async (pageName) => {
     try {
-      log("Creating daily banner for chat room", "INFO");
+      log("Adding message to chat room thread", "INFO");
 
       const pageUid = window.roamAlphaAPI.data.q(`
         [:find ?uid .
@@ -423,178 +389,96 @@ const journalEntryCreator = (() => {
 
       if (!pageUid) throw new Error("Could not find Chat Room page UID");
 
-      const todaysDate = getTodaysRoamDate();
-      const bannerContent = `#st0 #clr-wht-act [[${todaysDate}]]`;
+      // Get current user for prepending
+      const coreData = getCoreData();
+      const currentUser = coreData?.getCurrentUser?.() || {
+        displayName: getCurrentUserFallback(),
+      };
 
-      // Step 1: Find all existing date banners on the page
-      const allBlocks = window.roamAlphaAPI.data.q(`
-        [:find ?uid ?string ?order
+      const todaysDate = getTodaysRoamDate();
+      const dayName = getTodaysDayName();
+      const headerContent = `#st0 #clr-wht-act [[${todaysDate}]]  -  ${dayName}`;
+
+      // Step 1: Find existing header or create new one
+      let headerUid = window.roamAlphaAPI.data.q(`
+        [:find ?uid .
          :where 
-         [?page :node/title "${pageName}"]
-         [?page :block/children ?child]
-         [?descendant :block/parents ?child]
-         [?descendant :block/uid ?uid]
-         [?descendant :block/string ?string]
-         [?descendant :block/order ?order]]
+         [?parent :block/uid "${pageUid}"]
+         [?parent :block/children ?child]
+         [?child :block/uid ?uid]
+         [?child :block/string "${headerContent}"]]
       `);
 
-      // Filter for blocks that are date banners (#st0 + date link pattern)
-      const dateBanners = allBlocks.filter(([uid, blockString, order]) => {
-        const lowerString = blockString.toLowerCase();
-        const hasStTag = lowerString.includes("#st0");
+      if (!headerUid) {
+        // Create new header if it doesn't exist
+        log("Creating new daily header for chat room", "INFO");
+        await window.roamAlphaAPI.data.block.create({
+          location: { "parent-uid": pageUid, order: 0 },
+          block: { string: headerContent },
+        });
 
-        // Look for any date link pattern [[...]]
-        const hasDateLink = /\[\[.*\]\]/.test(blockString);
+        await new Promise((resolve) => setTimeout(resolve, 200));
 
-        return hasStTag && hasDateLink;
-      });
-
-      let insertLocation;
-
-      if (dateBanners.length === 0) {
-        // No existing date banners - insert at BOTTOM of page
-        log(
-          "No existing date banners found, placing at bottom of page",
-          "INFO"
-        );
-
-        insertLocation = {
-          "parent-uid": pageUid,
-          order: "last",
-        };
-      } else {
-        // Find the topmost date banner (lowest order number or closest to page top)
-        log(
-          `Found ${dateBanners.length} existing date banners, finding topmost`,
-          "INFO"
-        );
-
-        // Get all direct children of the page to find the topmost banner
-        const pageChildren = window.roamAlphaAPI.data.q(`
-          [:find ?uid ?order
+        headerUid = window.roamAlphaAPI.data.q(`
+          [:find ?uid .
            :where 
-           [?page :node/title "${pageName}"]
-           [?page :block/children ?child]
+           [?parent :block/uid "${pageUid}"]
+           [?parent :block/children ?child]
            [?child :block/uid ?uid]
-           [?child :block/order ?order]]
+           [?child :block/string "${headerContent}"]]
         `);
-
-        // Find which direct child contains our topmost date banner
-        let topmostBannerParent = null;
-        let topmostOrder = Infinity;
-
-        for (const [bannerUid, bannerString, bannerOrder] of dateBanners) {
-          // Check if this banner is a direct child of the page
-          const isDirectChild = pageChildren.some(
-            ([childUid]) => childUid === bannerUid
-          );
-
-          if (isDirectChild) {
-            const childOrder =
-              pageChildren.find(([childUid]) => childUid === bannerUid)?.[1] ||
-              Infinity;
-            if (childOrder < topmostOrder) {
-              topmostOrder = childOrder;
-              topmostBannerParent = bannerUid;
-            }
-          } else {
-            // Find the parent that is a direct child of the page
-            const parentUid = window.roamAlphaAPI.data.q(`
-              [:find ?parent-uid .
-               :where 
-               [?banner :block/uid "${bannerUid}"]
-               [?banner :block/parents ?parent]
-               [?parent :block/uid ?parent-uid]
-               [?page :node/title "${pageName}"]
-               [?page :block/children ?parent]]
-            `);
-
-            if (parentUid) {
-              const parentOrder =
-                pageChildren.find(
-                  ([childUid]) => childUid === parentUid
-                )?.[1] || Infinity;
-              if (parentOrder < topmostOrder) {
-                topmostOrder = parentOrder;
-                topmostBannerParent = parentUid;
-              }
-            }
-          }
-        }
-
-        if (topmostBannerParent) {
-          // Insert above the topmost banner
-          insertLocation = {
-            "parent-uid": pageUid,
-            order: topmostOrder,
-          };
-          log(
-            `Placing banner above topmost existing banner (order: ${topmostOrder})`,
-            "INFO"
-          );
-        } else {
-          // Fallback to bottom if we can't determine order
-          insertLocation = {
-            "parent-uid": pageUid,
-            order: "last",
-          };
-          log("Could not determine topmost banner, placing at bottom", "WARN");
-        }
+      } else {
+        log(
+          "Found existing daily header, adding to conversation thread",
+          "INFO"
+        );
       }
 
-      // Step 2: Create the banner block
+      if (!headerUid) throw new Error("Could not find or create daily header");
+
+      // Step 2: Add new message as LAST child of the header (for threaded conversation)
+      const childContent = `#ts0 #[[${currentUser.displayName}]]  ▸  `;
       await window.roamAlphaAPI.data.block.create({
-        location: insertLocation,
-        block: { string: bannerContent },
+        location: { "parent-uid": headerUid, order: "last" },
+        block: { string: childContent },
       });
 
-      // Wait for creation to complete
+      // Step 3: Focus cursor at end of the prepended text
       await new Promise((resolve) => setTimeout(resolve, 200));
 
-      // Step 3: Find the newly created banner
-      const newBannerUid = window.roamAlphaAPI.data.q(`
-        [:find ?uid .
+      // Find the new child block we just created
+      const allChildren = window.roamAlphaAPI.data.q(`
+        [:find ?uid ?string
          :where 
-         [?page :node/title "${pageName}"]
-         [?page :block/children ?child]
-         [?descendant :block/parents ?child]
-         [?descendant :block/uid ?uid]
-         [?descendant :block/string "${bannerContent}"]]
-      `);
-
-      if (!newBannerUid) throw new Error("Could not find newly created banner");
-
-      // Step 4: Create empty child block under the banner
-      await window.roamAlphaAPI.data.block.create({
-        location: { "parent-uid": newBannerUid, order: 0 },
-        block: { string: "" },
-      });
-
-      // Step 5: Focus on the empty child block
-      await new Promise((resolve) => setTimeout(resolve, 200));
-
-      const childUid = window.roamAlphaAPI.data.q(`
-        [:find ?uid .
-         :where 
-         [?parent :block/uid "${newBannerUid}"]
+         [?parent :block/uid "${headerUid}"]
          [?parent :block/children ?child]
-         [?child :block/uid ?uid]]
+         [?child :block/uid ?uid]
+         [?child :block/string ?string]]
       `);
 
-      if (childUid) {
+      // Find our newly created block (should be the one with our exact content)
+      const newChildUid = allChildren.find(
+        ([uid, string]) => string === childContent
+      )?.[0];
+
+      if (newChildUid) {
         window.roamAlphaAPI.ui.setBlockFocusAndSelection({
           location: {
-            "block-uid": childUid,
+            "block-uid": newChildUid,
             "window-id": "main-window",
           },
+          selection: { start: childContent.length, end: childContent.length },
         });
-        log("Cursor positioned in new banner's child block", "SUCCESS");
+        log("Cursor positioned after username in new message", "SUCCESS");
       }
 
-      log("Daily banner created successfully with smart placement", "SUCCESS");
+      log(
+        "Chat room message added to conversation thread successfully",
+        "SUCCESS"
+      );
       return true;
     } catch (error) {
-      log(`Error creating chat room banner: ${error.message}`, "ERROR");
+      log(`Error creating chat room entry: ${error.message}`, "ERROR");
       throw error;
     }
   };
@@ -619,12 +503,9 @@ const journalEntryCreator = (() => {
         showQuickEntryButton("Add daily entry", () =>
           createUsernameEntry(pageContext.page)
         );
-      } else if (
-        pageContext.type === "chatroom" &&
-        shouldShowChatRoomButton(pageContext.page)
-      ) {
-        // NEW: Conditional showing for chat rooms with new button text
-        showQuickEntryButton("Add a daily banner?", () =>
+      } else if (pageContext.type === "chatroom") {
+        // Always show for chat rooms (threaded conversation support)
+        showQuickEntryButton("Add chat message", () =>
           createChatRoomEntry(pageContext.page)
         );
       }
@@ -717,7 +598,7 @@ const journalEntryCreator = (() => {
       quickEntryButton.addEventListener("click", async () => {
         try {
           // Visual feedback BEFORE hiding
-          quickEntryButton.innerHTML = `<span style="font-size: 16px;">⏳</span><span>Creating...</span>`;
+          quickEntryButton.innerHTML = `<span style="font-size: 16px;">⏳</span><span>Adding message...</span>`;
           quickEntryButton.style.background =
             "linear-gradient(135deg, #fef3c7, #fde68a)";
 
@@ -725,7 +606,7 @@ const journalEntryCreator = (() => {
 
           // Success feedback
           if (quickEntryButton) {
-            quickEntryButton.innerHTML = `<span style="font-size: 16px;">✅</span><span>Banner Added!</span>`;
+            quickEntryButton.innerHTML = `<span style="font-size: 16px;">✅</span><span>Message Added!</span>`;
             quickEntryButton.style.background =
               "linear-gradient(135deg, #dcfce7, #bbf7d0)";
             quickEntryButton.style.borderColor = "#16a34a";
@@ -755,7 +636,7 @@ const journalEntryCreator = (() => {
             // Reset button for retry in chat room
             setTimeout(() => {
               if (quickEntryButton) {
-                quickEntryButton.innerHTML = `<span style="font-size: 16px;">✏️</span><span>Add a daily banner?</span>`;
+                quickEntryButton.innerHTML = `<span style="font-size: 16px;">✏️</span><span>Add chat message</span>`;
                 quickEntryButton.style.background =
                   "linear-gradient(135deg, #fef3c7, #fde68a)";
                 quickEntryButton.style.borderColor = "#f59e0b";
