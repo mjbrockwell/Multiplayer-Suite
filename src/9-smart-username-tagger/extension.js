@@ -195,18 +195,93 @@ const smartUsernameTagger = (() => {
       debug(`✅ Confirmed chat room page!`);
 
       // 🆕 2a. EXCLUSION: Check if THIS block contains #ch0 (conversation header)
-      debug(`🚫 Checking if this block contains #ch0...`);
+      debug(`🚫 === ENHANCED #ch0 DETECTION START ===`);
       const thisBlockTextElement = blockElement.querySelector(".rm-block-text");
       if (thisBlockTextElement) {
         const thisBlockContent = thisBlockTextElement.textContent || "";
-        debug(`🚫 This block content: "${thisBlockContent}"`);
+        const thisBlockHTML = thisBlockTextElement.innerHTML || "";
+        debug(`🚫 This block text content: "${thisBlockContent}"`);
+        debug(`🚫 This block innerHTML: "${thisBlockHTML}"`);
 
-        // Check for various #ch0 patterns
-        if (
-          thisBlockContent.includes("#ch0") ||
-          thisBlockContent.includes("ch0") ||
-          blockElement.querySelector('.rm-page-ref[data-tag="ch0"]')
-        ) {
+        // Method 1: Check text content for literal #ch0
+        const hasLiteralCh0 =
+          thisBlockContent.includes("#ch0") || thisBlockContent.includes("ch0");
+        debug(`🚫 Method 1 - Literal text contains ch0: ${hasLiteralCh0}`);
+
+        // Method 2: Check for page reference DOM elements
+        const pageRefCh0 = blockElement.querySelector(
+          '.rm-page-ref[data-tag="ch0"]'
+        );
+        debug(`🚫 Method 2 - Page ref element found: ${!!pageRefCh0}`);
+        if (pageRefCh0) {
+          debug(`🚫 Page ref element:`, pageRefCh0);
+          debug(`🚫 Page ref data-tag:`, pageRefCh0.getAttribute("data-tag"));
+        }
+
+        // Method 3: Check for alternative page reference selectors
+        const pageRefAlt1 = blockElement.querySelector('[data-tag="ch0"]');
+        const pageRefAlt2 = blockElement.querySelector(
+          '.rm-page-ref[title*="ch0"]'
+        );
+        const pageRefAlt3 = blockElement.querySelector('a[href*="ch0"]');
+        debug(`🚫 Method 3a - Alt selector [data-tag="ch0"]: ${!!pageRefAlt1}`);
+        debug(`🚫 Method 3b - Alt selector [title*="ch0"]: ${!!pageRefAlt2}`);
+        debug(`🚫 Method 3c - Alt selector [href*="ch0"]: ${!!pageRefAlt3}`);
+
+        // Method 4: Check innerHTML for ch0 patterns
+        const htmlContainsCh0 =
+          thisBlockHTML.includes("ch0") || thisBlockHTML.includes("CH0");
+        debug(`🚫 Method 4 - HTML contains ch0: ${htmlContainsCh0}`);
+
+        // Method 5: Look for specific emoji or visual indicators that suggest #ch0
+        const hasConversationEmoji =
+          thisBlockContent.includes("💬") ||
+          thisBlockContent.includes("🗨️") ||
+          thisBlockContent.includes("💭") ||
+          thisBlockHTML.includes("💬") ||
+          thisBlockHTML.includes("🗨️") ||
+          thisBlockHTML.includes("💭");
+        debug(`🚫 Method 5 - Has conversation emoji: ${hasConversationEmoji}`);
+
+        // Method 6: Check all child elements for ch0-related attributes
+        const allChildElements = blockElement.querySelectorAll("*");
+        let foundCh0InChild = false;
+        for (const child of allChildElements) {
+          const childTag = child.getAttribute("data-tag");
+          const childHref = child.getAttribute("href");
+          const childTitle = child.getAttribute("title");
+          const childText = child.textContent || "";
+
+          if (
+            (childTag && childTag.includes("ch0")) ||
+            (childHref && childHref.includes("ch0")) ||
+            (childTitle && childTitle.includes("ch0")) ||
+            childText.includes("ch0")
+          ) {
+            foundCh0InChild = true;
+            debug(`🚫 Method 6 - Found ch0 in child element:`, child);
+            debug(`🚫 Child data-tag: ${childTag}`);
+            debug(`🚫 Child href: ${childHref}`);
+            debug(`🚫 Child title: ${childTitle}`);
+            debug(`🚫 Child text: ${childText}`);
+            break;
+          }
+        }
+        debug(`🚫 Method 6 - Found ch0 in any child: ${foundCh0InChild}`);
+
+        // Combine all detection methods
+        const containsCh0 =
+          hasLiteralCh0 ||
+          !!pageRefCh0 ||
+          !!pageRefAlt1 ||
+          !!pageRefAlt2 ||
+          !!pageRefAlt3 ||
+          htmlContainsCh0 ||
+          foundCh0InChild;
+        debug(`🚫 FINAL RESULT - Block contains ch0: ${containsCh0}`);
+        debug(`🚫 === ENHANCED #ch0 DETECTION END ===`);
+
+        if (containsCh0) {
           debug(
             `🚫 ❌ Block contains #ch0, EXCLUDING from tagging (conversation header)`
           );
