@@ -10,10 +10,18 @@ const smartUsernameTagger = (() => {
   let idleTimer = null;
   let isProcessing = false;
 
-  // 🌸 1.1 - Debug Function (unchanged)
+  // 🌸 1.1 - Debug Function (ENHANCED with immediate test)
   const debug = (message) => {
     console.log("Smart Tagger:", message);
   };
+
+  // 🚨 IMMEDIATE TEST: Verify debug function works
+  debug("🚀 DEBUG FUNCTION TEST - Extension is initializing!");
+
+  // 🚨 Test console output immediately
+  console.log("🚨 DIRECT CONSOLE TEST - Extension loaded!");
+  console.warn("⚠️ CONSOLE WARNING TEST - This should be visible!");
+  console.error("❌ CONSOLE ERROR TEST - This should be red!");
 
   // 🔧 1.2 - ENHANCED: Get Block Author with Robust User Detection
   const getBlockAuthor = (blockUid) => {
@@ -705,13 +713,66 @@ const smartUsernameTagger = (() => {
     debug("✅ Existing conversations AND chat rooms processed");
   };
 
-  // 🌲 5.0 - Setup Event Listeners (unchanged - works well)
+  // 🌲 5.0 - Setup Event Listeners (ENHANCED DEBUG + ALTERNATIVE APPROACHES)
   const setupEventListeners = () => {
-    document.addEventListener("focusout", handleBlockBlur, true);
-    document.addEventListener("keydown", handleKeyDown, true);
-    window.addEventListener("beforeunload", handlePageChange);
-    window.addEventListener("hashchange", handlePageChange);
-    debug("Event listeners setup complete");
+    debug("🔧 Starting event listener setup...");
+    console.log("🔧 DIRECT: Starting event listener setup...");
+
+    try {
+      // Test multiple event listener approaches
+      debug("🔧 Method 1: Adding focusout listener with capture=true");
+      document.addEventListener("focusout", handleBlockBlur, true);
+
+      debug("🔧 Method 2: Adding keydown listener with capture=true");
+      document.addEventListener("keydown", handleKeyDown, true);
+
+      // Also try without capture phase
+      debug("🔧 Method 3: Adding blur listener without capture");
+      document.addEventListener(
+        "blur",
+        (event) => {
+          debug("🔥 BLUR EVENT (non-capture) detected!");
+          handleBlockBlur(event);
+        },
+        false
+      );
+
+      // Also try keyup as backup
+      debug("🔧 Method 4: Adding keyup listener as backup");
+      document.addEventListener(
+        "keyup",
+        (event) => {
+          debug("⌨️ KEYUP EVENT detected!");
+          if (event.key === "Enter") {
+            debug("⌨️ KEYUP ENTER detected!");
+            handleKeyDown(event);
+          }
+        },
+        true
+      );
+
+      // Test if we can detect ANY keyboard events
+      debug("🔧 Method 5: Adding universal keydown test");
+      document.addEventListener(
+        "keydown",
+        (event) => {
+          debug(
+            `🔧 UNIVERSAL KEYDOWN: ${event.key} (target: ${event.target.tagName})`
+          );
+        },
+        true
+      );
+
+      debug("🔧 Method 6: Adding window-level events");
+      window.addEventListener("beforeunload", handlePageChange);
+      window.addEventListener("hashchange", handlePageChange);
+
+      debug("✅ All event listeners setup complete");
+      console.log("✅ DIRECT: All event listeners setup complete");
+    } catch (error) {
+      debug(`❌ Error setting up event listeners: ${error.message}`);
+      console.error("❌ DIRECT: Error setting up event listeners:", error);
+    }
   };
 
   const removeEventListeners = () => {
@@ -726,54 +787,91 @@ const smartUsernameTagger = (() => {
     }
   };
 
-  // 🍎 6.0 - Extension Lifecycle (UPDATED: enhanced settings panel)
+  // 🍎 6.0 - Extension Lifecycle (ENHANCED with immediate testing)
   const onload = ({ extensionAPI }) => {
+    console.log("🚀 === EXTENSION LOADING START ===");
     debug(
       "🚀 Loading Enhanced Smart Username Tagger with chat room support..."
     );
 
-    // 🆕 Enhanced settings panel with chat room support
-    extensionAPI.settings.panel.create({
-      tabTitle: "Smart Username Tagger",
-      settings: [
-        {
-          id: "processExisting",
-          name: "Process existing conversations on load",
-          description:
-            "Add #ts0 and #[[username]] tags to existing conversation messages when extension loads",
-          action: { type: "switch" },
-        },
-        {
-          id: "enableChatRoomTagging",
-          name: "Enable chat room tagging",
-          description:
-            "Tag messages in chat room pages under [[date]] headings",
-          action: { type: "switch" },
-        },
-        {
-          id: "idleDelay",
-          name: "Idle delay (seconds)",
-          description:
-            "Wait time for focus-loss events (Enter key processes immediately)",
-          action: { type: "input", placeholder: "2" },
-        },
-        {
-          id: "validateMembership",
-          name: "Validate against member directory",
-          description:
-            "Check if users exist in the graph member directory (requires utilities)",
-          action: { type: "switch" },
-        },
-        {
-          id: "enableUtilities",
-          name: "Use utilities for enhanced functionality",
-          description:
-            "Enable integration with the utilities suite for better reliability",
-          action: { type: "switch" },
-        },
-      ],
-    });
+    // 🚨 IMMEDIATE TESTS
+    console.log("🚨 Testing basic functionality...");
+    debug("🚨 Debug function working!");
 
+    // Test page title detection
+    const pageTitle = document.title || "";
+    debug(`📄 Current page title: "${pageTitle}"`);
+    debug(
+      `📄 Is chat room page? ${pageTitle.toLowerCase().includes("chat room")}`
+    );
+
+    // Test DOM availability
+    debug(`🌐 Document ready state: ${document.readyState}`);
+    debug(`🌐 Body available: ${!!document.body}`);
+    debug(`🌐 Roam API available: ${!!window.roamAlphaAPI}`);
+
+    // Test block detection
+    const allBlocks = document.querySelectorAll(".rm-block");
+    debug(`🧱 Found ${allBlocks.length} blocks on page`);
+
+    if (allBlocks.length > 0) {
+      debug(`🧱 First block classes: ${allBlocks[0].className}`);
+      debug(
+        `🧱 First block content: "${allBlocks[0].textContent?.substring(
+          0,
+          50
+        )}..."`
+      );
+    }
+
+    // 🆕 Enhanced settings panel with chat room support
+    try {
+      extensionAPI.settings.panel.create({
+        tabTitle: "Smart Username Tagger",
+        settings: [
+          {
+            id: "processExisting",
+            name: "Process existing conversations on load",
+            description:
+              "Add #ts0 and #[[username]] tags to existing conversation messages when extension loads",
+            action: { type: "switch" },
+          },
+          {
+            id: "enableChatRoomTagging",
+            name: "Enable chat room tagging",
+            description:
+              "Tag messages in chat room pages under [[date]] headings",
+            action: { type: "switch" },
+          },
+          {
+            id: "idleDelay",
+            name: "Idle delay (seconds)",
+            description:
+              "Wait time for focus-loss events (Enter key processes immediately)",
+            action: { type: "input", placeholder: "2" },
+          },
+          {
+            id: "validateMembership",
+            name: "Validate against member directory",
+            description:
+              "Check if users exist in the graph member directory (requires utilities)",
+            action: { type: "switch" },
+          },
+          {
+            id: "enableUtilities",
+            name: "Use utilities for enhanced functionality",
+            description:
+              "Enable integration with the utilities suite for better reliability",
+            action: { type: "switch" },
+          },
+        ],
+      });
+      debug("✅ Settings panel created successfully");
+    } catch (settingsError) {
+      debug(`❌ Settings panel creation failed: ${settingsError.message}`);
+    }
+
+    // Setup event listeners with enhanced debugging
     setupEventListeners();
 
     // Process existing conversations with preferences
@@ -781,12 +879,17 @@ const smartUsernameTagger = (() => {
     const processExisting = extensionAPI.settings.get("processExisting");
 
     if (processExisting !== false && preferences.processExistingOnLoad) {
-      setTimeout(processExistingConversations, 3000);
+      debug("🔄 Will process existing conversations in 3 seconds...");
+      setTimeout(() => {
+        debug("🔄 Processing existing conversations now...");
+        processExistingConversations();
+      }, 3000);
+    } else {
+      debug("⏸️ Skipping existing conversation processing");
     }
 
     // 🔍 Log utilities integration status
     const utilitiesAvailable = !!window._extensionRegistry?.utilities;
-    const pageTitle = document.title || "";
     const isChatRoom = pageTitle.toLowerCase().includes("chat room");
 
     debug(`✅ Enhanced Smart Username Tagger loaded`);
@@ -811,6 +914,18 @@ const smartUsernameTagger = (() => {
       );
       debug(`📦 Available utilities: ${availableUtilities.length} functions`);
     }
+
+    console.log("✅ === EXTENSION LOADING COMPLETE ===");
+
+    // 🚨 FINAL TEST: Trigger a manual test after everything is set up
+    setTimeout(() => {
+      debug(
+        "🚨 DELAYED TEST: Extension fully initialized, ready for user interaction!"
+      );
+      console.log(
+        "🚨 DELAYED TEST: Extension ready - try typing something now!"
+      );
+    }, 1000);
   };
 
   const onunload = () => {
