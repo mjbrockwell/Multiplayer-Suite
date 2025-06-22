@@ -11,10 +11,19 @@ const journalEntryCreator = (() => {
   // Safety variable (Extension Six handles directory buttons)
   let standingButton = null;
 
-  // 🌟 Logging with Registry Integration
+  // 🌟 Enhanced Logging with Registry Integration
   const log = (message, level = "INFO") => {
     const timestamp = new Date().toLocaleTimeString();
-    console.log(`[Journal Entry ${timestamp}] ${level}: ${message}`);
+    const emoji =
+      {
+        DEBUG: "🔍",
+        INFO: "ℹ️",
+        SUCCESS: "✅",
+        WARN: "⚠️",
+        ERROR: "❌",
+      }[level] || "📝";
+
+    console.log(`[Journal Entry ${timestamp}] ${emoji} ${level}: ${message}`);
 
     // Integration with suite logging if available
     if (window.RoamExtensionSuite?.log) {
@@ -48,28 +57,41 @@ const journalEntryCreator = (() => {
   // 🌟 Smart page detection using Core Data
   const detectPageContext = () => {
     try {
+      log("🔍 Starting page context detection...", "DEBUG");
+
       const coreData = getCoreData();
       const currentUser = coreData?.getCurrentUser?.() || {
         displayName: getCurrentUserFallback(),
       };
 
+      log(`👤 Current user: "${currentUser.displayName}"`, "DEBUG");
+
       // Get current page title
       const pageTitle = getCurrentPageTitle();
-      if (!pageTitle) return { type: "other", page: null };
+      log(`📄 Current page title: "${pageTitle}"`, "DEBUG");
+
+      if (!pageTitle) {
+        log("❌ No page title found", "WARN");
+        return { type: "other", page: null };
+      }
 
       // Check for Chat Room (flexible detection)
       if (pageTitle.toLowerCase().includes("chat room")) {
+        log(`🗨️ Detected CHAT ROOM page: "${pageTitle}"`, "SUCCESS");
         return { type: "chatroom", page: pageTitle };
       }
 
       // Check for username page
       if (currentUser.displayName && pageTitle === currentUser.displayName) {
+        log(`👤 Detected USERNAME page: "${pageTitle}"`, "SUCCESS");
         return { type: "username", page: pageTitle };
       }
 
+      log(`📝 Detected OTHER page type: "${pageTitle}"`, "INFO");
       return { type: "other", page: pageTitle };
     } catch (error) {
-      log(`Error detecting page context: ${error.message}`, "ERROR");
+      log(`❌ Error detecting page context: ${error.message}`, "ERROR");
+      log(`❌ Error stack: ${error.stack}`, "ERROR");
       return { type: "other", page: null };
     }
   };
@@ -292,42 +314,63 @@ const journalEntryCreator = (() => {
     }
   };
 
-  // 🌟 Check if today's daily banner exists (Chat Room page)
+  // 🌟 Check if today's daily banner exists (Chat Room page) - FIXED LOGIC
   const shouldShowChatRoomButton = (pageName) => {
     try {
-      const todaysDate = getTodaysRoamDate();
+      log(`🔍 Checking if banner exists for chat room: "${pageName}"`, "DEBUG");
 
-      const allBlocks = window.roamAlphaAPI.data.q(`
+      const todaysDate = getTodaysRoamDate();
+      log(`📅 Today's date: "${todaysDate}"`, "DEBUG");
+
+      // Get DIRECT children only (same as creation logic)
+      const pageChildren = window.roamAlphaAPI.data.q(`
         [:find ?string
          :where 
          [?page :node/title "${pageName}"]
          [?page :block/children ?child]
-         [?descendant :block/parents ?child]
-         [?descendant :block/string ?string]]
+         [?child :block/string ?string]]
       `);
 
+      log(`🔍 Found ${pageChildren.length} direct children to check`, "DEBUG");
+
       // Check if today's banner exists (contains #st0 and today's date link)
-      const todaysBannerExists = allBlocks.some(([blockString]) => {
+      let bannerCount = 0;
+      let todaysBannerCount = 0;
+
+      const todaysBannerExists = pageChildren.some(([blockString]) => {
         const lowerString = blockString.toLowerCase();
         const hasStTag = lowerString.includes("#st0");
 
-        // Check for today's date in various formats
-        const dateVariations = [
-          `[[${todaysDate}]]`,
-          `[[${todaysDate.toLowerCase()}]]`,
-          `[[${todaysDate.toUpperCase()}]]`,
-        ];
+        if (hasStTag) {
+          bannerCount++;
+          log(`📋 Found #st0 block: "${blockString}"`, "DEBUG");
+        }
 
-        const hasDateLink = dateVariations.some((dateFormat) =>
-          lowerString.includes(dateFormat.toLowerCase())
-        );
+        // Check for today's date (exact match)
+        const todaysDateLower = todaysDate.toLowerCase();
+        const hasDateLink = lowerString.includes(`[[${todaysDateLower}]]`);
 
-        return hasStTag && hasDateLink;
+        if (hasStTag && hasDateLink) {
+          todaysBannerCount++;
+          log(
+            `🎯 Found TODAY'S banner #${todaysBannerCount}: "${blockString}"`,
+            "SUCCESS"
+          );
+          return true;
+        }
+
+        return false;
       });
+
+      log(`📊 Found ${bannerCount} total #st0 blocks`, "DEBUG");
+      log(`📊 Found ${todaysBannerCount} today's banners`, "DEBUG");
+      log(`🎯 Today's banner exists: ${todaysBannerExists}`, "DEBUG");
+      log(`🔘 Should show button: ${!todaysBannerExists}`, "INFO");
 
       return !todaysBannerExists;
     } catch (error) {
-      log(`Error checking chat room button: ${error.message}`, "ERROR");
+      log(`❌ Error checking chat room button: ${error.message}`, "ERROR");
+      log(`❌ Error stack: ${error.stack}`, "ERROR");
       return false;
     }
   };
@@ -439,6 +482,10 @@ const journalEntryCreator = (() => {
 
       // Step 3: Find existing date banners for placement logic
       log("Step 3: Finding existing date banners...", "DEBUG");
+
+      // Declare insertLocation in broader scope
+      let insertLocation;
+
       try {
         // Simplified approach: get all direct children of the page first
         const pageChildren = window.roamAlphaAPI.data.q(`
@@ -473,7 +520,6 @@ const journalEntryCreator = (() => {
         log(`Found ${dateBanners.length} existing date banners`, "INFO");
 
         // Step 4: Determine placement
-        let insertLocation;
         if (dateBanners.length === 0) {
           log("📍 No existing banners - placing at BOTTOM of page", "INFO");
           insertLocation = {
@@ -607,9 +653,16 @@ const journalEntryCreator = (() => {
   // 🌟 Button management (Extension Six handles directory buttons)
   const updateButtons = () => {
     try {
+      log("🔄 Starting button update process...", "DEBUG");
+
       const pageContext = detectPageContext();
+      log(
+        `📋 Page context result: type="${pageContext.type}", page="${pageContext.page}"`,
+        "DEBUG"
+      );
 
       // Clear existing buttons
+      log("🧹 Clearing existing buttons...", "DEBUG");
       hideButtons();
 
       // Show quick entry button only where needed
@@ -617,6 +670,7 @@ const journalEntryCreator = (() => {
         pageContext.type === "username" &&
         shouldShowUsernameButton(pageContext.page)
       ) {
+        log("🏠 Showing USERNAME daily entry button", "INFO");
         showQuickEntryButton("Add daily entry", () =>
           createUsernameEntry(pageContext.page)
         );
@@ -624,15 +678,33 @@ const journalEntryCreator = (() => {
         pageContext.type === "chatroom" &&
         shouldShowChatRoomButton(pageContext.page)
       ) {
-        // NEW: Conditional showing for chat rooms with new button text
+        log("🗨️ Showing CHAT ROOM daily banner button", "INFO");
         showQuickEntryButton("Add a daily banner?", () =>
           createChatRoomEntry(pageContext.page)
         );
+      } else {
+        log(`🚫 No button needed for page type: ${pageContext.type}`, "DEBUG");
+
+        // Additional debug info
+        if (pageContext.type === "username") {
+          log(
+            "👤 Username page detected but button condition not met",
+            "DEBUG"
+          );
+        } else if (pageContext.type === "chatroom") {
+          log(
+            "🗨️ Chat room page detected but button condition not met",
+            "DEBUG"
+          );
+        }
       }
+
+      log("✅ Button update process completed", "DEBUG");
 
       // Note: Extension Six handles all directory/navigation buttons
     } catch (error) {
-      log(`Error updating buttons: ${error.message}`, "ERROR");
+      log(`❌ Error updating buttons: ${error.message}`, "ERROR");
+      log(`❌ Error stack: ${error.stack}`, "ERROR");
       console.error("Button update error details:", error);
     }
   };
@@ -672,7 +744,7 @@ const journalEntryCreator = (() => {
     }
   };
 
-  // 🌟 Manual button creation (positioned higher, same line as directory button)
+  // 🌟 Manual button creation (positioned within main content area)
   const createManualQuickEntryButton = (text, onClick) => {
     try {
       if (quickEntryButton) {
@@ -680,15 +752,57 @@ const journalEntryCreator = (() => {
         quickEntryButton = null;
       }
 
-      // Position higher to align with directory button (top line)
-      const topPosition = "60px";
+      // Calculate position within main content area (not over sidebar)
+      let rightPosition = "20px";
+      let topPosition = "60px";
+
+      try {
+        // Find main content container
+        const mainContent =
+          document.querySelector(".roam-main") ||
+          document.querySelector(".roam-article") ||
+          document.querySelector(".roam-body") ||
+          document.querySelector("#main-content") ||
+          document.querySelector(".roam-center");
+
+        if (mainContent) {
+          const rect = mainContent.getBoundingClientRect();
+          const viewportWidth = window.innerWidth;
+
+          // Position button within main content, not over sidebar
+          const buttonWidth = 200; // Approximate button width
+          const margin = 20;
+
+          // Calculate right position relative to main content right edge
+          const maxRight = Math.min(
+            rect.right - buttonWidth - margin,
+            viewportWidth - buttonWidth - margin
+          );
+          rightPosition = `${viewportWidth - maxRight}px`;
+
+          log(
+            `📍 Calculated button position: right=${rightPosition}, within main content bounds`,
+            "DEBUG"
+          );
+        } else {
+          log(
+            `⚠️ Could not find main content container, using fallback position`,
+            "WARN"
+          );
+        }
+      } catch (positionError) {
+        log(
+          `⚠️ Position calculation failed: ${positionError.message}, using fallback`,
+          "WARN"
+        );
+      }
 
       quickEntryButton = document.createElement("div");
       quickEntryButton.id = "journal-quick-entry-button";
       quickEntryButton.style.cssText = `
         position: fixed;
         top: ${topPosition};
-        right: 20px;
+        right: ${rightPosition};
         background: linear-gradient(135deg, #fef3c7, #fde68a);
         border: 1px solid #f59e0b;
         border-radius: 12px;
@@ -707,6 +821,8 @@ const journalEntryCreator = (() => {
         font-size: 14px;
         opacity: 0;
         transform: translateX(320px);
+        max-width: 200px;
+        white-space: nowrap;
       `;
 
       quickEntryButton.innerHTML = `
@@ -738,7 +854,7 @@ const journalEntryCreator = (() => {
             hideButtons();
           }, 2000);
         } catch (error) {
-          log(`Button click error: ${error.message}`, "ERROR");
+          log(`❌ Button click error: ${error.message}`, "ERROR");
 
           // Error feedback with context-aware hiding
           if (quickEntryButton) {
@@ -797,9 +913,9 @@ const journalEntryCreator = (() => {
         quickEntryButton.style.transform = "translateX(0)";
       }, 100);
 
-      log(`Manual quick entry button created: "${text}"`, "SUCCESS");
+      log(`✅ Manual quick entry button created: "${text}"`, "SUCCESS");
     } catch (error) {
-      log(`Error creating manual button: ${error.message}`, "ERROR");
+      log(`❌ Error creating manual button: ${error.message}`, "ERROR");
     }
   };
 
