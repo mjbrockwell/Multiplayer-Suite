@@ -170,7 +170,7 @@ const smartUsernameTagger = (() => {
     return false;
   };
 
-  // 🆕 1.7 - NEW: Check chat room date context (ENHANCED with roam/comments exclusion)
+  // 🆕 1.7 - NEW: Check chat room date context (ENHANCED with roam/comments + #ch0 exclusions)
   const isInChatRoomDateContext = (blockElement) => {
     debug(`🔍 === CHAT ROOM DATE CONTEXT DEBUG START ===`);
 
@@ -194,7 +194,32 @@ const smartUsernameTagger = (() => {
 
       debug(`✅ Confirmed chat room page!`);
 
-      // 🆕 2. EXCLUSION: Check if block is under [[roam/comments]]
+      // 🆕 2a. EXCLUSION: Check if THIS block contains #ch0 (conversation header)
+      debug(`🚫 Checking if this block contains #ch0...`);
+      const thisBlockTextElement = blockElement.querySelector(".rm-block-text");
+      if (thisBlockTextElement) {
+        const thisBlockContent = thisBlockTextElement.textContent || "";
+        debug(`🚫 This block content: "${thisBlockContent}"`);
+
+        // Check for various #ch0 patterns
+        if (
+          thisBlockContent.includes("#ch0") ||
+          thisBlockContent.includes("ch0") ||
+          blockElement.querySelector('.rm-page-ref[data-tag="ch0"]')
+        ) {
+          debug(
+            `🚫 ❌ Block contains #ch0, EXCLUDING from tagging (conversation header)`
+          );
+          debug(`🚫 #ch0 block content: "${thisBlockContent}"`);
+          debug(
+            `🔍 === CHAT ROOM DATE CONTEXT DEBUG END (EXCLUDED: CH0 HEADER) ===`
+          );
+          return false;
+        }
+      }
+      debug(`🚫 ✅ Block does not contain #ch0, proceeding...`);
+
+      // 🆕 2b. EXCLUSION: Check if block is under [[roam/comments]]
       debug(`🚫 Checking for roam/comments exclusion...`);
       let current = blockElement;
       while (current && current !== document.body) {
