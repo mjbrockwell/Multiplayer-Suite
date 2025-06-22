@@ -1,40 +1,53 @@
-// 🌳 Enhanced Smart Username Tagger - Integrated with Utilities Suite
-// 🌳 Preserves specialized timing logic + adds robust utilities integration
-// 🌳 NEW: Chat room date context support + #ch0 conversation support
-// 🌳 Updated: Better user detection, member validation, preferences support
+// 🌳 Smart Username Tagger - Clean Production Version
+// 🌳 Auto-tags messages with #ts0 and #[[username]] in two contexts:
+// 🌳 1. Direct children of #ch0 conversation blocks
+// 🌳 2. Direct children of [[date]] blocks on "chat room" pages
+// 🌳 Excludes: #ch0 headers, [[roam/comments]], already tagged blocks
 
 const smartUsernameTagger = (() => {
-  // 🌲 1.0 - Internal State (unchanged - this works well)
+  // ===================================================================
+  // 🌲 1. STATE & CONFIGURATION
+  // ===================================================================
+
   let processedBlocks = new Set();
   let pendingBlocks = new Set();
   let idleTimer = null;
   let isProcessing = false;
 
-  // 🌸 1.1 - Debug Function (ENHANCED with immediate test)
   const debug = (message) => {
     console.log("Smart Tagger:", message);
   };
 
-  // 🚨 IMMEDIATE TEST: Verify debug function works
-  debug("🚀 DEBUG FUNCTION TEST - Extension is initializing!");
+  const getUserPreferences = () => ({
+    enableTagging: true,
+    idleDelay: 2000,
+    processExistingOnLoad: true,
+    enableChatRoomTagging: true,
+  });
 
-  // 🚨 Test console output immediately
-  console.log("🚨 DIRECT CONSOLE TEST - Extension loaded!");
-  console.warn("⚠️ CONSOLE WARNING TEST - This should be visible!");
-  console.error("❌ CONSOLE ERROR TEST - This should be red!");
+  // ===================================================================
+  // 🌲 2. UTILITIES & AUTHOR DETECTION
+  // ===================================================================
 
-  // 🔧 1.2 - ENHANCED: Get Block Author with Robust User Detection
+  const getBlockUidFromDOM = (element) => {
+    const blockElement = element.closest(".rm-block");
+    if (!blockElement) return null;
+
+    return (
+      blockElement.getAttribute("data-uid") ||
+      blockElement.id?.replace("block-input-", "") ||
+      blockElement.querySelector("[data-uid]")?.getAttribute("data-uid")
+    );
+  };
+
   const getBlockAuthor = (blockUid) => {
     try {
-      // Try the original method first (fastest)
       const blockData = window.roamAlphaAPI.pull(`[:block/uid :create/user]`, [
         ":block/uid",
         blockUid,
       ]);
 
-      if (!blockData || !blockData[":create/user"]) {
-        return null;
-      }
+      if (!blockData || !blockData[":create/user"]) return null;
 
       const userDbId = blockData[":create/user"][":db/id"];
       const userData = window.roamAlphaAPI.pull(
@@ -42,108 +55,71 @@ const smartUsernameTagger = (() => {
         userDbId
       );
 
-      const username = userData?.[":user/display-name"] || null;
-
-      // 🆕 ENHANCEMENT: Validate against member list if utilities available
-      if (
-        username &&
-        window._extensionRegistry?.utilities?.getGraphMembersFromList
-      ) {
-        const getGraphMembersFromList =
-          window._extensionRegistry.utilities.getGraphMembersFromList;
-        const validMembers = getGraphMembersFromList(
-          "roam/graph members",
-          "Directory"
-        );
-
-        if (validMembers.length > 0 && !validMembers.includes(username)) {
-          debug(
-            `⚠️ User "${username}" not in member directory, but proceeding with tagging`
-          );
-          // Note: We still proceed with tagging, just log the validation
-        }
-      }
-
-      return username;
+      return userData?.[":user/display-name"] || null;
     } catch (error) {
       debug(`Error getting block author: ${error.message}`);
-
-      // 🆕 FALLBACK: Try utilities-based user detection
-      if (window._extensionRegistry?.utilities?.getCurrentUser) {
-        try {
-          const getCurrentUser =
-            window._extensionRegistry.utilities.getCurrentUser;
-          const currentUser = getCurrentUser();
-          debug(`📝 Fallback: Using current user ${currentUser.displayName}`);
-          return currentUser.displayName;
-        } catch (fallbackError) {
-          debug(
-            `Fallback user detection also failed: ${fallbackError.message}`
-          );
-        }
-      }
-
       return null;
     }
   };
 
-  // 🌺 1.3 - ENHANCED: Extract Block UID with Utilities Fallback
-  const getBlockUidFromDOM = (element) => {
-    try {
-      const blockElement = element.closest(".rm-block");
-      if (!blockElement) return null;
-
-      // Try original methods first (fastest)
-      let blockUid =
-        blockElement.getAttribute("data-uid") ||
-        blockElement.id?.replace("block-input-", "") ||
-        blockElement.querySelector("[data-uid]")?.getAttribute("data-uid");
-
-      if (!blockUid) {
-        const createTime = blockElement.getAttribute("data-create-time");
-        if (createTime) {
-          const timestampQuery = window.roamAlphaAPI.data.q(`
-            [:find ?uid
-             :where 
-             [?e :create/time ${createTime}]
-             [?e :block/uid ?uid]]
-          `);
-          if (timestampQuery.length > 0) {
-            blockUid = timestampQuery[0][0];
-          }
-        }
-      }
-
-      // 🆕 ADDITIONAL FALLBACK: Use utilities if available
-      if (!blockUid && window._extensionRegistry?.utilities?.generateUID) {
-        debug("⚠️ Could not determine block UID, this may cause issues");
-      }
-
-      return blockUid;
-    } catch (error) {
-      debug(`Error extracting block UID: ${error.message}`);
-      return null;
-    }
-  };
-
-  // 🌺 1.4 - Check if block has username tags (unchanged - works well)
   const hasUsernameTag = (blockContent, username) => {
     if (!blockContent || !username) return false;
 
-    const newTagPattern = new RegExp(
-      `#ts0\\s+#\\[\\[${username.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\]\\]`,
+    const escapedUsername = username.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const tagPattern = new RegExp(
+      `#ts0\\s+#\\[\\[${escapedUsername}\\]\\]`,
       "i"
     );
 
-    const oldTagPattern = new RegExp(
-      `#\\[\\[${username.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\]\\]`,
-      "i"
-    );
-
-    return newTagPattern.test(blockContent) || oldTagPattern.test(blockContent);
+    return tagPattern.test(blockContent);
   };
 
-  // 🌺 1.5 - Check if block is being edited (unchanged - specialized logic)
+  const addUsernameTag = async (blockUid, username) => {
+    try {
+      // Try utilities first if available
+      if (window._extensionRegistry?.utilities?.updateBlock) {
+        const updateBlock = window._extensionRegistry.utilities.updateBlock;
+        const blockData = window.roamAlphaAPI.pull(`[:block/string]`, [
+          ":block/uid",
+          blockUid,
+        ]);
+
+        if (!blockData) return false;
+        const currentContent = blockData[":block/string"] || "";
+
+        if (hasUsernameTag(currentContent, username)) return true;
+
+        const newContent = `#ts0 #[[${username}]]  ▸  ${currentContent}`;
+        await updateBlock({ uid: blockUid, text: newContent });
+        return true;
+      }
+
+      // Fallback to direct API
+      const blockData = window.roamAlphaAPI.pull(`[:block/string]`, [
+        ":block/uid",
+        blockUid,
+      ]);
+      if (!blockData) return false;
+
+      const currentContent = blockData[":block/string"] || "";
+      if (hasUsernameTag(currentContent, username)) return true;
+
+      const newContent = `#ts0 #[[${username}]]  ▸  ${currentContent}`;
+      await window.roamAlphaAPI.data.block.update({
+        block: { uid: blockUid, string: newContent },
+      });
+
+      return true;
+    } catch (error) {
+      debug(`Error adding username tags: ${error.message}`);
+      return false;
+    }
+  };
+
+  // ===================================================================
+  // 🌲 3. CONTEXT DETECTION
+  // ===================================================================
+
   const isBlockBeingEdited = (blockElement) => {
     return (
       blockElement.classList.contains("rm-block--edit") ||
@@ -153,7 +129,6 @@ const smartUsernameTagger = (() => {
     );
   };
 
-  // 🌺 1.6 - Check conversation context (unchanged - domain-specific)
   const isInConversation = (blockElement) => {
     let current = blockElement;
     while (current && current !== document.body) {
@@ -170,404 +145,140 @@ const smartUsernameTagger = (() => {
     return false;
   };
 
-  // 🆕 1.7 - NEW: Check chat room date context (ENHANCED with roam/comments + #ch0 exclusions)
+  const isUnderRoamComments = (blockElement) => {
+    let current = blockElement;
+    while (current && current !== document.body) {
+      const textElement = current.querySelector(".rm-block-text");
+      if (textElement) {
+        const content = textElement.textContent || "";
+        if (
+          content.includes("[[roam/comments]]") ||
+          content.includes("roam/comments")
+        ) {
+          return true;
+        }
+      }
+      current = current.parentElement?.closest(".rm-block");
+    }
+    return false;
+  };
+
+  const containsCh0Header = (blockElement) => {
+    const textElement = blockElement.querySelector(".rm-block-text");
+    if (!textElement) return false;
+
+    const content = textElement.textContent || "";
+
+    // Check for already tagged ch0 blocks OR new ch0 blocks
+    return (
+      (content.includes("#ts0") && content.includes("ch0")) ||
+      content.includes("#ch0") ||
+      blockElement.querySelector('.rm-page-ref[data-tag="ch0"]') ||
+      blockElement.querySelector('[data-tag="ch0"]')
+    );
+  };
+
   const isInChatRoomDateContext = (blockElement) => {
-    debug(`🔍 === CHAT ROOM DATE CONTEXT DEBUG START ===`);
-
     try {
-      // 1. Check if we're on a "chat room" page (case-insensitive)
+      // Must be on a chat room page
       const pageTitle = document.title || "";
-      debug(`📄 Page title: "${pageTitle}"`);
-      debug(
-        `🔍 Contains 'chat room'? ${pageTitle
-          .toLowerCase()
-          .includes("chat room")}`
-      );
+      if (!pageTitle.toLowerCase().includes("chat room")) return false;
 
-      if (!pageTitle.toLowerCase().includes("chat room")) {
-        debug(`❌ Not a chat room page: "${pageTitle}"`);
-        debug(
-          `🔍 === CHAT ROOM DATE CONTEXT DEBUG END (FAILED: NOT CHAT ROOM) ===`
-        );
-        return false;
-      }
+      // Must not be under roam/comments
+      if (isUnderRoamComments(blockElement)) return false;
 
-      debug(`✅ Confirmed chat room page!`);
+      // Must not be a ch0 header itself
+      if (containsCh0Header(blockElement)) return false;
 
-      // 🆕 2a. EXCLUSION: Check if THIS block contains #ch0 (conversation header)
-      debug(`🚫 === ENHANCED #ch0 DETECTION START ===`);
-      const thisBlockTextElement = blockElement.querySelector(".rm-block-text");
-      if (thisBlockTextElement) {
-        const thisBlockContent = thisBlockTextElement.textContent || "";
-        const thisBlockHTML = thisBlockTextElement.innerHTML || "";
-        debug(`🚫 This block text content: "${thisBlockContent}"`);
-        debug(`🚫 This block innerHTML: "${thisBlockHTML}"`);
+      // Find parent block
+      const parentBlockElement =
+        blockElement.parentElement?.closest(".rm-block");
+      if (!parentBlockElement) return false;
 
-        // Method 1: Check text content for literal #ch0
-        const hasLiteralCh0 =
-          thisBlockContent.includes("#ch0") || thisBlockContent.includes("ch0");
-        debug(`🚫 Method 1 - Literal text contains ch0: ${hasLiteralCh0}`);
-
-        // Method 2: Check for page reference DOM elements
-        const pageRefCh0 = blockElement.querySelector(
-          '.rm-page-ref[data-tag="ch0"]'
-        );
-        debug(`🚫 Method 2 - Page ref element found: ${!!pageRefCh0}`);
-        if (pageRefCh0) {
-          debug(`🚫 Page ref element:`, pageRefCh0);
-          debug(`🚫 Page ref data-tag:`, pageRefCh0.getAttribute("data-tag"));
-        }
-
-        // Method 3: Check for alternative page reference selectors
-        const pageRefAlt1 = blockElement.querySelector('[data-tag="ch0"]');
-        const pageRefAlt2 = blockElement.querySelector(
-          '.rm-page-ref[title*="ch0"]'
-        );
-        const pageRefAlt3 = blockElement.querySelector('a[href*="ch0"]');
-        debug(`🚫 Method 3a - Alt selector [data-tag="ch0"]: ${!!pageRefAlt1}`);
-        debug(`🚫 Method 3b - Alt selector [title*="ch0"]: ${!!pageRefAlt2}`);
-        debug(`🚫 Method 3c - Alt selector [href*="ch0"]: ${!!pageRefAlt3}`);
-
-        // Method 4: Check innerHTML for ch0 patterns
-        const htmlContainsCh0 =
-          thisBlockHTML.includes("ch0") || thisBlockHTML.includes("CH0");
-        debug(`🚫 Method 4 - HTML contains ch0: ${htmlContainsCh0}`);
-
-        // Method 5: Look for specific emoji or visual indicators that suggest #ch0
-        const hasConversationEmoji =
-          thisBlockContent.includes("💬") ||
-          thisBlockContent.includes("🗨️") ||
-          thisBlockContent.includes("💭") ||
-          thisBlockHTML.includes("💬") ||
-          thisBlockHTML.includes("🗨️") ||
-          thisBlockHTML.includes("💭");
-        debug(`🚫 Method 5 - Has conversation emoji: ${hasConversationEmoji}`);
-
-        // Method 6: Check all child elements for ch0-related attributes
-        const allChildElements = blockElement.querySelectorAll("*");
-        let foundCh0InChild = false;
-        for (const child of allChildElements) {
-          const childTag = child.getAttribute("data-tag");
-          const childHref = child.getAttribute("href");
-          const childTitle = child.getAttribute("title");
-          const childText = child.textContent || "";
-
-          if (
-            (childTag && childTag.includes("ch0")) ||
-            (childHref && childHref.includes("ch0")) ||
-            (childTitle && childTitle.includes("ch0")) ||
-            childText.includes("ch0")
-          ) {
-            foundCh0InChild = true;
-            debug(`🚫 Method 6 - Found ch0 in child element:`, child);
-            debug(`🚫 Child data-tag: ${childTag}`);
-            debug(`🚫 Child href: ${childHref}`);
-            debug(`🚫 Child title: ${childTitle}`);
-            debug(`🚫 Child text: ${childText}`);
-            break;
-          }
-        }
-        debug(`🚫 Method 6 - Found ch0 in any child: ${foundCh0InChild}`);
-
-        // Combine all detection methods
-        const containsCh0 =
-          hasLiteralCh0 ||
-          !!pageRefCh0 ||
-          !!pageRefAlt1 ||
-          !!pageRefAlt2 ||
-          !!pageRefAlt3 ||
-          htmlContainsCh0 ||
-          foundCh0InChild;
-        debug(`🚫 FINAL RESULT - Block contains ch0: ${containsCh0}`);
-        debug(`🚫 === ENHANCED #ch0 DETECTION END ===`);
-
-        if (containsCh0) {
-          debug(
-            `🚫 ❌ Block contains #ch0, EXCLUDING from tagging (conversation header)`
-          );
-          debug(`🚫 #ch0 block content: "${thisBlockContent}"`);
-          debug(
-            `🔍 === CHAT ROOM DATE CONTEXT DEBUG END (EXCLUDED: CH0 HEADER) ===`
-          );
-          return false;
-        }
-      }
-      debug(`🚫 ✅ Block does not contain #ch0, proceeding...`);
-
-      // 🆕 2b. EXCLUSION: Check if block is under [[roam/comments]]
-      debug(`🚫 Checking for roam/comments exclusion...`);
-      let current = blockElement;
-      while (current && current !== document.body) {
-        const textElement = current.querySelector(".rm-block-text");
-        if (textElement) {
-          const content = textElement.textContent || "";
-          if (
-            content.includes("[[roam/comments]]") ||
-            content.includes("roam/comments")
-          ) {
-            debug(
-              `🚫 ❌ Block is under [[roam/comments]], EXCLUDING from tagging`
-            );
-            debug(`🚫 Comments block content: "${content}"`);
-            debug(
-              `🔍 === CHAT ROOM DATE CONTEXT DEBUG END (EXCLUDED: ROAM COMMENTS) ===`
-            );
-            return false;
-          }
-        }
-        current = current.parentElement?.closest(".rm-block");
-      }
-      debug(`🚫 ✅ Not under roam/comments, proceeding...`);
-
-      // 3. Analyze block structure in detail
-      debug(`🧱 Block element:`, blockElement);
-      debug(`🧱 Block classes:`, blockElement.className);
-      debug(`🧱 Block parent:`, blockElement.parentElement);
-      debug(`🧱 Block parent classes:`, blockElement.parentElement?.className);
-
-      // Find the direct parent block - try multiple approaches
-      let parentBlockElement = null;
-
-      // Method 1: parentElement.closest
-      parentBlockElement = blockElement.parentElement?.closest(".rm-block");
-      debug(`🔍 Method 1 parent block:`, parentBlockElement);
-
-      if (!parentBlockElement) {
-        // Method 2: walk up the DOM tree manually
-        let current = blockElement.parentElement;
-        while (current && current !== document.body) {
-          debug(`🔍 Checking element:`, current.className);
-          if (
-            current.classList?.contains("rm-block") &&
-            current !== blockElement
-          ) {
-            parentBlockElement = current;
-            debug(`🔍 Method 2 found parent:`, parentBlockElement);
-            break;
-          }
-          current = current.parentElement;
-        }
-      }
-
-      if (!parentBlockElement) {
-        debug(`❌ No parent block found with either method`);
-        debug(
-          `🔍 === CHAT ROOM DATE CONTEXT DEBUG END (FAILED: NO PARENT) ===`
-        );
-        return false;
-      }
-
-      debug(`✅ Parent block found:`, parentBlockElement);
-
-      // 4. Check if parent block contains [[date]] pattern - multiple approaches
-      let parentContent = "";
-
-      // Method 1: .rm-block-text
+      // Parent must contain date pattern
       const parentTextElement =
         parentBlockElement.querySelector(".rm-block-text");
-      if (parentTextElement) {
-        parentContent = parentTextElement.textContent || "";
-        debug(`🔍 Parent content (via .rm-block-text): "${parentContent}"`);
-      } else {
-        debug(`⚠️ No .rm-block-text found, trying alternative methods`);
+      if (!parentTextElement) return false;
 
-        // Method 2: direct text content
-        parentContent = parentBlockElement.textContent || "";
-        debug(`🔍 Parent content (via textContent): "${parentContent}"`);
-
-        // Method 3: innerHTML inspection
-        debug(
-          `🔍 Parent innerHTML:`,
-          parentBlockElement.innerHTML.substring(0, 200)
+      const parentContent = parentTextElement.textContent || "";
+      const hasDatePattern =
+        /\[\[([^\]]+)\]\]/.test(parentContent) ||
+        /(JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER)\s+\d{1,2}(ST|ND|RD|TH)?,?\s+\d{4}/i.test(
+          parentContent
         );
-      }
 
-      // Look for various date patterns
-      debug(`🔍 Searching for date patterns in: "${parentContent}"`);
+      if (!hasDatePattern) return false;
 
-      // Pattern 1: [[...]] brackets
-      const dateReferencePattern = /\[\[([^\]]+)\]\]/g;
-      const bracketMatches = [...parentContent.matchAll(dateReferencePattern)];
-      debug(`🔍 [[bracket]] matches:`, bracketMatches);
-
-      // Pattern 2: Common date formats (fallback)
-      const commonDatePattern =
-        /(JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER)\s+\d{1,2}(ST|ND|RD|TH)?,?\s+\d{4}/i;
-      const dateMatches = parentContent.match(commonDatePattern);
-      debug(`🔍 Common date matches:`, dateMatches);
-
-      if (bracketMatches.length === 0 && !dateMatches) {
-        debug(`❌ No date references found in parent: "${parentContent}"`);
-        debug(`🔍 === CHAT ROOM DATE CONTEXT DEBUG END (FAILED: NO DATE) ===`);
-        return false;
-      }
-
-      debug(`✅ Date references found!`);
-
-      // 5. Validate that we're exactly one level deeper than the parent
-      debug(`🔍 Validating parent-child relationship...`);
-
+      // Must be direct child of parent
       const blockChildren = blockElement.parentElement;
       const parentChildren = parentBlockElement.querySelector(
         ":scope > .rm-block-children"
       );
 
-      debug(`🔍 Block children container:`, blockChildren);
-      debug(`🔍 Parent children container:`, parentChildren);
-      debug(`🔍 Are they the same?`, blockChildren === parentChildren);
-
-      if (blockChildren !== parentChildren) {
-        debug(`❌ Block is not a direct child of the date block`);
-        debug(
-          `🔍 === CHAT ROOM DATE CONTEXT DEBUG END (FAILED: NOT DIRECT CHILD) ===`
-        );
-        return false;
-      }
-
-      debug(`✅✅✅ Chat room date context CONFIRMED!`);
-      debug(`📝 Parent content: "${parentContent.substring(0, 100)}..."`);
-      debug(`🔍 === CHAT ROOM DATE CONTEXT DEBUG END (SUCCESS!) ===`);
-      return true;
+      return blockChildren === parentChildren;
     } catch (error) {
-      debug(`❌ Error checking chat room date context: ${error.message}`);
-      debug(`🔍 Stack trace:`, error.stack);
-      debug(`🔍 === CHAT ROOM DATE CONTEXT DEBUG END (ERROR) ===`);
+      debug(`Error checking chat room date context: ${error.message}`);
       return false;
     }
   };
 
-  // 🆕 1.8 - NEW: Combined context checker (ENHANCED DEBUG)
   const isInTaggableContext = (blockElement) => {
-    debug(`🎯 === COMBINED CONTEXT CHECK START ===`);
-
-    const conversationResult = isInConversation(blockElement);
-    debug(`🎯 #ch0 conversation context: ${conversationResult}`);
-
-    const chatRoomResult = isInChatRoomDateContext(blockElement);
-    debug(`🎯 Chat room date context: ${chatRoomResult}`);
-
-    const finalResult = conversationResult || chatRoomResult;
-    debug(`🎯 Final taggable context result: ${finalResult}`);
-    debug(`🎯 === COMBINED CONTEXT CHECK END ===`);
-
-    return finalResult;
+    return (
+      isInConversation(blockElement) || isInChatRoomDateContext(blockElement)
+    );
   };
 
-  // 🔧 1.9 - ENHANCED: Add username tags with Utilities Integration (unchanged)
-  const addUsernameTag = async (blockUid, username) => {
-    try {
-      // 🆕 Try utilities-based block update first
-      if (window._extensionRegistry?.utilities?.updateBlock) {
-        const updateBlock = window._extensionRegistry.utilities.updateBlock;
-        const blockData = window.roamAlphaAPI.pull(`[:block/string]`, [
-          ":block/uid",
-          blockUid,
-        ]);
+  // ===================================================================
+  // 🌲 4. PROCESSING LOGIC
+  // ===================================================================
 
-        if (!blockData) return false;
-        const currentContent = blockData[":block/string"] || "";
+  const processBlockWithRetry = async (blockUid) => {
+    const maxAttempts = 3;
+    const delays = [500, 1000, 2000]; // Progressive delays
 
-        if (hasUsernameTag(currentContent, username)) {
-          debug(`Block ${blockUid} already has tags for ${username}`);
-          return true;
-        }
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
 
-        const newContent = `#ts0 #[[${username}]]  ▸  ${currentContent}`;
-
-        try {
-          await updateBlock({
-            uid: blockUid,
-            text: newContent,
-          });
-          debug(
-            `✅ Added #ts0 #[[${username}]] to block ${blockUid} (via utilities)`
-          );
-          return true;
-        } catch (utilityError) {
-          debug(
-            `⚠️ Utility update failed, falling back to direct API: ${utilityError.message}`
-          );
-        }
-      }
-
-      // 🔄 FALLBACK: Original method
       const blockData = window.roamAlphaAPI.pull(`[:block/string]`, [
         ":block/uid",
         blockUid,
       ]);
-      if (!blockData) return false;
+      const blockContent = blockData?.[":block/string"] || "";
 
-      const currentContent = blockData[":block/string"] || "";
-
-      if (hasUsernameTag(currentContent, username)) {
-        debug(`Block ${blockUid} already has tags for ${username}`);
-        return true;
+      if (blockContent.trim().length === 0) {
+        debug(`Skipping empty block ${blockUid}`);
+        return false;
       }
 
-      const newContent = `#ts0 #[[${username}]]  ▸  ${currentContent}`;
-
-      await window.roamAlphaAPI.data.block.update({
-        block: { uid: blockUid, string: newContent },
-      });
-
-      debug(
-        `✅ Added #ts0 #[[${username}]] to block ${blockUid} (via direct API)`
-      );
-      return true;
-    } catch (error) {
-      debug(`❌ Error adding username tags: ${error.message}`);
-      return false;
-    }
-  };
-
-  // 🆕 1.10 - NEW: Get User Preferences for Tagging Behavior
-  const getUserPreferences = () => {
-    const defaultPrefs = {
-      enableTagging: true,
-      idleDelay: 2000,
-      processExistingOnLoad: true,
-      validateMembership: false,
-      enableChatRoomTagging: true, // 🆕 NEW: Enable chat room tagging
-    };
-
-    try {
-      // Try to get preferences from utilities
-      if (window._extensionRegistry?.utilities?.findNestedDataValuesExact) {
-        const getCurrentUser =
-          window._extensionRegistry.utilities.getCurrentUser;
-        const getPageUidByTitle =
-          window._extensionRegistry.utilities.getPageUidByTitle;
-        const findNestedDataValuesExact =
-          window._extensionRegistry.utilities.findNestedDataValuesExact;
-
-        const currentUser = getCurrentUser();
-        if (currentUser?.displayName) {
-          const userPageUid = getPageUidByTitle(currentUser.displayName);
-          if (userPageUid) {
-            const preferences = findNestedDataValuesExact(
-              userPageUid,
-              "Smart Tagger Settings"
-            );
-            return { ...defaultPrefs, ...preferences };
-          }
+      const authorName = getBlockAuthor(blockUid);
+      if (authorName) {
+        const success = await addUsernameTag(blockUid, authorName);
+        if (success) {
+          debug(
+            `✅ Tagged block ${blockUid} with ${authorName} (attempt ${
+              attempt + 1
+            })`
+          );
+          return true;
         }
       }
-    } catch (error) {
-      debug(`Could not load user preferences: ${error.message}`);
+
+      if (attempt < maxAttempts - 1) {
+        debug(
+          `Retry ${attempt + 1} failed for block ${blockUid}, trying again...`
+        );
+      }
     }
 
-    return defaultPrefs;
+    debug(`❌ All attempts failed for block ${blockUid}`);
+    return false;
   };
 
-  // 🌲 2.0 - Smart Processing Logic (UPDATED: enhanced with new context support)
   const processPendingBlocks = async () => {
     if (isProcessing || pendingBlocks.size === 0) return;
 
     const preferences = getUserPreferences();
-    if (!preferences.enableTagging) {
-      debug("⏸️ Tagging disabled in user preferences");
-      return;
-    }
+    if (!preferences.enableTagging) return;
 
     isProcessing = true;
     debug(`Processing ${pendingBlocks.size} pending blocks...`);
@@ -578,7 +289,7 @@ const smartUsernameTagger = (() => {
         continue;
       }
 
-      // Find DOM element (original logic preserved)
+      // Find DOM element and validate context
       const blockElements = document.querySelectorAll(".rm-block");
       let blockElement = null;
 
@@ -589,227 +300,82 @@ const smartUsernameTagger = (() => {
         }
       }
 
-      if (blockElement && isBlockBeingEdited(blockElement)) {
-        debug(`Skipping ${blockUid} - still being edited`);
-        continue;
-      }
-
-      // 🆕 UPDATED: Check BOTH contexts
-      if (blockElement && !isInTaggableContext(blockElement)) {
-        debug(
-          `Skipping ${blockUid} - not in taggable context (neither #ch0 nor chat room date)`
-        );
+      if (
+        !blockElement ||
+        isBlockBeingEdited(blockElement) ||
+        !isInTaggableContext(blockElement)
+      ) {
         pendingBlocks.delete(blockUid);
         continue;
       }
 
-      // Get author and add tags
-      const authorName = getBlockAuthor(blockUid);
-      if (authorName) {
-        const success = await addUsernameTag(blockUid, authorName);
-        if (success) {
-          processedBlocks.add(blockUid);
-          pendingBlocks.delete(blockUid);
-        }
-      } else {
-        pendingBlocks.delete(blockUid);
+      const success = await processBlockWithRetry(blockUid);
+      if (success) {
+        processedBlocks.add(blockUid);
       }
+      pendingBlocks.delete(blockUid);
 
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
 
     isProcessing = false;
-    debug("Pending blocks processing complete");
   };
 
-  // 🌲 3.0 - Event Handlers (UPDATED: use combined context checker + ENHANCED DEBUG)
+  // ===================================================================
+  // 🌲 5. EVENT HANDLERS
+  // ===================================================================
+
   const handleBlockBlur = (event) => {
-    debug(`🔥 === BLOCK BLUR EVENT TRIGGERED ===`);
-    debug(`🔥 Event target:`, event.target);
-    debug(`🔥 Event target classes:`, event.target.className);
-
     const blockElement = event.target.closest(".rm-block");
-    debug(`🔥 Found block element:`, blockElement);
-    debug(`🔥 Block element classes:`, blockElement?.className);
-
-    if (!blockElement) {
-      debug(`🔥 No block element found, exiting blur handler`);
-      return;
-    }
-
-    debug(`🔥 Checking if in taggable context...`);
-    const inTaggableContext = isInTaggableContext(blockElement);
-    debug(`🔥 In taggable context? ${inTaggableContext}`);
-
-    if (!inTaggableContext) {
-      debug(`🔥 Not in taggable context, exiting blur handler`);
-      return;
-    }
+    if (!blockElement || !isInTaggableContext(blockElement)) return;
 
     const blockUid = getBlockUidFromDOM(blockElement);
-    debug(`🔥 Block UID: ${blockUid}`);
-    debug(`🔥 Already processed? ${processedBlocks.has(blockUid)}`);
-
     if (blockUid && !processedBlocks.has(blockUid)) {
-      debug(`🔥 Adding block ${blockUid} to pending queue (blur)`);
       pendingBlocks.add(blockUid);
 
       const preferences = getUserPreferences();
       clearTimeout(idleTimer);
       idleTimer = setTimeout(processPendingBlocks, preferences.idleDelay);
-      debug(`🔥 Set idle timer for ${preferences.idleDelay}ms`);
     }
   };
 
   const handleKeyDown = async (event) => {
-    debug(`⌨️ === KEY DOWN EVENT: ${event.key} ===`);
-
     clearTimeout(idleTimer);
 
     if (event.key === "Enter") {
-      debug(`⌨️ ENTER key detected!`);
-      debug(`⌨️ Event target:`, event.target);
-      debug(`⌨️ Event target classes:`, event.target.className);
-
       const blockElement = event.target.closest(".rm-block");
-      debug(`⌨️ Found block element:`, blockElement);
-      debug(`⌨️ Block element classes:`, blockElement?.className);
-
-      if (!blockElement) {
-        debug(`⌨️ No block element found, exiting key handler`);
-        return;
-      }
-
-      debug(`⌨️ Checking if in taggable context...`);
-      const inTaggableContext = isInTaggableContext(blockElement);
-      debug(`⌨️ In taggable context? ${inTaggableContext}`);
-
-      if (blockElement && inTaggableContext) {
+      if (blockElement && isInTaggableContext(blockElement)) {
         const blockUid = getBlockUidFromDOM(blockElement);
-        debug(`⌨️ Block UID: ${blockUid}`);
-        debug(`⌨️ Already processed? ${processedBlocks.has(blockUid)}`);
-
         if (blockUid && !processedBlocks.has(blockUid)) {
-          debug(`⌨️ Processing block ${blockUid} immediately (Enter key)`);
-
-          // 🆕 INCREASED TIMEOUT: Give Roam more time to create block metadata
           setTimeout(async () => {
-            debug(`⌨️ 500ms timeout expired, processing block ${blockUid}`);
-
-            const blockData = window.roamAlphaAPI.pull(`[:block/string]`, [
-              ":block/uid",
-              blockUid,
-            ]);
-            const blockContent = blockData?.[":block/string"] || "";
-            debug(`⌨️ Block content: "${blockContent}"`);
-
-            if (blockContent.trim().length === 0) {
-              debug(`⌨️ Skipping empty block ${blockUid}`);
-              return;
+            const success = await processBlockWithRetry(blockUid);
+            if (success) {
+              processedBlocks.add(blockUid);
+              pendingBlocks.delete(blockUid);
             }
-
-            debug(`⌨️ Getting block author (attempt 1)...`);
-            let authorName = getBlockAuthor(blockUid);
-            debug(`⌨️ Block author (attempt 1): ${authorName}`);
-
-            // 🆕 RETRY LOGIC: If no author found, wait and try again
-            if (!authorName) {
-              debug(
-                `⌨️ No author found on first attempt, retrying in 1 second...`
-              );
-              setTimeout(async () => {
-                debug(`⌨️ Getting block author (attempt 2)...`);
-                authorName = getBlockAuthor(blockUid);
-                debug(`⌨️ Block author (attempt 2): ${authorName}`);
-
-                if (!authorName) {
-                  debug(
-                    `⌨️ Still no author found on second attempt, retrying in 2 seconds...`
-                  );
-                  setTimeout(async () => {
-                    debug(`⌨️ Getting block author (attempt 3 - final)...`);
-                    authorName = getBlockAuthor(blockUid);
-                    debug(`⌨️ Block author (attempt 3): ${authorName}`);
-
-                    if (authorName) {
-                      debug(`⌨️ Adding username tag (attempt 3)...`);
-                      const success = await addUsernameTag(
-                        blockUid,
-                        authorName
-                      );
-                      if (success) {
-                        processedBlocks.add(blockUid);
-                        pendingBlocks.delete(blockUid);
-                        debug(
-                          `⌨️ ✅ Successfully tagged block ${blockUid} (attempt 3)`
-                        );
-                      } else {
-                        debug(
-                          `⌨️ ❌ Failed to tag block ${blockUid} (attempt 3)`
-                        );
-                      }
-                    } else {
-                      debug(
-                        `⌨️ ❌ Final attempt failed - no author found for block ${blockUid}`
-                      );
-                    }
-                  }, 2000);
-                } else {
-                  debug(`⌨️ Adding username tag (attempt 2)...`);
-                  const success = await addUsernameTag(blockUid, authorName);
-                  if (success) {
-                    processedBlocks.add(blockUid);
-                    pendingBlocks.delete(blockUid);
-                    debug(
-                      `⌨️ ✅ Successfully tagged block ${blockUid} (attempt 2)`
-                    );
-                  } else {
-                    debug(`⌨️ ❌ Failed to tag block ${blockUid} (attempt 2)`);
-                  }
-                }
-              }, 1000);
-            } else {
-              debug(`⌨️ Adding username tag (attempt 1)...`);
-              const success = await addUsernameTag(blockUid, authorName);
-              if (success) {
-                processedBlocks.add(blockUid);
-                pendingBlocks.delete(blockUid);
-                debug(
-                  `⌨️ ✅ Successfully tagged block ${blockUid} (attempt 1)`
-                );
-              } else {
-                debug(`⌨️ ❌ Failed to tag block ${blockUid} (attempt 1)`);
-              }
-            }
-          }, 500); // 🆕 INCREASED from 100ms to 500ms
+          }, 100);
         }
-      } else {
-        debug(`⌨️ Block not in taggable context or no block element`);
       }
     }
   };
 
   const handlePageChange = () => {
-    debug("Page change detected, processing pending blocks");
     clearTimeout(idleTimer);
     processPendingBlocks();
   };
 
-  // 🌲 4.0 - Process Existing Conversations (UPDATED: includes chat rooms)
+  // ===================================================================
+  // 🌲 6. INITIALIZATION & CLEANUP
+  // ===================================================================
+
   const processExistingConversations = async () => {
     const preferences = getUserPreferences();
-    if (!preferences.processExistingOnLoad) {
-      debug("⏸️ Processing existing conversations disabled in preferences");
-      return;
-    }
+    if (!preferences.processExistingOnLoad) return;
 
-    debug(
-      "Scanning existing conversations AND chat rooms for taggable blocks..."
-    );
+    debug("Processing existing conversations...");
 
-    // 🔄 EXISTING: Process #ch0 conversations
+    // Process #ch0 conversations
     const ch0Tags = document.querySelectorAll('.rm-page-ref[data-tag="ch0"]');
-
     for (const ch0Tag of ch0Tags) {
       const conversationBlock = ch0Tag.closest(".rm-block");
       if (!conversationBlock) continue;
@@ -817,36 +383,22 @@ const smartUsernameTagger = (() => {
       const directChildren = conversationBlock.querySelectorAll(
         ":scope > .rm-block-children > .rm-block"
       );
-
-      debug(
-        `Found ${directChildren.length} direct children in #ch0 conversation`
-      );
-
       for (const childBlock of directChildren) {
-        if (isBlockBeingEdited(childBlock)) {
-          debug("Skipping block in edit mode during initial scan");
-          continue;
-        }
+        if (isBlockBeingEdited(childBlock)) continue;
 
         const blockUid = getBlockUidFromDOM(childBlock);
         if (blockUid && !processedBlocks.has(blockUid)) {
-          const authorName = getBlockAuthor(blockUid);
-          if (authorName) {
-            await addUsernameTag(blockUid, authorName);
-            processedBlocks.add(blockUid);
-            await new Promise((resolve) => setTimeout(resolve, 100));
-          }
+          const success = await processBlockWithRetry(blockUid);
+          if (success) processedBlocks.add(blockUid);
+          await new Promise((resolve) => setTimeout(resolve, 100));
         }
       }
     }
 
-    // 🆕 NEW: Process chat room date contexts
+    // Process chat room date contexts
     if (preferences.enableChatRoomTagging) {
       const pageTitle = document.title || "";
       if (pageTitle.toLowerCase().includes("chat room")) {
-        debug(`📅 Processing chat room page: "${pageTitle}"`);
-
-        // Find all blocks that might contain [[date]] references
         const allBlocks = document.querySelectorAll(".rm-block");
 
         for (const block of allBlocks) {
@@ -854,37 +406,19 @@ const smartUsernameTagger = (() => {
           if (!textElement) continue;
 
           const content = textElement.textContent || "";
-
-          // Check if this block contains [[date]] references
           if (/\[\[([^\]]+)\]\]/.test(content)) {
-            // Find direct children of this date block
             const directChildren = block.querySelectorAll(
               ":scope > .rm-block-children > .rm-block"
             );
 
-            debug(
-              `Found ${
-                directChildren.length
-              } direct children under date block: "${content.substring(
-                0,
-                50
-              )}..."`
-            );
-
             for (const childBlock of directChildren) {
-              if (isBlockBeingEdited(childBlock)) {
-                debug("Skipping block in edit mode during chat room scan");
-                continue;
-              }
+              if (isBlockBeingEdited(childBlock)) continue;
 
               const blockUid = getBlockUidFromDOM(childBlock);
               if (blockUid && !processedBlocks.has(blockUid)) {
-                const authorName = getBlockAuthor(blockUid);
-                if (authorName) {
-                  await addUsernameTag(blockUid, authorName);
-                  processedBlocks.add(blockUid);
-                  await new Promise((resolve) => setTimeout(resolve, 100));
-                }
+                const success = await processBlockWithRetry(blockUid);
+                if (success) processedBlocks.add(blockUid);
+                await new Promise((resolve) => setTimeout(resolve, 100));
               }
             }
           }
@@ -892,69 +426,14 @@ const smartUsernameTagger = (() => {
       }
     }
 
-    debug("✅ Existing conversations AND chat rooms processed");
+    debug("✅ Existing conversations processed");
   };
 
-  // 🌲 5.0 - Setup Event Listeners (ENHANCED DEBUG + ALTERNATIVE APPROACHES)
   const setupEventListeners = () => {
-    debug("🔧 Starting event listener setup...");
-    console.log("🔧 DIRECT: Starting event listener setup...");
-
-    try {
-      // Test multiple event listener approaches
-      debug("🔧 Method 1: Adding focusout listener with capture=true");
-      document.addEventListener("focusout", handleBlockBlur, true);
-
-      debug("🔧 Method 2: Adding keydown listener with capture=true");
-      document.addEventListener("keydown", handleKeyDown, true);
-
-      // Also try without capture phase
-      debug("🔧 Method 3: Adding blur listener without capture");
-      document.addEventListener(
-        "blur",
-        (event) => {
-          debug("🔥 BLUR EVENT (non-capture) detected!");
-          handleBlockBlur(event);
-        },
-        false
-      );
-
-      // Also try keyup as backup
-      debug("🔧 Method 4: Adding keyup listener as backup");
-      document.addEventListener(
-        "keyup",
-        (event) => {
-          debug("⌨️ KEYUP EVENT detected!");
-          if (event.key === "Enter") {
-            debug("⌨️ KEYUP ENTER detected!");
-            handleKeyDown(event);
-          }
-        },
-        true
-      );
-
-      // Test if we can detect ANY keyboard events
-      debug("🔧 Method 5: Adding universal keydown test");
-      document.addEventListener(
-        "keydown",
-        (event) => {
-          debug(
-            `🔧 UNIVERSAL KEYDOWN: ${event.key} (target: ${event.target.tagName})`
-          );
-        },
-        true
-      );
-
-      debug("🔧 Method 6: Adding window-level events");
-      window.addEventListener("beforeunload", handlePageChange);
-      window.addEventListener("hashchange", handlePageChange);
-
-      debug("✅ All event listeners setup complete");
-      console.log("✅ DIRECT: All event listeners setup complete");
-    } catch (error) {
-      debug(`❌ Error setting up event listeners: ${error.message}`);
-      console.error("❌ DIRECT: Error setting up event listeners:", error);
-    }
+    document.addEventListener("focusout", handleBlockBlur, true);
+    document.addEventListener("keydown", handleKeyDown, true);
+    window.addEventListener("beforeunload", handlePageChange);
+    window.addEventListener("hashchange", handlePageChange);
   };
 
   const removeEventListeners = () => {
@@ -969,159 +448,68 @@ const smartUsernameTagger = (() => {
     }
   };
 
-  // 🍎 6.0 - Extension Lifecycle (ENHANCED with immediate testing)
+  // ===================================================================
+  // 🌲 7. EXTENSION LIFECYCLE
+  // ===================================================================
+
   const onload = ({ extensionAPI }) => {
-    console.log("🚀 === EXTENSION LOADING START ===");
-    debug(
-      "🚀 Loading Enhanced Smart Username Tagger with chat room support..."
-    );
+    debug("🚀 Loading Smart Username Tagger...");
 
-    // 🚨 IMMEDIATE TESTS
-    console.log("🚨 Testing basic functionality...");
-    debug("🚨 Debug function working!");
+    // Create settings panel
+    extensionAPI.settings.panel.create({
+      tabTitle: "Smart Username Tagger",
+      settings: [
+        {
+          id: "processExisting",
+          name: "Process existing conversations on load",
+          description:
+            "Add tags to existing conversation messages when extension loads",
+          action: { type: "switch" },
+        },
+        {
+          id: "enableChatRoomTagging",
+          name: "Enable chat room tagging",
+          description: "Tag messages in chat room pages under date headings",
+          action: { type: "switch" },
+        },
+        {
+          id: "idleDelay",
+          name: "Idle delay (seconds)",
+          description: "Wait time for focus-loss events",
+          action: { type: "input", placeholder: "2" },
+        },
+      ],
+    });
 
-    // Test page title detection
-    const pageTitle = document.title || "";
-    debug(`📄 Current page title: "${pageTitle}"`);
-    debug(
-      `📄 Is chat room page? ${pageTitle.toLowerCase().includes("chat room")}`
-    );
-
-    // Test DOM availability
-    debug(`🌐 Document ready state: ${document.readyState}`);
-    debug(`🌐 Body available: ${!!document.body}`);
-    debug(`🌐 Roam API available: ${!!window.roamAlphaAPI}`);
-
-    // Test block detection
-    const allBlocks = document.querySelectorAll(".rm-block");
-    debug(`🧱 Found ${allBlocks.length} blocks on page`);
-
-    if (allBlocks.length > 0) {
-      debug(`🧱 First block classes: ${allBlocks[0].className}`);
-      debug(
-        `🧱 First block content: "${allBlocks[0].textContent?.substring(
-          0,
-          50
-        )}..."`
-      );
-    }
-
-    // 🆕 Enhanced settings panel with chat room support
-    try {
-      extensionAPI.settings.panel.create({
-        tabTitle: "Smart Username Tagger",
-        settings: [
-          {
-            id: "processExisting",
-            name: "Process existing conversations on load",
-            description:
-              "Add #ts0 and #[[username]] tags to existing conversation messages when extension loads",
-            action: { type: "switch" },
-          },
-          {
-            id: "enableChatRoomTagging",
-            name: "Enable chat room tagging",
-            description:
-              "Tag messages in chat room pages under [[date]] headings",
-            action: { type: "switch" },
-          },
-          {
-            id: "idleDelay",
-            name: "Idle delay (seconds)",
-            description:
-              "Wait time for focus-loss events (Enter key processes immediately)",
-            action: { type: "input", placeholder: "2" },
-          },
-          {
-            id: "validateMembership",
-            name: "Validate against member directory",
-            description:
-              "Check if users exist in the graph member directory (requires utilities)",
-            action: { type: "switch" },
-          },
-          {
-            id: "enableUtilities",
-            name: "Use utilities for enhanced functionality",
-            description:
-              "Enable integration with the utilities suite for better reliability",
-            action: { type: "switch" },
-          },
-        ],
-      });
-      debug("✅ Settings panel created successfully");
-    } catch (settingsError) {
-      debug(`❌ Settings panel creation failed: ${settingsError.message}`);
-    }
-
-    // Setup event listeners with enhanced debugging
     setupEventListeners();
 
-    // Process existing conversations with preferences
-    const preferences = getUserPreferences();
+    // Process existing conversations
     const processExisting = extensionAPI.settings.get("processExisting");
-
-    if (processExisting !== false && preferences.processExistingOnLoad) {
-      debug("🔄 Will process existing conversations in 3 seconds...");
-      setTimeout(() => {
-        debug("🔄 Processing existing conversations now...");
-        processExistingConversations();
-      }, 3000);
-    } else {
-      debug("⏸️ Skipping existing conversation processing");
+    if (processExisting !== false) {
+      setTimeout(processExistingConversations, 3000);
     }
 
-    // 🔍 Log utilities integration status
-    const utilitiesAvailable = !!window._extensionRegistry?.utilities;
+    // Log status
+    const pageTitle = document.title || "";
     const isChatRoom = pageTitle.toLowerCase().includes("chat room");
+    const utilitiesAvailable = !!window._extensionRegistry?.utilities;
 
-    debug(`✅ Enhanced Smart Username Tagger loaded`);
+    debug(`✅ Smart Username Tagger loaded`);
+    debug(`📅 Context: ${isChatRoom ? "Chat Room" : "Regular Page"}`);
     debug(
-      `🔧 Utilities integration: ${utilitiesAvailable ? "ENABLED" : "DISABLED"}`
+      `🔧 Utilities: ${utilitiesAvailable ? "Available" : "Not Available"}`
     );
-    debug(`📅 Chat room context: ${isChatRoom ? "DETECTED" : "NOT DETECTED"}`);
-    debug(
-      `⚙️ Processing existing: ${
-        preferences.processExistingOnLoad ? "ENABLED" : "DISABLED"
-      }`
-    );
-    debug(
-      `🏷️ Chat room tagging: ${
-        preferences.enableChatRoomTagging ? "ENABLED" : "DISABLED"
-      }`
-    );
-
-    if (utilitiesAvailable) {
-      const availableUtilities = Object.keys(
-        window._extensionRegistry.utilities
-      );
-      debug(`📦 Available utilities: ${availableUtilities.length} functions`);
-    }
-
-    console.log("✅ === EXTENSION LOADING COMPLETE ===");
-
-    // 🚨 FINAL TEST: Trigger a manual test after everything is set up
-    setTimeout(() => {
-      debug(
-        "🚨 DELAYED TEST: Extension fully initialized, ready for user interaction!"
-      );
-      console.log(
-        "🚨 DELAYED TEST: Extension ready - try typing something now!"
-      );
-    }, 1000);
   };
 
   const onunload = () => {
-    debug("Unloading Enhanced Smart Username Tagger...");
+    debug("Unloading Smart Username Tagger...");
     removeEventListeners();
     processedBlocks.clear();
     pendingBlocks.clear();
-    debug("✅ Enhanced Smart Username Tagger unloaded");
+    debug("✅ Smart Username Tagger unloaded");
   };
 
-  return {
-    onload,
-    onunload,
-  };
+  return { onload, onunload };
 })();
 
 export default smartUsernameTagger;
