@@ -477,7 +477,8 @@ const journalEntryCreator = (() => {
 
       // Step 2: Build banner content (following username pattern)
       const todaysDate = getTodaysRoamDate();
-      const bannerContent = `#st0 #clr-wht-act [[${todaysDate}]]`;
+      const dayName = getTodaysDayName();
+      const bannerContent = `#st0 #clr-wht-act [[${todaysDate}]]  -  ${dayName}`;
       log(`📅 Banner content: "${bannerContent}"`, "DEBUG");
 
       // Step 3: Find existing date banners for placement logic
@@ -1075,6 +1076,16 @@ const journalEntryCreator = (() => {
   // 🌟 Extension lifecycle
   const onload = ({ extensionAPI: api }) => {
     try {
+      // Prevent multiple instances
+      if (window.journalEntryCreatorActive) {
+        log(
+          "⚠️ Extension already loaded, skipping duplicate initialization",
+          "WARN"
+        );
+        return;
+      }
+      window.journalEntryCreatorActive = true;
+
       log("🚀 Journal Entry Creator v1.0 loading...", "SUCCESS");
       extensionAPI = api;
 
@@ -1180,6 +1191,11 @@ const journalEntryCreator = (() => {
       hideButtons();
       isInitialized = false;
       extensionAPI = null;
+
+      // Clean up instance protection
+      if (window.journalEntryCreatorActive) {
+        delete window.journalEntryCreatorActive;
+      }
 
       if (window.journalEntryCreator) {
         delete window.journalEntryCreator;
