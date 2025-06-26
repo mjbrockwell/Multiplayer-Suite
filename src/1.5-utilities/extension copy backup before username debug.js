@@ -1,9 +1,8 @@
 // ===================================================================
-// Extension 1.5: Enhanced Utility Library - SURGICALLY FIXED USER DETECTION
+// Extension 1.5: Enhanced Utility Library - Phase 1 Implementation
 // COMPLETE FIX: Working member list with findBlockByText function
 // NEW: Timezone, Modal, Navigation, Profile Analysis, Enhanced Image Processing
-// FIXED: User detection now uses ONLY Josh's official API method
-// FIXED: Auto-registration of real users to directory
+// FIXED: Member list now correctly finds Directory:: block and its children
 // ===================================================================
 
 // ===================================================================
@@ -361,6 +360,14 @@ const findBlockUidByTitle = (parentUid, titleStart) => {
     return null;
   }
 };
+
+// Add the new utility to the UTILITIES object
+
+console.log("🎯 LASER FOCUSED utility ready!");
+console.log("1. Add findBlockUidByTitle function to Extension 1.5");
+console.log("2. Add 'findBlockUidByTitle,' to UTILITIES object");
+console.log("3. Update getGraphMembersFromList to use it");
+console.log("4. Member list problem = SOLVED! 🎉");
 
 // ===================================================================
 // 🧭 NAVIGATION UTILITIES - Extracted from Extension SIX
@@ -814,7 +821,7 @@ const getGraphMembersFromList = (
       : `${blockName}::`;
     console.log(`🔍 Searching for block: "${blockNameWithSuffix}"`);
 
-    // ✅ THE ACTUAL FIX: Use findBlockUidByTitle
+    // ✅ THE ACTUAL FIX: Use findBlockByTitle
     const directoryUid = findBlockUidByTitle(pageUid, blockName);
     if (!directoryUid) {
       console.warn(
@@ -836,6 +843,63 @@ const getGraphMembersFromList = (
     console.error("❌ Error getting graph members from list:", error);
     return [];
   }
+};
+
+/**
+ * 🧪 ENHANCED DIAGNOSTIC: Check member list structure
+ */
+const diagnoseMemberListStructure = () => {
+  console.group("🔍 Diagnosing Member List Structure");
+
+  try {
+    const listPageTitle = "roam/graph members";
+    const pageUid = getPageUidByTitle(listPageTitle);
+    console.log(`📄 Page "${listPageTitle}" UID:`, pageUid);
+
+    if (pageUid) {
+      const allBlocks = window.roamAlphaAPI.data.q(`
+        [:find ?uid ?str
+         :where 
+         [?page :node/title "${listPageTitle}"]
+         [?page :block/children ?block]
+         [?block :block/uid ?uid]
+         [?block :block/string ?str]]
+      `);
+
+      console.log("📋 All blocks on page:", allBlocks);
+
+      // Get direct children for analysis
+      const children = getDirectChildren(pageUid);
+      console.log("👶 Direct children of page:", children);
+
+      // Test different variations
+      ["Directory", "Directory:", "Directory::"].forEach((variation) => {
+        const foundExact = findDataValueExact(pageUid, variation);
+        const foundByText = findBlockByText(pageUid, variation);
+        console.log(`   "${variation}":`);
+        console.log(
+          `      findDataValueExact → ${
+            foundExact ? "✅ FOUND" : "❌ not found"
+          }`
+        );
+        console.log(
+          `      findBlockByText → ${foundByText ? "✅ FOUND" : "❌ not found"}`
+        );
+      });
+
+      // Test the actual function
+      console.log("\n🧪 Testing getGraphMembersFromList:");
+      const members = getGraphMembersFromList(
+        "roam/graph members",
+        "Directory"
+      );
+      console.log(`Result: ${members.length} members found:`, members);
+    }
+  } catch (error) {
+    console.error("❌ Diagnosis failed:", error);
+  }
+
+  console.groupEnd();
 };
 
 /**
@@ -871,186 +935,6 @@ const removeGraphMember = async (username, listPageTitle = "Graph Members") => {
   } catch (error) {
     console.error("Error removing graph member:", error);
     return false;
-  }
-};
-
-// ===================================================================
-// 🔧 SURGICALLY FIXED USER DETECTION - JOSH'S METHOD ONLY
-// ===================================================================
-
-/**
- * 🎯 SURGICAL REPLACEMENT: getCurrentUser() - Josh's Method Only
- * Replaces the fallback-heavy version with clean single-method approach
- */
-const getCurrentUser = () => {
-  try {
-    // ✅ ONLY Josh's Official API Method - No Fallbacks
-    if (window.roamAlphaAPI?.user?.uid) {
-      const userUid = window.roamAlphaAPI.user.uid();
-
-      if (userUid) {
-        const userData = window.roamAlphaAPI.pull("[*]", [
-          ":user/uid",
-          userUid,
-        ]);
-
-        if (userData) {
-          const user = {
-            displayName:
-              userData[":user/display-name"] ||
-              userData[":user/email"] ||
-              "Current User",
-            email: userData[":user/email"] || "",
-            uid: userUid,
-            photoUrl: userData[":user/photo-url"] || "",
-            method: "official-api",
-          };
-
-          // 🎯 AUTO-REGISTRATION: Add real user to directory
-          autoRegisterUser(user.displayName);
-
-          return user;
-        }
-      }
-    }
-
-    // ❌ NO FALLBACKS - Return "not detected" object with same interface
-    console.warn("⚠️ No user detected via official API");
-    return {
-      displayName: "user not detected",
-      email: "",
-      uid: "not-detected",
-      method: "error",
-    };
-  } catch (error) {
-    console.error("getCurrentUser failed:", error);
-    return {
-      displayName: "user not detected",
-      email: "",
-      uid: "error",
-      method: "error",
-    };
-  }
-};
-
-/**
- * 🎯 SURGICAL REPLACEMENT: getCurrentUserViaOfficialAPI() - Clean Josh's Method
- * Updated to use exact Josh Brown implementation
- */
-const getCurrentUserViaOfficialAPI = () => {
-  try {
-    if (window.roamAlphaAPI?.user?.uid) {
-      const userUid = window.roamAlphaAPI.user.uid();
-
-      if (userUid) {
-        const userData = window.roamAlphaAPI.pull("[*]", [
-          ":user/uid",
-          userUid,
-        ]);
-
-        if (userData) {
-          return {
-            displayName:
-              userData[":user/display-name"] ||
-              userData[":user/email"] ||
-              "Current User",
-            email: userData[":user/email"] || "",
-            uid: userUid,
-            photoUrl: userData[":user/photo-url"] || "",
-            method: "official-api",
-          };
-        }
-      }
-    }
-    return null;
-  } catch (error) {
-    console.error("Official API user detection failed:", error);
-    return null;
-  }
-};
-
-/**
- * 🗑️ SURGICAL REMOVAL: getCurrentUserViaDOM() - COMPLETELY REMOVED
- * This function created fake users - now completely eliminated
- */
-// FUNCTION COMPLETELY REMOVED - NO REPLACEMENT
-
-/**
- * 🎯 NEW: Auto-registration system
- * Automatically adds real users to the directory when detected
- */
-const autoRegisterUser = async (username) => {
-  if (
-    !username ||
-    username === "user not detected" ||
-    username === "Current User"
-  ) {
-    return; // Don't register generic/error usernames
-  }
-
-  try {
-    console.log(`🎯 Auto-registering user: ${username}`);
-
-    // Get or create the graph members page
-    const pageUid = await createPageIfNotExists("roam/graph members");
-    if (!pageUid) {
-      console.warn("❌ Could not create/find graph members page");
-      return;
-    }
-
-    // Get or create the Directory:: block
-    const directoryUid = await ensureBlockExists(pageUid, "Directory::");
-    if (!directoryUid) {
-      console.warn("❌ Could not create/find Directory block");
-      return;
-    }
-
-    // Add user to directory (addToBlockList handles duplicates)
-    const added = await addToBlockList(directoryUid, username);
-
-    if (added) {
-      console.log(`✅ Auto-registered user: ${username}`);
-    } else {
-      console.log(`ℹ️ User already registered: ${username}`);
-    }
-  } catch (error) {
-    console.error(`❌ Auto-registration failed for ${username}:`, error);
-  }
-};
-
-/**
- * Clear user cache (for testing)
- */
-const clearUserCache = () => {
-  // Implementation for clearing any cached user data
-  console.log("User cache cleared");
-};
-
-/**
- * Get all graph members (fallback method)
- */
-const getGraphMembers = () => {
-  try {
-    const result = window.roamAlphaAPI.q(`
-      [:find ?title
-       :where [?p :node/title ?title]
-       [(clojure.string/includes? ?title " ")]]
-    `);
-
-    const members = result
-      .map(([title]) => title)
-      .filter(
-        (title) =>
-          !title.startsWith("roam/") &&
-          !title.includes("::") &&
-          title.length > 2
-      )
-      .sort();
-
-    return members;
-  } catch (error) {
-    console.error("getGraphMembers error:", error);
-    return [];
   }
 };
 
@@ -1600,126 +1484,161 @@ const removeFromBlockList = async (parentUid, itemText) => {
   }
 };
 
-// ===================================================================
-// 🧪 TEST FUNCTIONS FOR NEW UTILITIES + SURGICAL FIX TESTS
-// ===================================================================
-
 /**
- * 🧪 Test the surgical changes
+ * Get current user using multiple methods
  */
-const testSurgicalFix = () => {
-  console.group("🔧 Testing Surgical User Detection Fix");
-
-  console.log("1️⃣ Testing getCurrentUser() - Josh's method only...");
-  const user = getCurrentUser();
-  console.log("Current user:", user);
-  console.log(`Method used: ${user.method}`);
-  console.log(`Is real user: ${user.method === "official-api"}`);
-
-  console.log("\n2️⃣ Testing getCurrentUserViaOfficialAPI()...");
-  const officialUser = getCurrentUserViaOfficialAPI();
-  console.log("Official API user:", officialUser);
-
-  console.log("\n3️⃣ Testing auto-registration...");
-  if (user.method === "official-api") {
-    console.log(`✅ Real user detected: ${user.displayName}`);
-    console.log("Auto-registration should have triggered");
-  } else {
-    console.log("❌ No real user detected - no auto-registration");
-  }
-
-  console.log("\n4️⃣ Testing directory access...");
-  const members = getGraphMembersFromList("roam/graph members", "Directory");
-  console.log(`Directory members: ${members.length}`, members);
-
-  console.groupEnd();
-};
-
-/**
- * 🧪 Verify no breaking changes for dependent extensions
- */
-const testDependentExtensionsCompatibility = () => {
-  console.group("🔧 Testing Extension 2.0 Compatibility");
-
-  // Test Extension 2.0 functions still work
-  const user = getCurrentUser();
-
-  // Extension 2.0 calls these patterns:
-  console.log("✅ getCurrentUser() return format:", typeof user === "object");
-  console.log("✅ Has displayName:", !!user.displayName);
-  console.log("✅ Has method:", !!user.method);
-  console.log(
-    "✅ Method check (user.method !== 'error'):",
-    user.method !== "error"
-  );
-
-  // Test what Extension 2.0's functions would return
-  const isAuthenticated =
-    user && user.method !== "fallback" && user.method !== "error";
-  const username = user ? user.displayName : null;
-
-  console.log("✅ isUserAuthenticated() equivalent:", isAuthenticated);
-  console.log("✅ getCurrentUsername() equivalent:", username);
-
-  console.groupEnd();
-};
-
-/**
- * 🧪 ENHANCED DIAGNOSTIC: Check member list structure
- */
-const diagnoseMemberListStructure = () => {
-  console.group("🔍 Diagnosing Member List Structure");
-
+const getCurrentUser = () => {
   try {
-    const listPageTitle = "roam/graph members";
-    const pageUid = getPageUidByTitle(listPageTitle);
-    console.log(`📄 Page "${listPageTitle}" UID:`, pageUid);
-
-    if (pageUid) {
-      const allBlocks = window.roamAlphaAPI.data.q(`
-        [:find ?uid ?str
-         :where 
-         [?page :node/title "${listPageTitle}"]
-         [?page :block/children ?block]
-         [?block :block/uid ?uid]
-         [?block :block/string ?str]]
-      `);
-
-      console.log("📋 All blocks on page:", allBlocks);
-
-      // Get direct children for analysis
-      const children = getDirectChildren(pageUid);
-      console.log("👶 Direct children of page:", children);
-
-      // Test different variations
-      ["Directory", "Directory:", "Directory::"].forEach((variation) => {
-        const foundExact = findDataValueExact(pageUid, variation);
-        const foundByText = findBlockByText(pageUid, variation);
-        console.log(`   "${variation}":`);
-        console.log(
-          `      findDataValueExact → ${
-            foundExact ? "✅ FOUND" : "❌ not found"
-          }`
-        );
-        console.log(
-          `      findBlockByText → ${foundByText ? "✅ FOUND" : "❌ not found"}`
-        );
-      });
-
-      // Test the actual function
-      console.log("\n🧪 Testing getGraphMembersFromList:");
-      const members = getGraphMembersFromList(
-        "roam/graph members",
-        "Directory"
-      );
-      console.log(`Result: ${members.length} members found:`, members);
+    // Try official API first (new method)
+    if (window.roamAlphaAPI?.user?.uid) {
+      const userUid = window.roamAlphaAPI.user.uid();
+      const userData = window.roamAlphaAPI.pull("[*]", [":user/uid", userUid]);
+      if (userData) {
+        return {
+          displayName: userData[":user/display-name"] || "Unknown User",
+          email: userData[":user/email"] || "",
+          uid: userUid,
+          photoUrl: userData[":user/photo-url"] || "",
+          method: "official-api",
+        };
+      }
     }
-  } catch (error) {
-    console.error("❌ Diagnosis failed:", error);
-  }
 
-  console.groupEnd();
+    // Fallback to localStorage method
+    const globalAppState = JSON.parse(
+      localStorage.getItem("globalAppState") || '["","",[]]'
+    );
+    const userIndex = globalAppState.findIndex((s) => s === "~:user");
+    if (userIndex > 0 && globalAppState[userIndex + 1]) {
+      const userData = globalAppState[userIndex + 1];
+      return {
+        displayName: userData[1] || "Unknown User",
+        email: userData[3] || "",
+        uid: userData[0] || "unknown",
+        photoUrl: userData[4] || "",
+        method: "localStorage",
+      };
+    }
+
+    return {
+      displayName: "Unknown User",
+      email: "",
+      uid: "unknown",
+      method: "fallback",
+    };
+  } catch (error) {
+    console.error("getCurrentUser failed:", error);
+    return {
+      displayName: "Error",
+      email: "",
+      uid: "error",
+      method: "error",
+    };
+  }
 };
+
+/**
+ * Get current user using official API (new method)
+ */
+const getCurrentUserViaOfficialAPI = () => {
+  try {
+    if (window.roamAlphaAPI?.user?.uid) {
+      const userUid = window.roamAlphaAPI.user.uid();
+      const userData = window.roamAlphaAPI.pull("[*]", [":user/uid", userUid]);
+      if (userData) {
+        return {
+          displayName: userData[":user/display-name"] || "Unknown User",
+          email: userData[":user/email"] || "",
+          uid: userUid,
+          photoUrl: userData[":user/photo-url"] || "",
+          method: "official-api",
+        };
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error("Official API user detection failed:", error);
+    return null;
+  }
+};
+
+/**
+ * Get current user via DOM scanning (fallback method)
+ */
+const getCurrentUserViaDOM = () => {
+  try {
+    // Fallback to localStorage method
+    const globalAppState = JSON.parse(
+      localStorage.getItem("globalAppState") || '["","",[]]'
+    );
+    const userIndex = globalAppState.findIndex((s) => s === "~:user");
+    if (userIndex > 0 && globalAppState[userIndex + 1]) {
+      const userData = globalAppState[userIndex + 1];
+      return {
+        displayName: userData[1] || "Unknown User",
+        email: userData[3] || "",
+        uid: userData[0] || "unknown",
+        photoUrl: userData[4] || "",
+        method: "localStorage",
+      };
+    }
+
+    return {
+      displayName: "Unknown User",
+      email: "",
+      uid: "unknown",
+      method: "fallback",
+    };
+  } catch (error) {
+    console.error("DOM user detection failed:", error);
+    return {
+      displayName: "Error",
+      email: "",
+      uid: "error",
+      method: "error",
+    };
+  }
+};
+
+/**
+ * Clear user cache (for testing)
+ */
+const clearUserCache = () => {
+  // Implementation for clearing any cached user data
+  console.log("User cache cleared");
+};
+
+/**
+ * Get all graph members
+ */
+const getGraphMembers = () => {
+  try {
+    const result = window.roamAlphaAPI.q(`
+      [:find ?title
+       :where [?p :node/title ?title]
+       [(clojure.string/includes? ?title " ")]]
+    `);
+
+    const members = result
+      .map(([title]) => title)
+      .filter(
+        (title) =>
+          !title.startsWith("roam/") &&
+          !title.includes("::") &&
+          title.length > 2
+      )
+      .sort();
+
+    return members;
+  } catch (error) {
+    console.error("getGraphMembers error:", error);
+    return [];
+  }
+};
+
+// ===================================================================
+// 🧪 TEST FUNCTIONS FOR NEW UTILITIES
+// ===================================================================
 
 /**
  * Test timezone utilities
@@ -2078,7 +1997,7 @@ const testImageExtraction = async () => {
 };
 
 // ===================================================================
-// 🎛️ ENHANCED UTILITIES REGISTRY - COMPLETE WITH SURGICAL FIX
+// 🎛️ ENHANCED UTILITIES REGISTRY - COMPLETE WITH FIX
 // ===================================================================
 
 const UTILITIES = {
@@ -2138,10 +2057,10 @@ const UTILITIES = {
   // 🔧 EXISTING: Enhanced Data Functions
   setNestedDataValuesStructured,
 
-  // 🔍 SURGICALLY FIXED: User Detection
-  getCurrentUser, // ✅ FIXED - Josh's method only
-  getCurrentUserViaOfficialAPI, // ✅ FIXED - Updated implementation
-  autoRegisterUser, // ✅ NEW - Auto-registration system
+  // 🔍 EXISTING: User Detection
+  getCurrentUser,
+  getCurrentUserViaOfficialAPI,
+  getCurrentUserViaDOM,
   clearUserCache,
 
   // 🧪 EXISTING: Test Functions for Original Utilities
@@ -2159,10 +2078,6 @@ const UTILITIES = {
   testEnhancedImageProcessing,
   testEnhancedMemberManagement,
 
-  // 🧪 SURGICALLY ADDED: Test Functions for Fix
-  testSurgicalFix, // ✅ NEW - Test the surgical changes
-  testDependentExtensionsCompatibility, // ✅ NEW - Verify no breaking changes
-
   // 🔍 DIAGNOSTIC: Debug Functions
   diagnoseMemberListStructure, // Enhanced diagnostic
 
@@ -2171,12 +2086,14 @@ const UTILITIES = {
 };
 
 // ===================================================================
-// 🎯 EXTENSION REGISTRATION - Enhanced with Surgical Fix
+// 🎯 EXTENSION REGISTRATION - Enhanced with Phase 1 Utilities
 // ===================================================================
 
 export default {
   onload: () => {
-    console.log("🔧 Extension 1.5 loading with SURGICAL USER DETECTION FIX...");
+    console.log(
+      "🔧 Extension 1.5 loading with Phase 1 enhancements + MEMBER LIST FIX..."
+    );
 
     // Initialize extension registry if it doesn't exist
     if (!window._extensionRegistry) {
@@ -2194,26 +2111,8 @@ export default {
       window._extensionRegistry.utilities = {};
     }
 
-    // 🎯 TRIGGER AUTO-REGISTRATION ON STARTUP
-    const currentUser = getCurrentUser();
-    if (currentUser && currentUser.method === "official-api") {
-      console.log(
-        `🎯 Auto-registering user on startup: ${currentUser.displayName}`
-      );
-      autoRegisterUser(currentUser.displayName);
-    }
-
     // 🧪 Command palette functions for testing
     const commands = [
-      // NEW Surgical Fix test commands
-      {
-        label: "🔧 Test: Surgical User Detection Fix",
-        callback: testSurgicalFix,
-      },
-      {
-        label: "🔧 Test: Extension 2.0 Compatibility Check",
-        callback: testDependentExtensionsCompatibility,
-      },
       // NEW Phase 1 test commands
       {
         label: "Test: Timezone Management Utilities",
@@ -2298,13 +2197,13 @@ export default {
           "utility-library",
           {
             utilities: UTILITIES,
-            version: "1.5.3-surgical-fix",
+            version: "1.5.2-member-fix",
           },
           {
-            name: "Enhanced Utility Library + SURGICAL USER DETECTION FIX",
+            name: "Enhanced Utility Library + Member List Fix",
             description:
-              "Phase 1 enhanced utility library with SURGICALLY FIXED user detection (Josh's method only)",
-            version: "1.5.3-surgical-fix",
+              "Phase 1 enhanced utility library with FIXED member list functionality",
+            version: "1.5.2-member-fix",
             dependencies: [],
           }
         );
@@ -2312,16 +2211,10 @@ export default {
     }
 
     // ✅ Extension successfully loaded
-    console.log("✅ Extension 1.5 SURGICAL FIX loaded successfully!");
+    console.log(
+      "✅ Extension 1.5 Phase 1 + MEMBER LIST FIX loaded successfully!"
+    );
     console.log(`🔧 Registered ${Object.keys(UTILITIES).length} utilities:`);
-    console.log(
-      "   🔧 FIXED: getCurrentUser() - Josh's official API method ONLY"
-    );
-    console.log("   🗑️ REMOVED: getCurrentUserViaDOM() - No more fake users");
-    console.log(
-      "   🎯 NEW: autoRegisterUser() - Real users auto-added to directory"
-    );
-    console.log("   ✅ PRESERVED: All other utilities completely unchanged");
     console.log(
       "   🌍 NEW: Timezone Management (TimezoneManager from Extension SIX)"
     );
@@ -2343,18 +2236,18 @@ export default {
     console.log("   🔧 NEW: findBlockByText utility (THE FIX for member list)");
     console.log("   🚀 EXISTING: All previous utilities maintained");
     console.log(
-      "💡 Try: Cmd+P → '🔧 Test: Surgical User Detection Fix' to verify the fix!"
+      "💡 Try: Cmd+P → 'Test: Diagnose Member List Structure (ENHANCED)' to verify the fix!"
     );
 
     return {
       extensionId: "utility-library",
       utilities: UTILITIES,
-      version: "1.5.3-surgical-fix",
+      version: "1.5.2-member-fix",
     };
   },
 
   onunload: () => {
-    console.log("🔧 Extension 1.5 SURGICAL FIX unloading...");
+    console.log("🔧 Extension 1.5 Phase 1 + MEMBER LIST FIX unloading...");
     // Cleanup handled by the registry
   },
 };
