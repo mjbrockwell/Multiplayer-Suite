@@ -16,29 +16,17 @@
  */
 const getUserPreferencesPageUid = async (username) => {
   const platform = window.RoamExtensionSuite;
-  const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
+  const cascadeToBlock = platform.getUtility("cascadeToBlock");
 
   const pageTitle = `${username}/user preferences`;
 
-  // Check if page already exists
-  let pageUid = getPageUidByTitle(pageTitle);
+  // Use bulletproof cascading to create page if it doesn't exist
+  const pageUid = await cascadeToBlock(pageTitle, [], true);
 
-  if (!pageUid) {
-    // Create the page using direct Roam API
-    try {
-      pageUid = await window.roamAlphaAPI.data.page.create({
-        page: { title: pageTitle },
-      });
-      console.log(`📄 Created user preferences page: ${pageTitle}`);
-    } catch (error) {
-      console.error(
-        `Failed to create preferences page for ${username}:`,
-        error
-      );
-      return null;
-    }
+  if (pageUid) {
+    console.log(`📄 User preferences page ready: ${pageTitle}`);
   } else {
-    console.log(`📄 User preferences page already exists: ${pageTitle}`);
+    console.error(`Failed to create preferences page for ${username}`);
   }
 
   return pageUid;
@@ -88,69 +76,27 @@ const setUserPreference = async (
 ) => {
   try {
     const platform = window.RoamExtensionSuite;
-    const getDirectChildren = platform.getUtility("getDirectChildren");
+    const setDataValueStructured = platform.getUtility(
+      "setDataValueStructured"
+    );
 
     const pageUid = await getUserPreferencesPageUid(username);
     if (!pageUid) return false;
 
-    // Get existing children to check if preference already exists
-    const children = getDirectChildren(pageUid);
-    const keyText = useAttributeFormat ? `${key}::` : `**${key}:**`;
-
-    let preferenceBlock = children.find(
-      (child) => child.text.includes(key) || child.text.startsWith(keyText)
+    const success = await setDataValueStructured(
+      pageUid,
+      key,
+      value,
+      useAttributeFormat
     );
 
-    if (!preferenceBlock) {
-      // Create preference block
-      try {
-        const blockUid = await window.roamAlphaAPI.data.block.create({
-          location: { "parent-uid": pageUid, order: "last" },
-          block: { string: keyText },
-        });
-
-        // Create value block under preference
-        await window.roamAlphaAPI.data.block.create({
-          location: { "parent-uid": blockUid, order: "last" },
-          block: {
-            string: Array.isArray(value) ? value.join(", ") : String(value),
-          },
-        });
-
-        console.log(`✅ Set preference "${key}" for ${username}: ${value}`);
-        return true;
-      } catch (error) {
-        console.error(`❌ Failed to create preference "${key}":`, error);
-        return false;
-      }
+    if (success) {
+      console.log(`✅ Set preference "${key}" for ${username}: ${value}`);
     } else {
-      // Update existing preference
-      try {
-        const prefChildren = getDirectChildren(preferenceBlock.uid);
-        const valueText = Array.isArray(value)
-          ? value.join(", ")
-          : String(value);
-
-        if (prefChildren.length > 0) {
-          // Update first child with new value
-          await window.roamAlphaAPI.data.block.update({
-            block: { uid: prefChildren[0].uid, string: valueText },
-          });
-        } else {
-          // Create value block
-          await window.roamAlphaAPI.data.block.create({
-            location: { "parent-uid": preferenceBlock.uid, order: "last" },
-            block: { string: valueText },
-          });
-        }
-
-        console.log(`✅ Updated preference "${key}" for ${username}: ${value}`);
-        return true;
-      } catch (error) {
-        console.error(`❌ Failed to update preference "${key}":`, error);
-        return false;
-      }
+      console.error(`❌ Failed to set preference "${key}" for ${username}`);
     }
+
+    return success;
   } catch (error) {
     console.error(`Error setting preference "${key}" for ${username}:`, error);
     return false;
@@ -250,218 +196,97 @@ const initializeUserPreferences = async (username) => {
 // ===================================================================
 
 /**
- * 👤 2.1 Initialize user profile structure using Subjournals pattern
- * Creates the complete "My Info::" structure with bulletproof retry logic
+ * 👤 2.1 Initialize user profile structure with default values
+ * Creates the complete "My Info::" structure for a user if missing
  * @param {string} username - Username to initialize profile for
  * @returns {boolean} - Success status
  */
 const initializeUserProfile = async (username) => {
-  const startTime = Date.now();
-  const TIMEOUT = 5000; // 5 second timeout
-  const workingOn = { step: null, uid: null, content: null };
-  let loopCount = 0;
+  try {
+    console.log(`🎯 Initializing user profile structure for ${username}...`);
 
-  console.log(`🎯 Initializing user profile structure for ${username}...`);
+    const platform = window.RoamExtensionSuite;
+    const cascadeToBlock = platform.getUtility("cascadeToBlock");
 
-  while (Date.now() - startTime < TIMEOUT) {
-    loopCount++;
+    // Step 1: Ensure user page exists
+    const userPageUid = await cascadeToBlock(username, [], true);
+    if (!userPageUid) {
+      console.error(`❌ Failed to create/find user page for ${username}`);
+      return false;
+    }
 
-    try {
-      // STEP 1: Ensure user page exists
-      let userPageUid = await getOrCreatePageUid(username);
-      if (!userPageUid) {
-        if (workingOn.step !== "page") {
-          workingOn.step = "page";
-          workingOn.uid = null;
-          workingOn.content = username;
-          console.log(`➕ Creating user page: ${username}`);
-          userPageUid = await window.roamAlphaAPI.data.page.create({
-            page: { title: username },
-          });
-        }
-        continue; // Retry
-      }
+    console.log(`✅ User page ready: ${username} (${userPageUid})`);
 
-      // STEP 2: Ensure "My Info::" block exists
-      const myInfoBlock = await findOrCreateBlock(userPageUid, "My Info::");
-      if (!myInfoBlock) {
-        if (workingOn.step !== "myinfo" || workingOn.uid !== userPageUid) {
-          workingOn.step = "myinfo";
-          workingOn.uid = userPageUid;
-          workingOn.content = "My Info::";
-          await createBlockSimple(userPageUid, "My Info::");
-        }
-        continue; // Retry
-      }
+    // Step 2: Create/ensure "My Info::" block exists
+    const myInfoPath = ["My Info::"];
+    const myInfoUid = await cascadeToBlock(username, myInfoPath, false);
 
-      // STEP 3: Create profile fields
-      const profileFields = [
-        { name: "Avatar::", defaultValue: "__not yet entered__" },
-        { name: "Location::", defaultValue: "__not yet entered__" },
-        { name: "Role::", defaultValue: "__not yet entered__" },
-        { name: "Timezone::", defaultValue: "__not yet entered__" },
-        { name: "About Me::", defaultValue: "__not yet entered__" },
-      ];
+    if (!myInfoUid) {
+      console.error(`❌ Failed to create "My Info::" block for ${username}`);
+      return false;
+    }
 
-      let allFieldsCreated = true;
-      let createdCount = 0;
-      let skippedCount = 0;
+    console.log(`✅ "My Info::" block ready (${myInfoUid})`);
 
-      for (const field of profileFields) {
-        const fieldBlock = await findOrCreateBlock(myInfoBlock.uid, field.name);
+    // Step 3: Define required profile fields with default values
+    const profileFields = {
+      "Avatar::": "__not yet entered__",
+      "Location::": "__not yet entered__",
+      "Role::": "__not yet entered__",
+      "Timezone::": "__not yet entered__",
+      "About Me::": "__not yet entered__",
+    };
 
-        if (!fieldBlock) {
-          if (
-            workingOn.step !== `field-${field.name}` ||
-            workingOn.uid !== myInfoBlock.uid
-          ) {
-            workingOn.step = `field-${field.name}`;
-            workingOn.uid = myInfoBlock.uid;
-            workingOn.content = field.name;
-            await createBlockSimple(myInfoBlock.uid, field.name);
+    // Step 4: Create each profile field under "My Info::"
+    let createdCount = 0;
+    let skippedCount = 0;
+
+    for (const [fieldName, defaultValue] of Object.entries(profileFields)) {
+      try {
+        const fieldPath = ["My Info::", fieldName];
+        const fieldUid = await cascadeToBlock(username, fieldPath, false);
+
+        if (fieldUid) {
+          // Check if field already has content
+          const getDirectChildren = platform.getUtility("getDirectChildren");
+          const children = getDirectChildren(fieldUid);
+
+          if (children.length === 0) {
+            // Field exists but is empty - add default value
+            const valuePath = ["My Info::", fieldName, defaultValue];
+            const valueUid = await cascadeToBlock(username, valuePath, false);
+
+            if (valueUid) {
+              console.log(`✅ Created ${fieldName} with default value`);
+              createdCount++;
+            } else {
+              console.warn(`⚠️ Failed to add default value to ${fieldName}`);
+            }
+          } else {
+            console.log(`⏭️ ${fieldName} already has content, skipping`);
+            skippedCount++;
           }
-          allFieldsCreated = false;
-          break; // Exit field loop, retry main loop
-        }
-
-        // Check if field has content
-        const hasContent = await blockHasChildren(fieldBlock.uid);
-        if (!hasContent) {
-          if (
-            workingOn.step !== `value-${field.name}` ||
-            workingOn.uid !== fieldBlock.uid
-          ) {
-            workingOn.step = `value-${field.name}`;
-            workingOn.uid = fieldBlock.uid;
-            workingOn.content = field.defaultValue;
-            await createBlockSimple(fieldBlock.uid, field.defaultValue);
-          }
-          allFieldsCreated = false;
-          break; // Exit field loop, retry main loop
         } else {
-          skippedCount++;
+          console.error(`❌ Failed to create ${fieldName} block`);
         }
+      } catch (error) {
+        console.error(`❌ Error creating ${fieldName}:`, error);
       }
-
-      if (!allFieldsCreated) {
-        continue; // Retry main loop
-      }
-
-      // SUCCESS - all fields exist with content
-      createdCount = profileFields.length - skippedCount;
-      console.log(`✅ Profile initialization complete for ${username}:`);
-      console.log(`   - ${createdCount} fields created with defaults`);
-      console.log(`   - ${skippedCount} fields already had content`);
-      console.log(
-        `   - Total loops: ${loopCount}, Time: ${Date.now() - startTime}ms`
-      );
-
-      return true;
-    } catch (error) {
-      console.error(`❌ Loop ${loopCount} error:`, error.message);
-    }
-  }
-
-  throw new Error(
-    `Profile initialization timeout after ${TIMEOUT}ms (${loopCount} loops)`
-  );
-};
-
-// ===================================================================
-// 🔧 SUPPORTING FUNCTIONS - Subjournals Pattern
-// ===================================================================
-
-/**
- * Get or create page UID using Subjournals pattern
- */
-const getOrCreatePageUid = async (title) => {
-  try {
-    // Check if page already exists
-    let pageUid = window.roamAlphaAPI.q(`
-      [:find ?uid :where [?e :node/title "${title}"] [?e :block/uid ?uid]]
-    `)?.[0]?.[0];
-
-    if (pageUid) return pageUid;
-
-    // Create the page
-    pageUid = window.roamAlphaAPI.util.generateUID();
-    await window.roamAlphaAPI.data.page.create({
-      page: { title, uid: pageUid },
-    });
-    return pageUid;
-  } catch (error) {
-    console.error(`getOrCreatePageUid failed for "${title}":`, error);
-    return null;
-  }
-};
-
-/**
- * Find or create block using Subjournals pattern
- */
-const findOrCreateBlock = async (parentUid, blockText) => {
-  try {
-    // Search for existing block
-    const existing = window.roamAlphaAPI.q(`
-      [:find (pull ?child [:block/uid :block/string])
-       :where 
-       [?parent :block/uid "${parentUid}"] [?child :block/parents ?parent]
-       [?child :block/string ?string] [(clojure.string/starts-with? ?string "${blockText}")]]
-    `);
-
-    if (existing.length > 0) {
-      const found = existing[0][0];
-      return {
-        uid: found[":block/uid"] || found.uid,
-        string: found[":block/string"] || found.string,
-      };
     }
 
-    // Block doesn't exist, caller should create it
-    return null;
+    console.log(`✅ Profile initialization complete for ${username}:`);
+    console.log(`   - ${createdCount} fields created with defaults`);
+    console.log(`   - ${skippedCount} fields already had content`);
+    console.log(`   - Total fields: ${Object.keys(profileFields).length}`);
+
+    return (
+      createdCount > 0 || skippedCount === Object.keys(profileFields).length
+    );
   } catch (error) {
-    console.error(`findOrCreateBlock failed for "${blockText}":`, error);
-    return null;
-  }
-};
-
-/**
- * Create block using Subjournals pattern
- */
-const createBlockSimple = async (parentUid, content) => {
-  try {
-    const childCount =
-      window.roamAlphaAPI.q(`
-      [:find (count ?child) :where 
-       [?parent :block/uid "${parentUid}"] [?child :block/parents ?parent]]
-    `)?.[0]?.[0] || 0;
-
-    const blockUid = window.roamAlphaAPI.util.generateUID();
-    await window.roamAlphaAPI.data.block.create({
-      location: { "parent-uid": parentUid, order: childCount },
-      block: { uid: blockUid, string: content },
-    });
-
-    return blockUid;
-  } catch (error) {
-    console.error(`createBlockSimple failed for "${content}":`, error);
-    throw error;
-  }
-};
-
-/**
- * Check if block has children using Subjournals pattern
- */
-const blockHasChildren = async (blockUid) => {
-  try {
-    const childCount =
-      window.roamAlphaAPI.q(`
-      [:find (count ?child) :where 
-       [?parent :block/uid "${blockUid}"] [?child :block/parents ?parent]]
-    `)?.[0]?.[0] || 0;
-
-    return childCount > 0;
-  } catch (error) {
-    console.error(`blockHasChildren failed for "${blockUid}":`, error);
+    console.error(
+      `❌ Failed to initialize user profile for ${username}:`,
+      error
+    );
     return false;
   }
 };
