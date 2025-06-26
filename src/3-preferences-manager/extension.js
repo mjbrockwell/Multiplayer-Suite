@@ -13,10 +13,10 @@ const CONFIGURATION_SCHEMAS = {
   "Loading Page Preference": {
     type: "select",
     description: "Page to navigate to when opening Roam",
-    options: ["Daily Page", "Chat Room", "Smart"],
+    options: ["Daily Page", "Chat Room"],
     default: "Daily Page",
     validation: (value) =>
-      ["Daily Page", "Chat Room", "Smart"].includes(value) ||
+      ["Daily Page", "Chat Room"].includes(value) ||
       "Invalid landing page option",
   },
 
@@ -69,7 +69,7 @@ const CONFIGURATION_SCHEMAS = {
   "Personal Shortcuts": {
     type: "array",
     description: "Personal navigation shortcuts (recommended: 8-10 pages)",
-    default: ["Daily Notes", "Chat Room"],
+    default: ["Daily Notes", "Chat Room"], // Will be personalized during initialization
     validation: (value) => {
       if (!Array.isArray(value)) return "Must be an array of page names";
       if (value.length > 15) return "Too many shortcuts (max 15)";
@@ -290,14 +290,23 @@ const initializeUserPreferencesBulletproof = async (username) => {
         continue; // Retry
       }
 
-      // STEP 2: Process each schema preference
-      const preferenceKeys = Object.keys(CONFIGURATION_SCHEMAS);
+      // STEP 2: Create personalized schemas with current username
+      const personalizedSchemas = {
+        ...CONFIGURATION_SCHEMAS,
+        "Personal Shortcuts": {
+          ...CONFIGURATION_SCHEMAS["Personal Shortcuts"],
+          default: [`${username}/user preferences`, username],
+        },
+      };
+
+      // STEP 3: Process each schema preference
+      const preferenceKeys = Object.keys(personalizedSchemas);
       let allPreferencesSet = true;
       let successCount = 0;
 
       for (let i = 0; i < preferenceKeys.length; i++) {
         const key = preferenceKeys[i];
-        const schema = CONFIGURATION_SCHEMAS[key];
+        const schema = personalizedSchemas[key];
 
         console.log(`🔧 Processing ${i + 1}/${preferenceKeys.length}: ${key}`);
 
@@ -320,33 +329,43 @@ const initializeUserPreferencesBulletproof = async (username) => {
         // Check if preference has value
         const hasValue = await blockHasChildren(existingBlock.uid);
         if (!hasValue) {
-          // Add default value
-          const defaultValue = Array.isArray(schema.default)
-            ? schema.default[0] // Use first item for arrays initially
-            : schema.default;
+          // Add default value(s)
+          const defaultValues = Array.isArray(schema.default)
+            ? schema.default
+            : [schema.default];
 
-          if (
-            workingOn.step !== `value-${key}` ||
-            workingOn.uid !== existingBlock.uid
-          ) {
-            workingOn.step = `value-${key}`;
-            workingOn.uid = existingBlock.uid;
-            workingOn.content = String(defaultValue);
-            await createBlockSimple(existingBlock.uid, String(defaultValue));
+          console.log(
+            `📝 Adding ${defaultValues.length} default value(s) for ${key}`
+          );
 
-            // For arrays, add remaining values
-            if (Array.isArray(schema.default) && schema.default.length > 1) {
-              for (let j = 1; j < schema.default.length; j++) {
-                await createBlockSimple(
-                  existingBlock.uid,
-                  String(schema.default[j])
-                );
-                await new Promise((resolve) => setTimeout(resolve, 50));
-              }
+          // Create all default values
+          for (let j = 0; j < defaultValues.length; j++) {
+            const val = String(defaultValues[j]).trim();
+            if (val === "") continue; // Skip empty values
+
+            if (
+              workingOn.step !== `value-${key}-${j}` ||
+              workingOn.uid !== existingBlock.uid
+            ) {
+              workingOn.step = `value-${key}-${j}`;
+              workingOn.uid = existingBlock.uid;
+              workingOn.content = val;
+              await createBlockSimple(existingBlock.uid, val);
+              await new Promise((resolve) => setTimeout(resolve, 100));
             }
           }
-          allPreferencesSet = false;
-          break; // Exit preference loop, retry main loop
+
+          // Verify all values were created
+          const newChildCount = await getBlockChildCount(existingBlock.uid);
+          if (newChildCount < defaultValues.length) {
+            allPreferencesSet = false;
+            break; // Exit preference loop, retry main loop
+          }
+
+          console.log(
+            `✅ Added ${defaultValues.length} default value(s) for ${key}`
+          );
+          successCount++;
         } else {
           successCount++;
           console.log(
@@ -535,6 +554,24 @@ const getBlockChildren = async (blockUid) => {
   } catch (error) {
     console.error(`getBlockChildren failed for "${blockUid}":`, error);
     return [];
+  }
+};
+
+/**
+ * Get block child count using direct API
+ */
+const getBlockChildCount = async (blockUid) => {
+  try {
+    const childCount =
+      window.roamAlphaAPI.q(`
+      [:find (count ?child) :where 
+       [?parent :block/uid "${blockUid}"] [?child :block/parents ?parent]]
+    `)?.[0]?.[0] || 0;
+
+    return childCount;
+  } catch (error) {
+    console.error(`getBlockChildCount failed for "${blockUid}":`, error);
+    return 0;
   }
 };
 
@@ -1078,30 +1115,59 @@ export default {
           "🎯 Running startup configuration check with auto-creation..."
         );
 
-        // First, try to get overview (this will show missing page)
+        // First, try to get overview (this will show current state)
         const overview = await generateConfigurationOverview(user.displayName);
 
         console.log(
           "🎵 Configuration Manager (RESURRECTED) loaded successfully!"
         );
-        console.log(`⚙️ Configuration status: ${overview.summary}`);
-        console.log(
-          '💡 Try: Cmd+P → "Config: Initialize Preferences" for auto-creation'
-        );
+        console.log(`⚙️ Initial configuration status: ${overview.summary}`);
 
-        // Auto-initialize if completely missing
-        if (overview.configuredSettings === 0) {
-          console.log("🚀 No preferences detected - suggesting initialization");
-          console.log(
-            '🎯 Run "Config: Initialize Preferences" to create preference page'
-          );
+        // AUTO-CREATE: Initialize preferences if missing or incomplete
+        if (
+          overview.configuredSettings === 0 ||
+          overview.missingSettings.length > 0
+        ) {
+          console.log("🚀 Auto-creating user preferences...");
+          try {
+            const success = await initializeUserPreferencesBulletproof(
+              user.displayName
+            );
+            if (success) {
+              console.log("✅ User preferences auto-created successfully!");
+              console.log(
+                `📄 Created: [[${user.displayName}/user preferences]]`
+              );
+
+              // Show final status
+              const finalOverview = await generateConfigurationOverview(
+                user.displayName
+              );
+              console.log(`🎉 Final status: ${finalOverview.summary}`);
+            } else {
+              console.error(
+                "❌ Auto-creation failed - manual initialization may be needed"
+              );
+            }
+          } catch (autoError) {
+            console.error("❌ Auto-creation error:", autoError.message);
+            console.log(
+              '💡 Try manual: Cmd+P → "Config: Initialize Preferences"'
+            );
+          }
+        } else {
+          console.log("✅ User preferences already configured!");
         }
+
+        console.log(
+          '💡 Available: Cmd+P → "Config: Show My Configuration Status"'
+        );
       } else {
         console.log(
           "✅ Configuration Manager (RESURRECTED) loaded successfully!"
         );
         console.log(
-          "ℹ️ No authenticated user detected - commands available when user logs in"
+          "ℹ️ No authenticated user detected - auto-creation will run when user logs in"
         );
       }
     } catch (error) {
@@ -1109,6 +1175,7 @@ export default {
         "Configuration Manager loaded with warnings:",
         error.message
       );
+      console.log('💡 Try manual: Cmd+P → "Config: Initialize Preferences"');
     }
 
     console.log("🦜🎵 Ready for beautiful parrot duet with Extension 2!");
