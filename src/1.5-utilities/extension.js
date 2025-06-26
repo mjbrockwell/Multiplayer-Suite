@@ -1,9 +1,9 @@
 // ===================================================================
-// Extension 1.5: Enhanced Utility Library - SURGICALLY FIXED USER DETECTION
-// COMPLETE FIX: Working member list with findBlockByText function
-// NEW: Timezone, Modal, Navigation, Profile Analysis, Enhanced Image Processing
-// FIXED: User detection now uses ONLY Josh's official API method
-// FIXED: Auto-registration of real users to directory
+// Extension 1.5: Enhanced Utility Library - COMPLETE FIXED VERSION
+// ✅ FIXED: autoRegisterUser now properly registered and triggered
+// ✅ FIXED: All functions accessible globally and via platform
+// ✅ FIXED: Auto-registration triggers on startup with real users
+// Features: User authentication + user preferences management + utilities
 // ===================================================================
 
 // ===================================================================
@@ -312,57 +312,6 @@ const modalUtilities = {
 };
 
 // ===================================================================
-// 🎯 LASER FOCUSED: ONE NEW UTILITY FOR EXTENSION 1.5
-// ===================================================================
-
-/**
- * 🎯 NEW UTILITY: Find block UID by title that starts with given text
- * Handles bold formatting automatically (searches for both "Title" and "**Title")
- * Perfect pair with getBlockListItems() for the common pattern:
- * 1. Find block by title → get UID
- * 2. Get children of that block → get list items
- *
- * @param {string} parentUid - UID of parent block/page to search within
- * @param {string} titleStart - Text that the block title should start with (without :: suffix)
- * @returns {string|null} - UID of the block that starts with titleStart, or null if not found
- */
-
-const findBlockUidByTitle = (parentUid, titleStart) => {
-  if (!parentUid || !titleStart) {
-    console.warn("findBlockUidByTitle requires parentUid and titleStart");
-    return null;
-  }
-
-  try {
-    // Get all direct children of the parent
-    const children = getDirectChildren(parentUid);
-
-    // Search for block that starts with titleStart or **titleStart
-    const found = children.find((child) => {
-      const text = child.text.trim();
-
-      // Check if it starts with the title (with or without bold formatting)
-      return text.startsWith(titleStart) || text.startsWith(`**${titleStart}`);
-    });
-
-    if (found) {
-      console.log(
-        `✅ findBlockUidByTitle: Found "${found.text}" → UID: ${found.uid}`
-      );
-      return found.uid;
-    } else {
-      console.log(
-        `❌ findBlockUidByTitle: No block starting with "${titleStart}" found in ${children.length} children`
-      );
-      return null;
-    }
-  } catch (error) {
-    console.error(`findBlockUidByTitle error for "${titleStart}":`, error);
-    return null;
-  }
-};
-
-// ===================================================================
 // 🧭 NAVIGATION UTILITIES - Extracted from Extension SIX
 // ===================================================================
 
@@ -383,10 +332,6 @@ const navigationUtilities = {
   /**
    * Create positioned navigation button with auto-cleanup
    */
-  /**
-   * 🎯 ULTRA-MINIMAL VERSION
-   */
-
   createNavButton: (config) => {
     const {
       text,
@@ -693,7 +638,7 @@ const processAvatarImages = async (blockUid, fallbackInitials) => {
 // ===================================================================
 
 /**
- * ✅ NEW: Find block UID by text content (THE FIX!)
+ * Find block UID by text content
  */
 const findBlockByText = (parentUid, blockText) => {
   if (!parentUid || !blockText) return null;
@@ -708,6 +653,44 @@ const findBlockByText = (parentUid, blockText) => {
     return found ? found.uid : null;
   } catch (error) {
     console.error(`findBlockByText error for ${blockText}:`, error);
+    return null;
+  }
+};
+
+/**
+ * Find block UID by title that starts with given text
+ */
+const findBlockUidByTitle = (parentUid, titleStart) => {
+  if (!parentUid || !titleStart) {
+    console.warn("findBlockUidByTitle requires parentUid and titleStart");
+    return null;
+  }
+
+  try {
+    // Get all direct children of the parent
+    const children = getDirectChildren(parentUid);
+
+    // Search for block that starts with titleStart or **titleStart
+    const found = children.find((child) => {
+      const text = child.text.trim();
+
+      // Check if it starts with the title (with or without bold formatting)
+      return text.startsWith(titleStart) || text.startsWith(`**${titleStart}`);
+    });
+
+    if (found) {
+      console.log(
+        `✅ findBlockUidByTitle: Found "${found.text}" → UID: ${found.uid}`
+      );
+      return found.uid;
+    } else {
+      console.log(
+        `❌ findBlockUidByTitle: No block starting with "${titleStart}" found in ${children.length} children`
+      );
+      return null;
+    }
+  } catch (error) {
+    console.error(`findBlockUidByTitle error for "${titleStart}":`, error);
     return null;
   }
 };
@@ -732,8 +715,6 @@ const getPageUidByTitle = (title) => {
 /**
  * Get direct children of a block
  */
-
-// ✅ FIXED VERSION (uses simple query with correct mapping)
 const getDirectChildren = (parentUid) => {
   if (!parentUid) return [];
 
@@ -784,282 +765,154 @@ const getBlockListItems = (parentUid) => {
   }
 };
 
-// ===================================================================
-// 👥 ENHANCED GRAPH MEMBER MANAGEMENT - COMPLETELY FIXED
-// ===================================================================
-
 /**
- * ✅ FIXED: Get graph members from managed list
+ * Generate unique identifier
  */
-const getGraphMembersFromList = (
-  listPageTitle = "Graph Members",
-  blockName = "Directory"
-) => {
-  try {
-    console.log(
-      `🔍 Looking for members in page: "${listPageTitle}", block: "${blockName}"`
-    );
-
-    const pageUid = getPageUidByTitle(listPageTitle);
-    if (!pageUid) {
-      console.warn(`❌ No managed list found: ${listPageTitle}`);
-      return [];
-    }
-
-    console.log(`✅ Found page UID: ${pageUid}`);
-
-    // ✅ FIX: Add "::" suffix if not present to match Roam block format
-    const blockNameWithSuffix = blockName.endsWith("::")
-      ? blockName
-      : `${blockName}::`;
-    console.log(`🔍 Searching for block: "${blockNameWithSuffix}"`);
-
-    // ✅ THE ACTUAL FIX: Use findBlockUidByTitle
-    const directoryUid = findBlockUidByTitle(pageUid, blockName);
-    if (!directoryUid) {
-      console.warn(
-        `❌ No ${blockNameWithSuffix} block found in ${listPageTitle}`
-      );
-      console.log(
-        `💡 Expected structure: Page "${listPageTitle}" → Block "${blockNameWithSuffix}" → Child blocks (members)`
-      );
-      return [];
-    }
-
-    console.log(`✅ Found directory block UID: ${directoryUid}`);
-
-    const members = getBlockListItems(directoryUid);
-    console.log(`📋 Found ${members.length} members:`, members);
-
-    return members;
-  } catch (error) {
-    console.error("❌ Error getting graph members from list:", error);
-    return [];
-  }
+const generateUID = () => {
+  return window.roamAlphaAPI.util.generateUID();
 };
 
 /**
- * Add member to managed list
+ * Create page if it doesn't exist
  */
-const addGraphMember = async (username, listPageTitle = "Graph Members") => {
-  try {
-    const pageUid = await createPageIfNotExists(listPageTitle);
-    if (!pageUid) return false;
-
-    const directoryUid = await ensureBlockExists(pageUid, "Directory::");
-    if (!directoryUid) return false;
-
-    return await addToBlockList(directoryUid, username);
-  } catch (error) {
-    console.error("Error adding graph member:", error);
-    return false;
-  }
-};
-
-/**
- * Remove member from managed list
- */
-const removeGraphMember = async (username, listPageTitle = "Graph Members") => {
-  try {
-    const pageUid = getPageUidByTitle(listPageTitle);
-    if (!pageUid) return false;
-
-    const directoryUid = findBlockByText(pageUid, "Directory::");
-    if (!directoryUid) return false;
-
-    return await removeFromBlockList(directoryUid, username);
-  } catch (error) {
-    console.error("Error removing graph member:", error);
-    return false;
-  }
-};
-
-// ===================================================================
-// 🔧 SURGICALLY FIXED USER DETECTION - JOSH'S METHOD ONLY
-// ===================================================================
-
-/**
- * 🎯 SURGICAL REPLACEMENT: getCurrentUser() - Josh's Method Only
- * Replaces the fallback-heavy version with clean single-method approach
- */
-const getCurrentUser = () => {
-  try {
-    // ✅ ONLY Josh's Official API Method - No Fallbacks
-    if (window.roamAlphaAPI?.user?.uid) {
-      const userUid = window.roamAlphaAPI.user.uid();
-
-      if (userUid) {
-        const userData = window.roamAlphaAPI.pull("[*]", [
-          ":user/uid",
-          userUid,
-        ]);
-
-        if (userData) {
-          const user = {
-            displayName:
-              userData[":user/display-name"] ||
-              userData[":user/email"] ||
-              "Current User",
-            email: userData[":user/email"] || "",
-            uid: userUid,
-            photoUrl: userData[":user/photo-url"] || "",
-            method: "official-api",
-          };
-
-          // 🎯 AUTO-REGISTRATION: Add real user to directory
-          autoRegisterUser(user.displayName);
-
-          return user;
-        }
-      }
-    }
-
-    // ❌ NO FALLBACKS - Return "not detected" object with same interface
-    console.warn("⚠️ No user detected via official API");
-    return {
-      displayName: "user not detected",
-      email: "",
-      uid: "not-detected",
-      method: "error",
-    };
-  } catch (error) {
-    console.error("getCurrentUser failed:", error);
-    return {
-      displayName: "user not detected",
-      email: "",
-      uid: "error",
-      method: "error",
-    };
-  }
-};
-
-/**
- * 🎯 SURGICAL REPLACEMENT: getCurrentUserViaOfficialAPI() - Clean Josh's Method
- * Updated to use exact Josh Brown implementation
- */
-const getCurrentUserViaOfficialAPI = () => {
-  try {
-    if (window.roamAlphaAPI?.user?.uid) {
-      const userUid = window.roamAlphaAPI.user.uid();
-
-      if (userUid) {
-        const userData = window.roamAlphaAPI.pull("[*]", [
-          ":user/uid",
-          userUid,
-        ]);
-
-        if (userData) {
-          return {
-            displayName:
-              userData[":user/display-name"] ||
-              userData[":user/email"] ||
-              "Current User",
-            email: userData[":user/email"] || "",
-            uid: userUid,
-            photoUrl: userData[":user/photo-url"] || "",
-            method: "official-api",
-          };
-        }
-      }
-    }
-    return null;
-  } catch (error) {
-    console.error("Official API user detection failed:", error);
+const createPageIfNotExists = async (title) => {
+  if (!title) {
+    console.warn("createPageIfNotExists: title is required");
     return null;
   }
+
+  let pageUid = getPageUidByTitle(title);
+
+  if (!pageUid) {
+    try {
+      pageUid = generateUID();
+      console.log(`📄 Creating page: "${title}"`);
+
+      await window.roamAlphaAPI.data.page.create({
+        page: {
+          title: title,
+          uid: pageUid,
+        },
+      });
+    } catch (error) {
+      console.error(`❌ Failed to create page "${title}":`, error);
+      return null;
+    }
+  }
+
+  return pageUid;
 };
 
 /**
- * 🗑️ SURGICAL REMOVAL: getCurrentUserViaDOM() - COMPLETELY REMOVED
- * This function created fake users - now completely eliminated
+ * Ensure a block exists with given text
  */
-// FUNCTION COMPLETELY REMOVED - NO REPLACEMENT
-
-/**
- * 🎯 NEW: Auto-registration system
- * Automatically adds real users to the directory when detected
- */
-const autoRegisterUser = async (username) => {
-  if (
-    !username ||
-    username === "user not detected" ||
-    username === "Current User"
-  ) {
-    return; // Don't register generic/error usernames
+const ensureBlockExists = async (parentUid, blockText) => {
+  if (!parentUid || !blockText) {
+    console.warn("ensureBlockExists requires parentUid and blockText");
+    return null;
   }
 
   try {
-    console.log(`🎯 Auto-registering user: ${username}`);
+    const children = getDirectChildren(parentUid);
+    const existing = children.find((child) => child.text === blockText);
 
-    // Get or create the graph members page
-    const pageUid = await createPageIfNotExists("roam/graph members");
-    if (!pageUid) {
-      console.warn("❌ Could not create/find graph members page");
-      return;
+    if (existing) {
+      console.log(`✅ Block exists: "${blockText}"`);
+      return existing.uid;
     }
 
-    // Get or create the Directory:: block
-    const directoryUid = await ensureBlockExists(pageUid, "Directory::");
-    if (!directoryUid) {
-      console.warn("❌ Could not create/find Directory block");
-      return;
-    }
+    console.log(`➕ Creating block: "${blockText}"`);
+    const newUid = generateUID();
 
-    // Add user to directory (addToBlockList handles duplicates)
-    const added = await addToBlockList(directoryUid, username);
+    await window.roamAlphaAPI.data.block.create({
+      location: {
+        "parent-uid": parentUid,
+        order: children.length,
+      },
+      block: {
+        uid: newUid,
+        string: blockText,
+      },
+    });
 
-    if (added) {
-      console.log(`✅ Auto-registered user: ${username}`);
-    } else {
-      console.log(`ℹ️ User already registered: ${username}`);
-    }
+    return newUid;
   } catch (error) {
-    console.error(`❌ Auto-registration failed for ${username}:`, error);
+    console.error(`❌ ensureBlockExists failed for "${blockText}":`, error);
+    throw error;
   }
 };
 
 /**
- * Clear user cache (for testing)
+ * Add item to block list
  */
-const clearUserCache = () => {
-  // Implementation for clearing any cached user data
-  console.log("User cache cleared");
-};
+const addToBlockList = async (parentUid, itemText) => {
+  if (!parentUid || !itemText) {
+    console.warn("addToBlockList requires parentUid and itemText");
+    return false;
+  }
 
-/**
- * Get all graph members (fallback method)
- */
-const getGraphMembers = () => {
   try {
-    const result = window.roamAlphaAPI.q(`
-      [:find ?title
-       :where [?p :node/title ?title]
-       [(clojure.string/includes? ?title " ")]]
-    `);
+    const children = getDirectChildren(parentUid);
+    const existing = children.find((child) => child.text === itemText);
 
-    const members = result
-      .map(([title]) => title)
-      .filter(
-        (title) =>
-          !title.startsWith("roam/") &&
-          !title.includes("::") &&
-          title.length > 2
-      )
-      .sort();
+    if (existing) {
+      console.log(`⚠️ Item already in list: "${itemText}"`);
+      return true;
+    }
 
-    return members;
+    console.log(`➕ Adding to list: "${itemText}"`);
+    const newUid = generateUID();
+
+    await window.roamAlphaAPI.data.block.create({
+      location: {
+        "parent-uid": parentUid,
+        order: children.length,
+      },
+      block: {
+        uid: newUid,
+        string: itemText,
+      },
+    });
+
+    return true;
   } catch (error) {
-    console.error("getGraphMembers error:", error);
-    return [];
+    console.error(`❌ addToBlockList failed for "${itemText}":`, error);
+    throw error;
   }
 };
 
-// ===================================================================
-// 🧪 EXISTING FUNCTIONS - Maintained from previous version
-// ===================================================================
+/**
+ * Remove item from block list
+ */
+const removeFromBlockList = async (parentUid, itemText) => {
+  if (!parentUid || !itemText) {
+    console.warn("removeFromBlockList requires parentUid and itemText");
+    return false;
+  }
+
+  try {
+    const children = getDirectChildren(parentUid);
+    const itemToRemove = children.find((child) => child.text === itemText);
+
+    if (!itemToRemove) {
+      console.log(`⚠️ Item not found in list: "${itemText}"`);
+      return false;
+    }
+
+    console.log(`🗑️ Removing from list: "${itemText}"`);
+    await window.roamAlphaAPI.data.block.delete({
+      block: { uid: itemToRemove.uid },
+    });
+
+    return true;
+  } catch (error) {
+    console.error(`❌ removeFromBlockList failed for "${itemText}":`, error);
+    throw error;
+  }
+};
 
 /**
- * ✅ CASCADE TO BLOCK - Create hierarchical structure
+ * ✅ CASCADE TO BLOCK - Create hierarchical structure using cascading
  */
 const cascadeToBlock = async (
   pageTitle,
@@ -1123,43 +976,236 @@ const cascadeToBlock = async (
   }
 };
 
+// ===================================================================
+// 🔧 SURGICALLY FIXED USER DETECTION - JOSH'S METHOD ONLY
+// ===================================================================
+
 /**
- * Create page if it doesn't exist
+ * 🎯 FIXED: getCurrentUser() - Josh's Method Only + Auto-Registration
  */
-const createPageIfNotExists = async (title) => {
-  if (!title) {
-    console.warn("createPageIfNotExists: title is required");
+const getCurrentUser = () => {
+  try {
+    // ✅ ONLY Josh's Official API Method - No Fallbacks
+    if (window.roamAlphaAPI?.user?.uid) {
+      const userUid = window.roamAlphaAPI.user.uid();
+
+      if (userUid) {
+        const userData = window.roamAlphaAPI.pull("[*]", [
+          ":user/uid",
+          userUid,
+        ]);
+
+        if (userData) {
+          const user = {
+            displayName:
+              userData[":user/display-name"] ||
+              userData[":user/email"] ||
+              "Current User",
+            email: userData[":user/email"] || "",
+            uid: userUid,
+            photoUrl: userData[":user/photo-url"] || "",
+            method: "official-api",
+          };
+
+          return user;
+        }
+      }
+    }
+
+    // ❌ NO FALLBACKS - Return "not detected" object with same interface
+    console.warn("⚠️ No user detected via official API");
+    return {
+      displayName: "user not detected",
+      email: "",
+      uid: "not-detected",
+      method: "error",
+    };
+  } catch (error) {
+    console.error("getCurrentUser failed:", error);
+    return {
+      displayName: "user not detected",
+      email: "",
+      uid: "error",
+      method: "error",
+    };
+  }
+};
+
+/**
+ * 🎯 FIXED: getCurrentUserViaOfficialAPI() - Clean Josh's Method
+ */
+const getCurrentUserViaOfficialAPI = () => {
+  try {
+    if (window.roamAlphaAPI?.user?.uid) {
+      const userUid = window.roamAlphaAPI.user.uid();
+
+      if (userUid) {
+        const userData = window.roamAlphaAPI.pull("[*]", [
+          ":user/uid",
+          userUid,
+        ]);
+
+        if (userData) {
+          return {
+            displayName:
+              userData[":user/display-name"] ||
+              userData[":user/email"] ||
+              "Current User",
+            email: userData[":user/email"] || "",
+            uid: userUid,
+            photoUrl: userData[":user/photo-url"] || "",
+            method: "official-api",
+          };
+        }
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error("Official API user detection failed:", error);
     return null;
   }
-
-  let pageUid = getPageUidByTitle(title);
-
-  if (!pageUid) {
-    try {
-      pageUid = generateUID();
-      console.log(`📄 Creating page: "${title}"`);
-
-      await window.roamAlphaAPI.data.page.create({
-        page: {
-          title: title,
-          uid: pageUid,
-        },
-      });
-    } catch (error) {
-      console.error(`❌ Failed to create page "${title}":`, error);
-      return null;
-    }
-  }
-
-  return pageUid;
 };
 
 /**
- * Generate unique identifier
+ * 🎯 FIXED: Auto-registration system using cascadeToBlock
  */
-const generateUID = () => {
-  return window.roamAlphaAPI.util.generateUID();
+const autoRegisterUser = async (username) => {
+  if (
+    !username ||
+    username === "user not detected" ||
+    username === "Current User"
+  ) {
+    return; // Don't register generic/error usernames
+  }
+
+  try {
+    console.log(`🎯 Auto-registering: ${username}`);
+
+    // ✅ FIXED: Use cascadeToBlock for elegant page creation
+    await cascadeToBlock("roam/graph members", ["Directory::", username], true);
+
+    console.log(`✅ Auto-registered user: ${username}`);
+  } catch (error) {
+    console.error(`❌ Auto-registration failed for ${username}:`, error);
+  }
 };
+
+// ===================================================================
+// 👥 ENHANCED GRAPH MEMBER MANAGEMENT - COMPLETELY FIXED
+// ===================================================================
+
+/**
+ * ✅ FIXED: Get graph members from managed list
+ */
+const getGraphMembersFromList = (
+  listPageTitle = "roam/graph members",
+  blockName = "Directory"
+) => {
+  try {
+    console.log(
+      `🔍 Looking for members in page: "${listPageTitle}", block: "${blockName}"`
+    );
+
+    const pageUid = getPageUidByTitle(listPageTitle);
+    if (!pageUid) {
+      console.warn(`❌ No managed list found: ${listPageTitle}`);
+      return [];
+    }
+
+    console.log(`✅ Found page UID: ${pageUid}`);
+
+    // ✅ FIX: Use findBlockUidByTitle
+    const directoryUid = findBlockUidByTitle(pageUid, blockName);
+    if (!directoryUid) {
+      console.warn(`❌ No ${blockName}:: block found in ${listPageTitle}`);
+      return [];
+    }
+
+    console.log(`✅ Found directory block UID: ${directoryUid}`);
+
+    const members = getBlockListItems(directoryUid);
+    console.log(`📋 Found ${members.length} members:`, members);
+
+    return members;
+  } catch (error) {
+    console.error("❌ Error getting graph members from list:", error);
+    return [];
+  }
+};
+
+/**
+ * Add member to managed list
+ */
+const addGraphMember = async (
+  username,
+  listPageTitle = "roam/graph members"
+) => {
+  try {
+    const pageUid = await createPageIfNotExists(listPageTitle);
+    if (!pageUid) return false;
+
+    const directoryUid = await ensureBlockExists(pageUid, "Directory::");
+    if (!directoryUid) return false;
+
+    return await addToBlockList(directoryUid, username);
+  } catch (error) {
+    console.error("Error adding graph member:", error);
+    return false;
+  }
+};
+
+/**
+ * Remove member from managed list
+ */
+const removeGraphMember = async (
+  username,
+  listPageTitle = "roam/graph members"
+) => {
+  try {
+    const pageUid = getPageUidByTitle(listPageTitle);
+    if (!pageUid) return false;
+
+    const directoryUid = findBlockByText(pageUid, "Directory::");
+    if (!directoryUid) return false;
+
+    return await removeFromBlockList(directoryUid, username);
+  } catch (error) {
+    console.error("Error removing graph member:", error);
+    return false;
+  }
+};
+
+/**
+ * Get all graph members (fallback method)
+ */
+const getGraphMembers = () => {
+  try {
+    const result = window.roamAlphaAPI.q(`
+      [:find ?title
+       :where [?p :node/title ?title]
+       [(clojure.string/includes? ?title " ")]]
+    `);
+
+    const members = result
+      .map(([title]) => title)
+      .filter(
+        (title) =>
+          !title.startsWith("roam/") &&
+          !title.includes("::") &&
+          title.length > 2
+      )
+      .sort();
+
+    return members;
+  } catch (error) {
+    console.error("getGraphMembers error:", error);
+    return [];
+  }
+};
+
+// ===================================================================
+// 🔧 OTHER UTILITY FUNCTIONS - Enhanced and Fixed
+// ===================================================================
 
 /**
  * Get current page title from URL
@@ -1240,41 +1286,6 @@ const getPageUidByPageTitle = (title) => {
 };
 
 /**
- * Set nested data values in structured format
- */
-const setNestedDataValuesStructured = async (
-  pageUid,
-  parentFieldName,
-  dataObject,
-  useAttribute = false
-) => {
-  try {
-    const parentText = useAttribute ? `${parentFieldName}::` : parentFieldName;
-    const parentUid = await ensureBlockExists(pageUid, parentText);
-
-    if (!parentUid) return false;
-
-    for (const [fieldName, value] of Object.entries(dataObject)) {
-      const fieldText = useAttribute ? `${fieldName}::` : fieldName;
-      const success = await setDataValueStructured(
-        parentUid,
-        fieldText,
-        value,
-        useAttribute
-      );
-      if (!success) {
-        console.warn(`Failed to set ${fieldName} = ${value}`);
-      }
-    }
-
-    return true;
-  } catch (error) {
-    console.error(`setNestedDataValuesStructured error:`, error);
-    return false;
-  }
-};
-
-/**
  * Normalize header text for consistent matching
  */
 const normalizeHeaderText = (text) => {
@@ -1328,14 +1339,8 @@ const findDataValueExact = (pageUid, fieldName) => {
   }
 };
 
-// ===================================================================
-// 🔧 EXTENSION 1.5 FIX: findNestedDataValuesExact Function
-// Replace the broken complex version with this simple working one
-// ===================================================================
-
 /**
  * ✅ FIXED: Extract nested data values using simple queries
- * This replaces the broken version that had complex regex queries
  */
 const findNestedDataValuesExact = (pageUid, parentFieldName) => {
   if (!pageUid || !parentFieldName) return {};
@@ -1493,124 +1498,59 @@ const setDataValueStructured = async (
 };
 
 /**
- * Ensure a block exists with given text
+ * Set nested data values in structured format
  */
-const ensureBlockExists = async (parentUid, blockText) => {
-  if (!parentUid || !blockText) {
-    console.warn("ensureBlockExists requires parentUid and blockText");
-    return null;
-  }
-
+const setNestedDataValuesStructured = async (
+  pageUid,
+  parentFieldName,
+  dataObject,
+  useAttribute = false
+) => {
   try {
-    const children = getDirectChildren(parentUid);
-    const existing = children.find((child) => child.text === blockText);
+    const parentText = useAttribute ? `${parentFieldName}::` : parentFieldName;
+    const parentUid = await ensureBlockExists(pageUid, parentText);
 
-    if (existing) {
-      console.log(`✅ Block exists: "${blockText}"`);
-      return existing.uid;
+    if (!parentUid) return false;
+
+    for (const [fieldName, value] of Object.entries(dataObject)) {
+      const fieldText = useAttribute ? `${fieldName}::` : fieldName;
+      const success = await setDataValueStructured(
+        parentUid,
+        fieldText,
+        value,
+        useAttribute
+      );
+      if (!success) {
+        console.warn(`Failed to set ${fieldName} = ${value}`);
+      }
     }
-
-    console.log(`➕ Creating block: "${blockText}"`);
-    const newUid = generateUID();
-
-    await window.roamAlphaAPI.data.block.create({
-      location: {
-        "parent-uid": parentUid,
-        order: children.length,
-      },
-      block: {
-        uid: newUid,
-        string: blockText,
-      },
-    });
-
-    return newUid;
-  } catch (error) {
-    console.error(`❌ ensureBlockExists failed for "${blockText}":`, error);
-    throw error;
-  }
-};
-
-/**
- * Add item to block list
- */
-const addToBlockList = async (parentUid, itemText) => {
-  if (!parentUid || !itemText) {
-    console.warn("addToBlockList requires parentUid and itemText");
-    return false;
-  }
-
-  try {
-    const children = getDirectChildren(parentUid);
-    const existing = children.find((child) => child.text === itemText);
-
-    if (existing) {
-      console.log(`⚠️ Item already in list: "${itemText}"`);
-      return true;
-    }
-
-    console.log(`➕ Adding to list: "${itemText}"`);
-    const newUid = generateUID();
-
-    await window.roamAlphaAPI.data.block.create({
-      location: {
-        "parent-uid": parentUid,
-        order: children.length,
-      },
-      block: {
-        uid: newUid,
-        string: itemText,
-      },
-    });
 
     return true;
   } catch (error) {
-    console.error(`❌ addToBlockList failed for "${itemText}":`, error);
-    throw error;
-  }
-};
-
-/**
- * Remove item from block list
- */
-const removeFromBlockList = async (parentUid, itemText) => {
-  if (!parentUid || !itemText) {
-    console.warn("removeFromBlockList requires parentUid and itemText");
+    console.error(`setNestedDataValuesStructured error:`, error);
     return false;
   }
+};
 
-  try {
-    const children = getDirectChildren(parentUid);
-    const itemToRemove = children.find((child) => child.text === itemText);
-
-    if (!itemToRemove) {
-      console.log(`⚠️ Item not found in list: "${itemText}"`);
-      return false;
-    }
-
-    console.log(`🗑️ Removing from list: "${itemText}"`);
-    await window.roamAlphaAPI.data.block.delete({
-      block: { uid: itemToRemove.uid },
-    });
-
-    return true;
-  } catch (error) {
-    console.error(`❌ removeFromBlockList failed for "${itemText}":`, error);
-    throw error;
-  }
+/**
+ * Clear user cache (for testing)
+ */
+const clearUserCache = () => {
+  // Implementation for clearing any cached user data
+  console.log("User cache cleared");
 };
 
 // ===================================================================
-// 🧪 TEST FUNCTIONS FOR NEW UTILITIES + SURGICAL FIX TESTS
+// 🧪 TEST FUNCTIONS
 // ===================================================================
 
 /**
- * 🧪 Test the surgical changes
+ * Test the fixed user detection and auto-registration
  */
 const testSurgicalFix = () => {
-  console.group("🔧 Testing Surgical User Detection Fix");
+  console.group("🔧 Testing Fixed User Detection");
 
-  console.log("1️⃣ Testing getCurrentUser() - Josh's method only...");
+  console.log("1️⃣ Testing getCurrentUser()...");
   const user = getCurrentUser();
   console.log("Current user:", user);
   console.log(`Method used: ${user.method}`);
@@ -1620,102 +1560,129 @@ const testSurgicalFix = () => {
   const officialUser = getCurrentUserViaOfficialAPI();
   console.log("Official API user:", officialUser);
 
-  console.log("\n3️⃣ Testing auto-registration...");
   if (user.method === "official-api") {
     console.log(`✅ Real user detected: ${user.displayName}`);
-    console.log("Auto-registration should have triggered");
   } else {
-    console.log("❌ No real user detected - no auto-registration");
+    console.log("❌ No real user detected");
   }
 
-  console.log("\n4️⃣ Testing directory access...");
-  const members = getGraphMembersFromList("roam/graph members", "Directory");
-  console.log(`Directory members: ${members.length}`, members);
-
   console.groupEnd();
 };
 
 /**
- * 🧪 Verify no breaking changes for dependent extensions
+ * Test auto-registration manually
  */
-const testDependentExtensionsCompatibility = () => {
-  console.group("🔧 Testing Extension 2.0 Compatibility");
+const testAutoRegistration = async () => {
+  console.group("🎯 Testing Auto-Registration");
 
-  // Test Extension 2.0 functions still work
   const user = getCurrentUser();
+  if (user?.method === "official-api") {
+    console.log(`🎯 Testing auto-registration for: ${user.displayName}`);
 
-  // Extension 2.0 calls these patterns:
-  console.log("✅ getCurrentUser() return format:", typeof user === "object");
-  console.log("✅ Has displayName:", !!user.displayName);
-  console.log("✅ Has method:", !!user.method);
-  console.log(
-    "✅ Method check (user.method !== 'error'):",
-    user.method !== "error"
-  );
+    await autoRegisterUser(user.displayName);
 
-  // Test what Extension 2.0's functions would return
-  const isAuthenticated =
-    user && user.method !== "fallback" && user.method !== "error";
-  const username = user ? user.displayName : null;
-
-  console.log("✅ isUserAuthenticated() equivalent:", isAuthenticated);
-  console.log("✅ getCurrentUsername() equivalent:", username);
+    // Check result
+    const members = getGraphMembersFromList("roam/graph members", "Directory");
+    console.log("Members after auto-registration:", members);
+  } else {
+    console.log("❌ Can't test auto-registration - no real user detected");
+  }
 
   console.groupEnd();
 };
 
 /**
- * 🧪 ENHANCED DIAGNOSTIC: Check member list structure
+ * Test the cascading utility
  */
-const diagnoseMemberListStructure = () => {
-  console.group("🔍 Diagnosing Member List Structure");
+const testCascadeToBlock = async () => {
+  console.group("🧪 Testing cascadeToBlock");
 
   try {
-    const listPageTitle = "roam/graph members";
-    const pageUid = getPageUidByTitle(listPageTitle);
-    console.log(`📄 Page "${listPageTitle}" UID:`, pageUid);
+    console.log("🎯 Test 1: Creating simple hierarchy...");
+    const result1 = await cascadeToBlock(
+      "Test Page 1",
+      ["Projects", "Web Development", "Roam Extensions"],
+      true
+    );
+    console.log(`✅ Result 1: ${result1}`);
 
-    if (pageUid) {
-      const allBlocks = window.roamAlphaAPI.data.q(`
-        [:find ?uid ?str
-         :where 
-         [?page :node/title "${listPageTitle}"]
-         [?page :block/children ?block]
-         [?block :block/uid ?uid]
-         [?block :block/string ?str]]
-      `);
+    console.log("\n🎯 Test 2: Adding to existing hierarchy...");
+    const result2 = await cascadeToBlock(
+      "Test Page 1",
+      ["Projects", "Web Development", "Documentation"],
+      true
+    );
+    console.log(`✅ Result 2: ${result2}`);
 
-      console.log("📋 All blocks on page:", allBlocks);
-
-      // Get direct children for analysis
-      const children = getDirectChildren(pageUid);
-      console.log("👶 Direct children of page:", children);
-
-      // Test different variations
-      ["Directory", "Directory:", "Directory::"].forEach((variation) => {
-        const foundExact = findDataValueExact(pageUid, variation);
-        const foundByText = findBlockByText(pageUid, variation);
-        console.log(`   "${variation}":`);
-        console.log(
-          `      findDataValueExact → ${
-            foundExact ? "✅ FOUND" : "❌ not found"
-          }`
-        );
-        console.log(
-          `      findBlockByText → ${foundByText ? "✅ FOUND" : "❌ not found"}`
-        );
-      });
-
-      // Test the actual function
-      console.log("\n🧪 Testing getGraphMembersFromList:");
-      const members = getGraphMembersFromList(
-        "roam/graph members",
-        "Directory"
-      );
-      console.log(`Result: ${members.length} members found:`, members);
-    }
+    console.log("\n🎯 Test 3: Creating user directory...");
+    const result3 = await cascadeToBlock(
+      "roam/graph members",
+      ["Directory::", "Test User"],
+      true
+    );
+    console.log(`✅ Result 3: ${result3}`);
   } catch (error) {
-    console.error("❌ Diagnosis failed:", error);
+    console.error("❌ Test failed:", error);
+  }
+
+  console.groupEnd();
+};
+
+/**
+ * Quick cascade test for immediate verification
+ */
+const quickCascadeTest = async () => {
+  console.log("🚀 Quick cascade test...");
+  const result = await cascadeToBlock(
+    "Quick Test",
+    ["Level 1", "Level 2"],
+    true
+  );
+  console.log(`✅ Quick test result: ${result}`);
+};
+
+/**
+ * Test hierarchical utilities
+ */
+const testHierarchicalUtilities = async () => {
+  console.group("🧪 Testing Hierarchical List Management Utilities");
+
+  try {
+    // Test scenario: Managing graph members
+    const pageUid = getPageUidByTitle("roam/graph members");
+    if (!pageUid) {
+      console.log("❌ Test page 'roam/graph members' not found");
+      return;
+    }
+
+    // 1. Test ensureBlockExists
+    console.log("\n1️⃣ Testing ensureBlockExists...");
+    const directoryUid = await ensureBlockExists(pageUid, "Directory::");
+    console.log(`✅ Directory block UID: ${directoryUid}`);
+
+    // 2. Test addToBlockList
+    console.log("\n2️⃣ Testing addToBlockList...");
+    const added = await addToBlockList(directoryUid, "Test User");
+    console.log(`✅ Added Test User: ${added}`);
+
+    // 3. Test getBlockListItems
+    console.log("\n3️⃣ Testing getBlockListItems...");
+    const items = getBlockListItems(directoryUid);
+    console.log(`✅ Current list items:`, items);
+
+    // 4. Test removeFromBlockList
+    console.log("\n4️⃣ Testing removeFromBlockList...");
+    const removed = await removeFromBlockList(directoryUid, "Test User");
+    console.log(`✅ Removed Test User: ${removed}`);
+
+    // 5. Check final state
+    console.log("\n5️⃣ Final state check...");
+    const finalItems = getBlockListItems(directoryUid);
+    console.log(`✅ Final list items:`, finalItems);
+
+    console.log("\n🎉 All hierarchical utility tests completed!");
+  } catch (error) {
+    console.error("❌ Hierarchical utilities test failed:", error);
   }
 
   console.groupEnd();
@@ -1927,103 +1894,6 @@ const testEnhancedMemberManagement = async () => {
 };
 
 /**
- * Test the bulletproof cascading function
- */
-const testCascadeToBlock = async () => {
-  console.group("🧪 Testing bulletproof cascadeToBlock");
-
-  try {
-    console.log("🎯 Test 1: Creating simple hierarchy...");
-    const result1 = await cascadeToBlock(
-      "Test Page 1",
-      ["Projects", "Web Development", "Roam Extensions"],
-      true
-    );
-    console.log(`✅ Result 1: ${result1}`);
-
-    console.log("\n🎯 Test 2: Adding to existing hierarchy...");
-    const result2 = await cascadeToBlock(
-      "Test Page 1",
-      ["Projects", "Web Development", "Documentation"],
-      true
-    );
-    console.log(`✅ Result 2: ${result2}`);
-
-    console.log("\n🎯 Test 3: Creating user preferences...");
-    const result3 = await cascadeToBlock(
-      "Matt Brockwell/user preferences",
-      ["**Loading Page Preference:**"],
-      true
-    );
-    console.log(`✅ Result 3: ${result3}`);
-  } catch (error) {
-    console.error("❌ Test failed:", error);
-  }
-
-  console.groupEnd();
-};
-
-/**
- * Quick cascade test for immediate verification
- */
-const quickCascadeTest = async () => {
-  console.log("🚀 Quick cascade test...");
-  const result = await cascadeToBlock(
-    "Quick Test",
-    ["Level 1", "Level 2"],
-    true
-  );
-  console.log(`✅ Quick test result: ${result}`);
-};
-
-/**
- * Test the new hierarchical list management utilities
- */
-const testHierarchicalUtilities = async () => {
-  console.group("🧪 Testing Hierarchical List Management Utilities");
-
-  try {
-    // Test scenario: Managing graph members
-    const pageUid = getPageUidByTitle("roam/graph members");
-    if (!pageUid) {
-      console.log("❌ Test page 'roam/graph members' not found");
-      return;
-    }
-
-    // 1. Test ensureBlockExists
-    console.log("\n1️⃣ Testing ensureBlockExists...");
-    const directoryUid = await ensureBlockExists(pageUid, "Directory::");
-    console.log(`✅ Directory block UID: ${directoryUid}`);
-
-    // 2. Test addToBlockList
-    console.log("\n2️⃣ Testing addToBlockList...");
-    const added = await addToBlockList(directoryUid, "Matt Brockwell");
-    console.log(`✅ Added Matt Brockwell: ${added}`);
-
-    // 3. Test getBlockListItems
-    console.log("\n3️⃣ Testing getBlockListItems...");
-    const items = getBlockListItems(directoryUid);
-    console.log(`✅ Current list items:`, items);
-
-    // 4. Test removeFromBlockList
-    console.log("\n4️⃣ Testing removeFromBlockList...");
-    const removed = await removeFromBlockList(directoryUid, "Matt Brockwell");
-    console.log(`✅ Removed Matt Brockwell: ${removed}`);
-
-    // 5. Check final state
-    console.log("\n5️⃣ Final state check...");
-    const finalItems = getBlockListItems(directoryUid);
-    console.log(`✅ Final list items:`, finalItems);
-
-    console.log("\n🎉 All hierarchical utility tests completed!");
-  } catch (error) {
-    console.error("❌ Hierarchical utilities test failed:", error);
-  }
-
-  console.groupEnd();
-};
-
-/**
  * Test complete graph members workflow
  */
 const testGraphMembersWorkflow = async () => {
@@ -2077,106 +1947,155 @@ const testImageExtraction = async () => {
   console.groupEnd();
 };
 
+/**
+ * Enhanced diagnostic for member list structure
+ */
+const diagnoseMemberListStructure = () => {
+  console.group("🔍 Diagnosing Member List Structure");
+
+  try {
+    const listPageTitle = "roam/graph members";
+    const pageUid = getPageUidByTitle(listPageTitle);
+    console.log(`📄 Page "${listPageTitle}" UID:`, pageUid);
+
+    if (pageUid) {
+      const allBlocks = window.roamAlphaAPI.data.q(`
+        [:find ?uid ?str
+         :where 
+         [?page :node/title "${listPageTitle}"]
+         [?page :block/children ?block]
+         [?block :block/uid ?uid]
+         [?block :block/string ?str]]
+      `);
+
+      console.log("📋 All blocks on page:", allBlocks);
+
+      // Get direct children for analysis
+      const children = getDirectChildren(pageUid);
+      console.log("👶 Direct children of page:", children);
+
+      // Test different variations
+      ["Directory", "Directory:", "Directory::"].forEach((variation) => {
+        const foundExact = findDataValueExact(pageUid, variation);
+        const foundByText = findBlockByText(pageUid, variation);
+        console.log(`   "${variation}":`);
+        console.log(
+          `      findDataValueExact → ${
+            foundExact ? "✅ FOUND" : "❌ not found"
+          }`
+        );
+        console.log(
+          `      findBlockByText → ${foundByText ? "✅ FOUND" : "❌ not found"}`
+        );
+      });
+
+      // Test the actual function
+      console.log("\n🧪 Testing getGraphMembersFromList:");
+      const members = getGraphMembersFromList(
+        "roam/graph members",
+        "Directory"
+      );
+      console.log(`Result: ${members.length} members found:`, members);
+    }
+  } catch (error) {
+    console.error("❌ Diagnosis failed:", error);
+  }
+
+  console.groupEnd();
+};
+
 // ===================================================================
-// 🎛️ ENHANCED UTILITIES REGISTRY - COMPLETE WITH SURGICAL FIX
+// 🎛️ COMPLETE UTILITIES REGISTRY - WITH ALL FIXES
 // ===================================================================
 
 const UTILITIES = {
-  // 🌍 NEW: Timezone Management Utilities
+  // 🌍 Timezone Management Utilities
   timezoneManager,
 
-  // 🪟 NEW: Modal Creation Utilities
+  // 🪟 Modal Creation Utilities
   modalUtilities,
 
-  // 🧭 NEW: Navigation Utilities
+  // 🧭 Navigation Utilities
   navigationUtilities,
 
-  // 📊 NEW: Profile Analysis Utilities
+  // 📊 Profile Analysis Utilities
   profileAnalysisUtilities,
 
-  // 🖼️ ENHANCED: Image Processing Utilities
+  // 🖼️ Enhanced Image Processing Utilities
   extractImageUrls,
   processAvatarImages,
 
-  // 👥 ENHANCED: Graph Member Management
+  // 👥 Graph Member Management
   getGraphMembers,
-  getGraphMembersFromList, // ✅ FIXED - now uses findBlockByText
+  getGraphMembersFromList,
   addGraphMember,
   removeGraphMember,
 
-  // 🔧 CORE: Block Management Utilities
-  findBlockByText, // ✅ NEW - THE FIX!
-  findDataValueExact, // Existing
-  findNestedDataValuesExact, // Existing
-  getDirectChildren, // Existing
-  getBlockListItems, // Enhanced with logging
+  // 🔧 Core Block Management Utilities
+  findBlockByText,
+  findBlockUidByTitle,
+  findDataValueExact,
+  findNestedDataValuesExact,
+  getDirectChildren,
+  getBlockListItems,
 
-  // 🆕 EXISTING: Hierarchical List Management
+  // 🆕 Hierarchical List Management
   ensureBlockExists,
   addToBlockList,
   removeFromBlockList,
 
-  // 🚀 EXISTING: Bulletproof Cascading
+  // 🚀 Bulletproof Cascading
   cascadeToBlock,
 
-  // 🔧 EXISTING: Core Functions
+  // 🔧 Core Functions
   setDataValueStructured,
+  setNestedDataValuesStructured,
 
-  // 🏗️ EXISTING: Helper Functions
+  // 🏗️ Helper Functions
   getPageUidByTitle,
+  getPageUidByPageTitle,
   createPageIfNotExists,
   generateUID,
   normalizeHeaderText,
   normalizeCategoryName,
 
-  // 🧭 EXISTING: Page Navigation Functions
+  // 🧭 Page Navigation Functions
   getCurrentPageTitle,
   getCurrentPageUid,
   getPageTitlesStartingWithPrefix,
-  getPageUidByPageTitle,
 
-  // 🔧 EXISTING: Enhanced Data Functions
-  setNestedDataValuesStructured,
-
-  // 🔍 SURGICALLY FIXED: User Detection
-  getCurrentUser, // ✅ FIXED - Josh's method only
-  getCurrentUserViaOfficialAPI, // ✅ FIXED - Updated implementation
-  autoRegisterUser, // ✅ NEW - Auto-registration system
+  // 🔍 FIXED: User Detection
+  getCurrentUser,
+  getCurrentUserViaOfficialAPI,
+  autoRegisterUser, // ✅ FIXED: Now properly included
   clearUserCache,
 
-  // 🧪 EXISTING: Test Functions for Original Utilities
+  // 🧪 Test Functions
+  testSurgicalFix,
+  testAutoRegistration,
   testCascadeToBlock,
   quickCascadeTest,
   testHierarchicalUtilities,
-  testGraphMembersWorkflow,
-  testImageExtraction,
-
-  // 🧪 NEW: Test Functions for New Utilities
   testTimezoneUtilities,
   testModalUtilities,
   testNavigationUtilities,
   testProfileAnalysisUtilities,
   testEnhancedImageProcessing,
   testEnhancedMemberManagement,
+  testGraphMembersWorkflow,
+  testImageExtraction,
 
-  // 🧪 SURGICALLY ADDED: Test Functions for Fix
-  testSurgicalFix, // ✅ NEW - Test the surgical changes
-  testDependentExtensionsCompatibility, // ✅ NEW - Verify no breaking changes
-
-  // 🔍 DIAGNOSTIC: Debug Functions
-  diagnoseMemberListStructure, // Enhanced diagnostic
-
-  // NEW: given the title, find the block UID
-  findBlockUidByTitle,
+  // 🔍 Diagnostic Functions
+  diagnoseMemberListStructure,
 };
 
 // ===================================================================
-// 🎯 EXTENSION REGISTRATION - Enhanced with Surgical Fix
+// 🎯 EXTENSION REGISTRATION - COMPLETE WITH ALL FIXES
 // ===================================================================
 
 export default {
   onload: () => {
-    console.log("🔧 Extension 1.5 loading with SURGICAL USER DETECTION FIX...");
+    console.log("🔧 Extension 1.5 loading - COMPLETE FIXED VERSION...");
 
     // Initialize extension registry if it doesn't exist
     if (!window._extensionRegistry) {
@@ -2194,33 +2113,88 @@ export default {
       window._extensionRegistry.utilities = {};
     }
 
-    // 🎯 TRIGGER AUTO-REGISTRATION ON STARTUP
-    const currentUser = getCurrentUser();
-    if (currentUser && currentUser.method === "official-api") {
-      console.log(
-        `🎯 Auto-registering user on startup: ${currentUser.displayName}`
-      );
-      autoRegisterUser(currentUser.displayName);
+    // 🔧 Register all utilities in registry
+    Object.entries(UTILITIES).forEach(([name, utility]) => {
+      window._extensionRegistry.utilities[name] = utility;
+      // ✅ FIXED: Also make globally accessible
+      window[name] = utility;
+    });
+
+    // 🎯 Register with extension platform if available
+    if (window.RoamExtensionSuite) {
+      // Register individual utilities with platform
+      if (window.RoamExtensionSuite.registerUtility) {
+        Object.entries(UTILITIES).forEach(([name, utility]) => {
+          window.RoamExtensionSuite.registerUtility(name, utility);
+        });
+      }
+
+      // Register the extension itself with the platform
+      if (window.RoamExtensionSuite.register) {
+        window.RoamExtensionSuite.register(
+          "utility-library",
+          {
+            utilities: UTILITIES,
+            version: "1.5.4-complete-fix",
+          },
+          {
+            name: "Enhanced Utility Library - COMPLETE FIXED VERSION",
+            description:
+              "Complete fixed utility library with working auto-registration",
+            version: "1.5.4-complete-fix",
+            dependencies: [],
+          }
+        );
+      }
     }
+
+    // ✅ FIXED: Trigger auto-registration on startup
+    setTimeout(async () => {
+      try {
+        const currentUser = getCurrentUser();
+        console.log("🔍 Startup user detection:", currentUser);
+
+        if (currentUser && currentUser.method === "official-api") {
+          console.log(
+            `🎯 Auto-registering user on startup: ${currentUser.displayName}`
+          );
+          await autoRegisterUser(currentUser.displayName);
+        } else {
+          console.log("⚠️ No real user detected for auto-registration");
+        }
+      } catch (error) {
+        console.error("❌ Auto-registration on startup failed:", error);
+      }
+    }, 2000); // Wait 2 seconds for everything to be ready
 
     // 🧪 Command palette functions for testing
     const commands = [
-      // NEW Surgical Fix test commands
       {
-        label: "🔧 Test: Surgical User Detection Fix",
+        label: "🔧 Test: Fixed User Detection",
         callback: testSurgicalFix,
       },
       {
-        label: "🔧 Test: Extension 2.0 Compatibility Check",
-        callback: testDependentExtensionsCompatibility,
+        label: "🎯 Test: Auto-Registration",
+        callback: testAutoRegistration,
       },
-      // NEW Phase 1 test commands
       {
-        label: "Test: Timezone Management Utilities",
+        label: "Test: Cascade to Block",
+        callback: testCascadeToBlock,
+      },
+      {
+        label: "Test: Quick Cascade Test",
+        callback: quickCascadeTest,
+      },
+      {
+        label: "Test: Hierarchical Utilities",
+        callback: testHierarchicalUtilities,
+      },
+      {
+        label: "Test: Timezone Utilities",
         callback: testTimezoneUtilities,
       },
       {
-        label: "Test: Modal Creation Utilities",
+        label: "Test: Modal Utilities",
         callback: testModalUtilities,
       },
       {
@@ -2239,31 +2213,17 @@ export default {
         label: "Test: Enhanced Member Management",
         callback: testEnhancedMemberManagement,
       },
-      // ENHANCED diagnostic
       {
-        label: "Test: Diagnose Member List Structure (ENHANCED)",
-        callback: diagnoseMemberListStructure,
-      },
-      // EXISTING original test commands (for backward compatibility)
-      {
-        label: "Test: Hierarchical List Management Utilities",
-        callback: testHierarchicalUtilities,
-      },
-      {
-        label: "Test: Graph Members Workflow (Complete Example)",
+        label: "Test: Graph Members Workflow",
         callback: testGraphMembersWorkflow,
       },
       {
-        label: "Test: Image Extraction Utility (Avatar Testing)",
+        label: "Test: Image Extraction",
         callback: testImageExtraction,
       },
       {
-        label: "Test: Bulletproof Cascade to Block",
-        callback: testCascadeToBlock,
-      },
-      {
-        label: "Test: Quick Cascade Test",
-        callback: quickCascadeTest,
+        label: "Test: Diagnose Member List Structure",
+        callback: diagnoseMemberListStructure,
       },
     ];
 
@@ -2278,83 +2238,41 @@ export default {
       window._extensionRegistry.commands.push(cmd);
     });
 
-    // 🔧 Register all utilities
-    Object.entries(UTILITIES).forEach(([name, utility]) => {
-      window._extensionRegistry.utilities[name] = utility;
-    });
-
-    // 🎯 Register with extension platform if available
-    if (window.RoamExtensionSuite) {
-      // Register individual utilities
-      if (window.RoamExtensionSuite.registerUtility) {
-        Object.entries(UTILITIES).forEach(([name, utility]) => {
-          window.RoamExtensionSuite.registerUtility(name, utility);
-        });
-      }
-
-      // Register the extension itself with the platform
-      if (window.RoamExtensionSuite.register) {
-        window.RoamExtensionSuite.register(
-          "utility-library",
-          {
-            utilities: UTILITIES,
-            version: "1.5.3-surgical-fix",
-          },
-          {
-            name: "Enhanced Utility Library + SURGICAL USER DETECTION FIX",
-            description:
-              "Phase 1 enhanced utility library with SURGICALLY FIXED user detection (Josh's method only)",
-            version: "1.5.3-surgical-fix",
-            dependencies: [],
-          }
-        );
-      }
-    }
-
     // ✅ Extension successfully loaded
-    console.log("✅ Extension 1.5 SURGICAL FIX loaded successfully!");
-    console.log(`🔧 Registered ${Object.keys(UTILITIES).length} utilities:`);
+    console.log("✅ Extension 1.5 COMPLETE FIXED VERSION loaded successfully!");
+    console.log(`🔧 Registered ${Object.keys(UTILITIES).length} utilities`);
     console.log(
-      "   🔧 FIXED: getCurrentUser() - Josh's official API method ONLY"
-    );
-    console.log("   🗑️ REMOVED: getCurrentUserViaDOM() - No more fake users");
-    console.log(
-      "   🎯 NEW: autoRegisterUser() - Real users auto-added to directory"
-    );
-    console.log("   ✅ PRESERVED: All other utilities completely unchanged");
-    console.log(
-      "   🌍 NEW: Timezone Management (TimezoneManager from Extension SIX)"
+      "   ✅ FIXED: autoRegisterUser now properly registered and triggers on startup"
     );
     console.log(
-      "   🪟 NEW: Modal Creation Utilities (Professional modal system)"
+      "   ✅ FIXED: All functions accessible globally and via platform"
     );
     console.log(
-      "   🧭 NEW: Navigation Utilities (Button placement and monitoring)"
+      "   ✅ FIXED: Auto-registration uses cascadeToBlock for elegant structure creation"
     );
     console.log(
-      "   📊 NEW: Profile Analysis Utilities (Completeness and categorization)"
+      "   🌍 Timezone Management, 🪟 Modal Creation, 🧭 Navigation, 📊 Profile Analysis"
     );
-    console.log(
-      "   🖼️ ENHANCED: Image Processing (Validation and avatar processing)"
-    );
-    console.log(
-      "   👥 FIXED: Graph Member Management (Now correctly finds Directory:: block and children)"
-    );
-    console.log("   🔧 NEW: findBlockByText utility (THE FIX for member list)");
-    console.log("   🚀 EXISTING: All previous utilities maintained");
-    console.log(
-      "💡 Try: Cmd+P → '🔧 Test: Surgical User Detection Fix' to verify the fix!"
-    );
+    console.log("   🖼️ Enhanced Image Processing, 👥 Graph Member Management");
+    console.log("💡 Try: Cmd+P → '🔧 Test: Fixed User Detection' to verify!");
 
     return {
       extensionId: "utility-library",
       utilities: UTILITIES,
-      version: "1.5.3-surgical-fix",
+      version: "1.5.4-complete-fix",
     };
   },
 
   onunload: () => {
-    console.log("🔧 Extension 1.5 SURGICAL FIX unloading...");
-    // Cleanup handled by the registry
+    console.log("🔧 Extension 1.5 COMPLETE FIXED VERSION unloading...");
+
+    // Clean up global functions
+    Object.keys(UTILITIES).forEach((name) => {
+      if (window[name]) {
+        delete window[name];
+      }
+    });
+
+    console.log("✅ Extension 1.5 cleanup complete");
   },
 };
