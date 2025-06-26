@@ -1,8 +1,7 @@
 // ===================================================================
-// Extension 3: Configuration Manager - RESURRECTED with Subjournals Pattern
-// 🎵 Parrot Duet Edition: "O mio babbino caro" - Now sings beautifully!
-// Uses proven step-by-step + retry pattern from working Subjournals extension
-// Format: **Field Name:** (bold single colons, not double like Extension 2)
+// Extension 3: Configuration Manager - MODERNIZED with Bulletproof Cascading
+// Leverages Extension 1.5 (Bulletproof Utilities) + Extension 2 (Authentication)
+// Focus: Professional configuration UI with battle-tested underlying architecture
 // ===================================================================
 
 // ===================================================================
@@ -81,122 +80,95 @@ const CONFIGURATION_SCHEMAS = {
 };
 
 // ===================================================================
-// 🚀 RESURRECTED PREFERENCE MANAGEMENT - Using Subjournals Pattern
+// 🚀 MODERNIZED PREFERENCE MANAGEMENT - Using Bulletproof Cascading
 // ===================================================================
 
 /**
- * 🎵 RESURRECTED: Set user preference using proven Subjournals pattern
- * No more broken cascadeToBlock with empty arrays!
+ * 🚀 MODERN: Set user preference using bulletproof cascading
+ * Uses proven Extension 1.5 utilities instead of older patterns
  */
 const setUserPreferenceBulletproof = async (username, key, value) => {
-  const startTime = Date.now();
-  const TIMEOUT = 5000; // 5 second timeout
-  const workingOn = { step: null, uid: null, content: null };
-  let loopCount = 0;
+  try {
+    console.log(
+      `🔧 [MODERN] Setting "${key}" = ${JSON.stringify(value)} for ${username}`
+    );
 
-  console.log(
-    `🔧 [RESURRECTED] Setting "${key}" = ${JSON.stringify(
-      value
-    )} for ${username}`
-  );
+    const platform = window.RoamExtensionSuite;
+    const cascadeToBlock = platform.getUtility("cascadeToBlock");
 
-  while (Date.now() - startTime < TIMEOUT) {
-    loopCount++;
-
-    try {
-      // STEP 1: Ensure preferences page exists
-      const pageTitle = `${username}/user preferences`;
-      let pageUid = await getOrCreatePageUid(pageTitle);
-
-      if (!pageUid) {
-        if (workingOn.step !== "page") {
-          workingOn.step = "page";
-          workingOn.uid = null;
-          workingOn.content = pageTitle;
-          console.log(`➕ Creating preferences page: ${pageTitle}`);
-          pageUid = await window.roamAlphaAPI.data.page.create({
-            page: { title: pageTitle },
-          });
-        }
-        continue; // Retry
-      }
-
-      // STEP 2: Ensure preference key block exists (bold format)
-      const keyText = `**${key}:**`;
-      const keyBlock = await findOrCreateBlock(pageUid, keyText);
-
-      if (!keyBlock) {
-        if (workingOn.step !== "key" || workingOn.uid !== pageUid) {
-          workingOn.step = "key";
-          workingOn.uid = pageUid;
-          workingOn.content = keyText;
-          await createBlockSimple(pageUid, keyText);
-        }
-        continue; // Retry
-      }
-
-      // STEP 3: Clear existing values (clean update)
-      console.log(`🧹 Clearing existing values for "${key}"`);
-      const existingChildren = await getBlockChildren(keyBlock.uid);
-
-      for (const child of existingChildren) {
-        await window.roamAlphaAPI.data.block.delete({
-          block: { uid: child.uid },
-        });
-      }
-
-      // Small delay after deletions
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      // STEP 4: Add new value(s) - handle arrays properly
-      const values = Array.isArray(value) ? value : [value];
-      console.log(`📝 Adding ${values.length} value(s)`);
-
-      let allValuesAdded = true;
-      for (let i = 0; i < values.length; i++) {
-        const val = String(values[i]).trim();
-        if (val === "") continue; // Skip empty values
-
-        console.log(`➕ Adding value ${i + 1}/${values.length}: "${val}"`);
-
-        try {
-          await window.roamAlphaAPI.data.block.create({
-            location: { "parent-uid": keyBlock.uid, order: i },
-            block: { string: val },
-          });
-
-          // Small delay to prevent API overload
-          await new Promise((resolve) => setTimeout(resolve, 50));
-        } catch (valueError) {
-          console.error(`❌ Failed to add value: ${val}`, valueError);
-          allValuesAdded = false;
-          break;
-        }
-      }
-
-      if (!allValuesAdded) {
-        continue; // Retry main loop
-      }
-
-      // SUCCESS!
-      console.log(
-        `✅ [RESURRECTED] Successfully set "${key}" for ${username} in ${loopCount} loops (${
-          Date.now() - startTime
-        }ms)`
+    if (!cascadeToBlock) {
+      console.error(
+        "❌ cascadeToBlock utility not found - Extension 1.5 required"
       );
-      return true;
-    } catch (error) {
-      console.error(`❌ Loop ${loopCount} error:`, error.message);
+      return false;
     }
-  }
 
-  throw new Error(
-    `Set preference timeout after ${TIMEOUT}ms (${loopCount} loops)`
-  );
+    // 1. Ensure user preferences page exists
+    const pageTitle = `${username}/user preferences`;
+    console.log(`📄 Ensuring preferences page exists: ${pageTitle}`);
+
+    const pageUid = await cascadeToBlock(pageTitle, [], true);
+    if (!pageUid) {
+      console.error(`❌ Failed to create preferences page: ${pageTitle}`);
+      return false;
+    }
+
+    // 2. Format the preference key (bold format for visibility)
+    const keyText = `**${key}:**`;
+
+    // 3. Use cascading to create/find the preference key block
+    console.log(`🔗 Creating preference key: ${keyText}`);
+    const keyBlockUid = await cascadeToBlock(pageTitle, [keyText], true);
+
+    if (!keyBlockUid) {
+      console.error(`❌ Failed to create preference key: ${keyText}`);
+      return false;
+    }
+
+    // 4. Clear existing values (clean update)
+    console.log(`🧹 Clearing existing values for "${key}"`);
+    const getDirectChildren = platform.getUtility("getDirectChildren");
+    const existingChildren = getDirectChildren(keyBlockUid);
+
+    for (const child of existingChildren) {
+      await window.roamAlphaAPI.data.block.delete({
+        block: { uid: child.uid },
+      });
+    }
+
+    // 5. Add new value(s) - handle arrays properly
+    const values = Array.isArray(value) ? value : [value];
+    console.log(`📝 Adding ${values.length} value(s)`);
+
+    for (let i = 0; i < values.length; i++) {
+      const val = String(values[i]).trim();
+      if (val === "") continue; // Skip empty values
+
+      console.log(`➕ Adding value ${i + 1}/${values.length}: "${val}"`);
+
+      await window.roamAlphaAPI.data.block.create({
+        location: { "parent-uid": keyBlockUid, order: i },
+        block: { string: val },
+      });
+
+      // Small delay to prevent API overload
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+
+    console.log(`✅ [MODERN] Successfully set "${key}" for ${username}`);
+    return true;
+  } catch (error) {
+    console.error(
+      `❌ [MODERN] Error setting preference "${key}" for ${username}:`,
+      error
+    );
+    return false;
+  }
 };
 
 /**
- * 🎵 RESURRECTED: Get user preference with auto-creation using Subjournals pattern
+ * 🚀 MODERN: Get user preference using Extension 1.5 utilities
+ * More reliable than the older findDataValueExact approach
  */
 const getUserPreferenceBulletproof = async (
   username,
@@ -204,44 +176,51 @@ const getUserPreferenceBulletproof = async (
   defaultValue = null
 ) => {
   try {
-    console.log(`🔍 [RESURRECTED] Getting "${key}" for ${username}`);
+    console.log(`🔍 [MODERN] Getting "${key}" for ${username}`);
 
-    // STEP 1: Check if preferences page exists
+    const platform = window.RoamExtensionSuite;
+    const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
+    const getDirectChildren = platform.getUtility("getDirectChildren");
+    const normalizeHeaderText = platform.getUtility("normalizeHeaderText");
+
+    // 1. Get preferences page UID
     const pageTitle = `${username}/user preferences`;
-    let pageUid = await getOrCreatePageUid(pageTitle);
+    const pageUid = getPageUidByTitle(pageTitle);
 
     if (!pageUid) {
-      console.log(
-        `📄 Preferences page doesn't exist, will auto-create on next set operation`
-      );
+      console.log(`📄 No preferences page found for ${username}`);
       return defaultValue;
     }
 
-    // STEP 2: Find the preference key block (bold format)
+    // 2. Find the preference key block
+    const pageChildren = getDirectChildren(pageUid);
     const keyText = `**${key}:**`;
-    const keyBlock = await findBlockByText(pageUid, keyText);
+
+    const keyBlock = pageChildren.find((child) => {
+      const normalized = normalizeHeaderText(child.text);
+      const normalizedKey = normalizeHeaderText(keyText);
+      return normalized === normalizedKey;
+    });
 
     if (!keyBlock) {
       console.log(`🔍 Preference "${key}" not found for ${username}`);
       return defaultValue;
     }
 
-    // STEP 3: Get the value(s)
-    const valueChildren = await getBlockChildren(keyBlock.uid);
+    // 3. Get the value(s)
+    const valueChildren = getDirectChildren(keyBlock.uid);
 
     if (valueChildren.length === 0) {
       return defaultValue;
     } else if (valueChildren.length === 1) {
       const result = valueChildren[0].text;
-      console.log(
-        `⚙️ [RESURRECTED] Preference "${key}" for ${username}: ${result}`
-      );
+      console.log(`⚙️ [MODERN] Preference "${key}" for ${username}: ${result}`);
       return result;
     } else {
       // Multiple values - return as array
       const result = valueChildren.map((child) => child.text);
       console.log(
-        `⚙️ [RESURRECTED] Preference "${key}" for ${username}: [${result.join(
+        `⚙️ [MODERN] Preference "${key}" for ${username}: [${result.join(
           ", "
         )}]`
       );
@@ -249,7 +228,7 @@ const getUserPreferenceBulletproof = async (
     }
   } catch (error) {
     console.error(
-      `❌ [RESURRECTED] Error getting preference "${key}" for ${username}:`,
+      `❌ [MODERN] Error getting preference "${key}" for ${username}:`,
       error
     );
     return defaultValue;
@@ -257,135 +236,11 @@ const getUserPreferenceBulletproof = async (
 };
 
 /**
- * 🎵 RESURRECTED: Initialize user preferences using proven Subjournals pattern
- */
-const initializeUserPreferencesBulletproof = async (username) => {
-  const startTime = Date.now();
-  const TIMEOUT = 10000; // 10 second timeout for full initialization
-  const workingOn = { step: null, uid: null, content: null };
-  let loopCount = 0;
-
-  console.log(
-    `🎯 [RESURRECTED] Initializing default preferences for ${username}...`
-  );
-
-  while (Date.now() - startTime < TIMEOUT) {
-    loopCount++;
-
-    try {
-      // STEP 1: Ensure preferences page exists
-      const pageTitle = `${username}/user preferences`;
-      let pageUid = await getOrCreatePageUid(pageTitle);
-
-      if (!pageUid) {
-        if (workingOn.step !== "page") {
-          workingOn.step = "page";
-          workingOn.uid = null;
-          workingOn.content = pageTitle;
-          console.log(`➕ Creating preferences page: ${pageTitle}`);
-          pageUid = await window.roamAlphaAPI.data.page.create({
-            page: { title: pageTitle },
-          });
-        }
-        continue; // Retry
-      }
-
-      // STEP 2: Process each schema preference
-      const preferenceKeys = Object.keys(CONFIGURATION_SCHEMAS);
-      let allPreferencesSet = true;
-      let successCount = 0;
-
-      for (let i = 0; i < preferenceKeys.length; i++) {
-        const key = preferenceKeys[i];
-        const schema = CONFIGURATION_SCHEMAS[key];
-
-        console.log(`🔧 Processing ${i + 1}/${preferenceKeys.length}: ${key}`);
-
-        // Check if preference already exists
-        const keyText = `**${key}:**`;
-        const existingBlock = await findBlockByText(pageUid, keyText);
-
-        if (!existingBlock) {
-          // Create preference key block
-          if (workingOn.step !== `pref-${key}` || workingOn.uid !== pageUid) {
-            workingOn.step = `pref-${key}`;
-            workingOn.uid = pageUid;
-            workingOn.content = keyText;
-            await createBlockSimple(pageUid, keyText);
-          }
-          allPreferencesSet = false;
-          break; // Exit preference loop, retry main loop
-        }
-
-        // Check if preference has value
-        const hasValue = await blockHasChildren(existingBlock.uid);
-        if (!hasValue) {
-          // Add default value
-          const defaultValue = Array.isArray(schema.default)
-            ? schema.default[0] // Use first item for arrays initially
-            : schema.default;
-
-          if (
-            workingOn.step !== `value-${key}` ||
-            workingOn.uid !== existingBlock.uid
-          ) {
-            workingOn.step = `value-${key}`;
-            workingOn.uid = existingBlock.uid;
-            workingOn.content = String(defaultValue);
-            await createBlockSimple(existingBlock.uid, String(defaultValue));
-
-            // For arrays, add remaining values
-            if (Array.isArray(schema.default) && schema.default.length > 1) {
-              for (let j = 1; j < schema.default.length; j++) {
-                await createBlockSimple(
-                  existingBlock.uid,
-                  String(schema.default[j])
-                );
-                await new Promise((resolve) => setTimeout(resolve, 50));
-              }
-            }
-          }
-          allPreferencesSet = false;
-          break; // Exit preference loop, retry main loop
-        } else {
-          successCount++;
-          console.log(
-            `✅ ${successCount}/${preferenceKeys.length}: ${key} already configured`
-          );
-        }
-
-        // Small delay between preferences
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
-
-      if (!allPreferencesSet) {
-        continue; // Retry main loop
-      }
-
-      // SUCCESS - all preferences initialized
-      console.log(
-        `🎉 [RESURRECTED] Initialized ${preferenceKeys.length} preferences for ${username}`
-      );
-      console.log(
-        `   - Total loops: ${loopCount}, Time: ${Date.now() - startTime}ms`
-      );
-      return true;
-    } catch (error) {
-      console.error(`❌ Loop ${loopCount} error:`, error.message);
-    }
-  }
-
-  throw new Error(
-    `Initialize preferences timeout after ${TIMEOUT}ms (${loopCount} loops)`
-  );
-};
-
-/**
- * 🎵 RESURRECTED: Get all user preferences
+ * 🚀 MODERN: Get all user preferences as object
  */
 const getAllUserPreferencesBulletproof = async (username) => {
   try {
-    console.log(`📊 [RESURRECTED] Loading all preferences for ${username}`);
+    console.log(`📊 [MODERN] Loading all preferences for ${username}`);
 
     const preferences = {};
     const preferenceKeys = Object.keys(CONFIGURATION_SCHEMAS);
@@ -398,166 +253,69 @@ const getAllUserPreferencesBulletproof = async (username) => {
     }
 
     console.log(
-      `📊 [RESURRECTED] Loaded ${
+      `📊 [MODERN] Loaded ${
         Object.keys(preferences).length
       } preferences for ${username}`
     );
     return preferences;
   } catch (error) {
     console.error(
-      `❌ [RESURRECTED] Failed to get all preferences for ${username}:`,
+      `❌ [MODERN] Failed to get all preferences for ${username}:`,
       error
     );
     return {};
   }
 };
 
-// ===================================================================
-// 🔧 SUPPORTING FUNCTIONS - Subjournals Pattern (Reused from Extension 2)
-// ===================================================================
-
 /**
- * Get or create page UID using Subjournals pattern
+ * 🚀 MODERN: Initialize user preferences using bulletproof cascading
  */
-const getOrCreatePageUid = async (title) => {
+const initializeUserPreferencesBulletproof = async (username) => {
   try {
-    // Check if page already exists
-    let pageUid = window.roamAlphaAPI.q(`
-      [:find ?uid :where [?e :node/title "${title}"] [?e :block/uid ?uid]]
-    `)?.[0]?.[0];
+    console.log(
+      `🎯 [MODERN] Initializing default preferences for ${username}...`
+    );
 
-    if (pageUid) return pageUid;
+    let successCount = 0;
+    const totalCount = Object.keys(CONFIGURATION_SCHEMAS).length;
 
-    // Page doesn't exist, caller should create it
-    return null;
-  } catch (error) {
-    console.error(`getOrCreatePageUid failed for "${title}":`, error);
-    return null;
-  }
-};
+    // Set each default preference using bulletproof method
+    for (const [key, schema] of Object.entries(CONFIGURATION_SCHEMAS)) {
+      console.log(
+        `🔧 Setting default: ${key} = ${JSON.stringify(schema.default)}`
+      );
 
-/**
- * Find block by text content using Subjournals pattern
- */
-const findBlockByText = async (parentUid, searchText) => {
-  try {
-    // Search for exact match first
-    const exact = window.roamAlphaAPI.q(`
-      [:find (pull ?child [:block/uid :block/string])
-       :where 
-       [?parent :block/uid "${parentUid}"] [?child :block/parents ?parent]
-       [?child :block/string "${searchText}"]]
-    `);
+      const success = await setUserPreferenceBulletproof(
+        username,
+        key,
+        schema.default
+      );
+      if (success) {
+        successCount++;
+        console.log(`✅ ${successCount}/${totalCount}: ${key}`);
+      } else {
+        console.error(`❌ Failed to set: ${key}`);
+      }
 
-    if (exact.length > 0) {
-      const found = exact[0][0];
-      return {
-        uid: found[":block/uid"] || found.uid,
-        string: found[":block/string"] || found.string,
-      };
+      // Small delay to prevent overwhelming the API
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
-    // Fallback: search with starts-with
-    const startsWith = window.roamAlphaAPI.q(`
-      [:find (pull ?child [:block/uid :block/string])
-       :where 
-       [?parent :block/uid "${parentUid}"] [?child :block/parents ?parent]
-       [?child :block/string ?string] [(clojure.string/starts-with? ?string "${searchText}")]]
-    `);
-
-    if (startsWith.length > 0) {
-      const found = startsWith[0][0];
-      return {
-        uid: found[":block/uid"] || found.uid,
-        string: found[":block/string"] || found.string,
-      };
-    }
-
-    return null;
+    console.log(
+      `🎉 [MODERN] Initialized ${successCount}/${totalCount} preferences for ${username}`
+    );
+    return successCount === totalCount;
   } catch (error) {
-    console.error(`findBlockByText failed for "${searchText}":`, error);
-    return null;
-  }
-};
-
-/**
- * Find or create block using Subjournals pattern
- */
-const findOrCreateBlock = async (parentUid, blockText) => {
-  try {
-    // Just find - creation handled by caller in retry loop
-    return await findBlockByText(parentUid, blockText);
-  } catch (error) {
-    console.error(`findOrCreateBlock failed for "${blockText}":`, error);
-    return null;
-  }
-};
-
-/**
- * Create block using Subjournals pattern
- */
-const createBlockSimple = async (parentUid, content) => {
-  try {
-    const childCount =
-      window.roamAlphaAPI.q(`
-      [:find (count ?child) :where 
-       [?parent :block/uid "${parentUid}"] [?child :block/parents ?parent]]
-    `)?.[0]?.[0] || 0;
-
-    const blockUid = window.roamAlphaAPI.util.generateUID();
-    await window.roamAlphaAPI.data.block.create({
-      location: { "parent-uid": parentUid, order: childCount },
-      block: { uid: blockUid, string: content },
-    });
-
-    return blockUid;
-  } catch (error) {
-    console.error(`createBlockSimple failed for "${content}":`, error);
-    throw error;
-  }
-};
-
-/**
- * Get block children using direct API
- */
-const getBlockChildren = async (blockUid) => {
-  try {
-    const children = window.roamAlphaAPI.q(`
-      [:find (pull ?child [:block/uid :block/string])
-       :where 
-       [?parent :block/uid "${blockUid}"] [?child :block/parents ?parent]]
-    `);
-
-    return children.map(([child]) => ({
-      uid: child[":block/uid"] || child.uid,
-      text: child[":block/string"] || child.string,
-    }));
-  } catch (error) {
-    console.error(`getBlockChildren failed for "${blockUid}":`, error);
-    return [];
-  }
-};
-
-/**
- * Check if block has children using Subjournals pattern
- */
-const blockHasChildren = async (blockUid) => {
-  try {
-    const childCount =
-      window.roamAlphaAPI.q(`
-      [:find (count ?child) :where 
-       [?parent :block/uid "${blockUid}"] [?child :block/parents ?parent]]
-    `)?.[0]?.[0] || 0;
-
-    return childCount > 0;
-  } catch (error) {
-    console.error(`blockHasChildren failed for "${blockUid}":`, error);
+    console.error(
+      `❌ [MODERN] Failed to initialize preferences for ${username}:`,
+      error
+    );
     return false;
   }
 };
 
 // ===================================================================
-// 🔧 CONFIGURATION VALIDATION & WORKFLOWS - Enhanced but Stable
+// 🔧 CONFIGURATION VALIDATION & WORKFLOWS - Modernized
 // ===================================================================
 
 /**
@@ -593,12 +351,12 @@ const getConfigurationSchema = (key) => {
 };
 
 /**
- * 🎵 RESURRECTED: Validate and repair user configuration
+ * 🚀 MODERN: Validate and repair user configuration
  */
 const validateAndRepairConfigurationBulletproof = async (username) => {
   try {
     console.log(
-      `🔧 [RESURRECTED] Validating and repairing configuration for ${username}...`
+      `🔧 [MODERN] Validating and repairing configuration for ${username}...`
     );
 
     let fixedCount = 0;
@@ -615,20 +373,16 @@ const validateAndRepairConfigurationBulletproof = async (username) => {
         console.log(
           `➕ Adding missing ${key}: ${JSON.stringify(schema.default)}`
         );
-        try {
-          const success = await setUserPreferenceBulletproof(
-            username,
-            key,
-            schema.default
-          );
-          if (success) {
-            addedCount++;
-            console.log(`✅ Added: ${key}`);
-          } else {
-            issues.push(`Failed to add ${key}`);
-          }
-        } catch (error) {
-          issues.push(`Error adding ${key}: ${error.message}`);
+        const success = await setUserPreferenceBulletproof(
+          username,
+          key,
+          schema.default
+        );
+        if (success) {
+          addedCount++;
+          console.log(`✅ Added: ${key}`);
+        } else {
+          issues.push(`Failed to add ${key}`);
         }
       } else {
         // Validate existing value
@@ -642,20 +396,16 @@ const validateAndRepairConfigurationBulletproof = async (username) => {
           );
           console.log(`   Reason: ${validation.error}`);
 
-          try {
-            const success = await setUserPreferenceBulletproof(
-              username,
-              key,
-              schema.default
-            );
-            if (success) {
-              fixedCount++;
-              console.log(`✅ Fixed: ${key}`);
-            } else {
-              issues.push(`Failed to fix ${key}: ${validation.error}`);
-            }
-          } catch (error) {
-            issues.push(`Error fixing ${key}: ${error.message}`);
+          const success = await setUserPreferenceBulletproof(
+            username,
+            key,
+            schema.default
+          );
+          if (success) {
+            fixedCount++;
+            console.log(`✅ Fixed: ${key}`);
+          } else {
+            issues.push(`Failed to fix ${key}: ${validation.error}`);
           }
         } else {
           console.log(`✅ Valid: ${key} = ${JSON.stringify(currentValue)}`);
@@ -663,10 +413,10 @@ const validateAndRepairConfigurationBulletproof = async (username) => {
       }
 
       // Small delay between operations
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
-    const message = `🔧 [RESURRECTED] Repair completed: ${fixedCount} fixed, ${addedCount} added`;
+    const message = `🔧 [MODERN] Repair completed: ${fixedCount} fixed, ${addedCount} added`;
     console.log(message);
 
     return {
@@ -678,7 +428,7 @@ const validateAndRepairConfigurationBulletproof = async (username) => {
     };
   } catch (error) {
     console.error(
-      `❌ [RESURRECTED] Validation/repair failed for ${username}:`,
+      `❌ [MODERN] Validation/repair failed for ${username}:`,
       error
     );
     return {
@@ -743,12 +493,10 @@ const generateConfigurationOverview = async (username) => {
 };
 
 /**
- * 🔄 Reset user configuration to defaults
+ * 🎯 Reset user configuration to defaults
  */
 const resetUserConfiguration = async (username) => {
-  console.log(
-    `🔄 [RESURRECTED] Resetting configuration to defaults for ${username}...`
-  );
+  console.log(`🔄 Resetting configuration to defaults for ${username}...`);
 
   try {
     const result = await initializeUserPreferencesBulletproof(username);
@@ -781,11 +529,11 @@ const exportUserConfiguration = async (username) => {
       timestamp: new Date().toISOString(),
       preferences,
       schemas: CONFIGURATION_SCHEMAS,
-      version: "3.0.0-resurrected",
+      version: "3.0.0-modern",
     };
 
     console.log(
-      `📤 [RESURRECTED] Exported ${
+      `📤 [MODERN] Exported ${
         Object.keys(preferences).length
       } preferences for ${username}`
     );
@@ -804,7 +552,7 @@ const exportUserConfiguration = async (username) => {
  * 📊 Display configuration status
  */
 const displayConfigurationStatus = async (username) => {
-  console.group(`⚙️ [RESURRECTED] Configuration Status: ${username}`);
+  console.group(`⚙️ Configuration Status: ${username}`);
 
   try {
     const overview = await generateConfigurationOverview(username);
@@ -858,13 +606,13 @@ const configurationServices = {
   getConfigurationDefault,
   getConfigurationSchema,
 
-  // Core preference operations (resurrected)
+  // Core preference operations (modern)
   setUserPreference: setUserPreferenceBulletproof,
   getUserPreference: getUserPreferenceBulletproof,
   getAllUserPreferences: getAllUserPreferencesBulletproof,
   initializeUserPreferences: initializeUserPreferencesBulletproof,
 
-  // Workflow services (resurrected)
+  // Workflow services (modern)
   validateAndRepairConfiguration: validateAndRepairConfigurationBulletproof,
   resetUserConfiguration,
   exportUserConfiguration,
@@ -899,7 +647,7 @@ const createConfigurationCommands = (platform) => {
     {
       label: "Config: Validate and Repair",
       callback: async () => {
-        console.group("🔧 [RESURRECTED] Configuration Validation and Repair");
+        console.group("🔧 [MODERN] Configuration Validation and Repair");
 
         const user = getAuthenticatedUser();
         if (!user) {
@@ -965,17 +713,15 @@ const createConfigurationCommands = (platform) => {
         const user = getAuthenticatedUser();
         if (user) {
           console.log(
-            `🎯 [RESURRECTED] Initializing preferences for: ${user.displayName}`
+            `🎯 [MODERN] Initializing preferences for: ${user.displayName}`
           );
           const success = await initializeUserPreferencesBulletproof(
             user.displayName
           );
           if (success) {
-            console.log(
-              "🎉 [RESURRECTED] Preferences initialized successfully!"
-            );
+            console.log("🎉 [MODERN] Preferences initialized successfully!");
           } else {
-            console.error("❌ [RESURRECTED] Failed to initialize preferences");
+            console.error("❌ [MODERN] Failed to initialize preferences");
           }
         }
       },
@@ -1005,8 +751,7 @@ const createConfigurationCommands = (platform) => {
 
 export default {
   onload: async ({ extensionAPI }) => {
-    console.log("🎵 Configuration Manager (RESURRECTED) starting...");
-    console.log("🦜 Preparing for parrot duet: 'O mio babbino caro'");
+    console.log("⚙️ Configuration Manager (Modern) starting...");
 
     // Verify dependencies
     if (!window.RoamExtensionSuite) {
@@ -1032,7 +777,7 @@ export default {
       return;
     }
 
-    console.log("✅ Dependencies verified - proceeding with resurrection");
+    console.log("✅ Dependencies verified - proceeding with registration");
 
     // Register configuration services
     Object.entries(configurationServices).forEach(([name, service]) => {
@@ -1057,49 +802,41 @@ export default {
       {
         schemas: CONFIGURATION_SCHEMAS,
         services: configurationServices,
-        version: "3.0.0-resurrected",
+        version: "3.0.0-modern",
       },
       {
-        name: "🎵 Configuration Manager (RESURRECTED)",
+        name: "Configuration Manager (Modern)",
         description:
-          "Professional configuration interface with proven Subjournals cascading architecture",
-        version: "3.0.0-resurrected",
+          "Professional configuration interface with bulletproof cascading architecture",
+        version: "3.0.0-modern",
         dependencies: ["utility-library", "user-authentication"],
       }
     );
 
-    // Startup validation with auto-creation
+    // Startup validation
     try {
       const getAuthenticatedUser = platform.getUtility("getAuthenticatedUser");
       const user = getAuthenticatedUser();
 
       if (user) {
-        console.log(
-          "🎯 Running startup configuration check with auto-creation..."
-        );
-
-        // First, try to get overview (this will show missing page)
+        console.log("🎯 Running startup configuration check...");
         const overview = await generateConfigurationOverview(user.displayName);
 
-        console.log(
-          "🎵 Configuration Manager (RESURRECTED) loaded successfully!"
-        );
+        console.log("✅ Configuration Manager (Modern) loaded successfully!");
         console.log(`⚙️ Configuration status: ${overview.summary}`);
-        console.log(
-          '💡 Try: Cmd+P → "Config: Initialize Preferences" for auto-creation'
-        );
+        console.log('💡 Try: Cmd+P → "Config: Show My Configuration Status"');
 
-        // Auto-initialize if completely missing
-        if (overview.configuredSettings === 0) {
-          console.log("🚀 No preferences detected - suggesting initialization");
+        // Auto-repair suggestion if needed
+        if (
+          overview.invalidSettings > 0 ||
+          overview.missingSettings.length > 0
+        ) {
           console.log(
-            '🎯 Run "Config: Initialize Preferences" to create preference page'
+            '🔧 Issues detected - consider running "Config: Validate and Repair"'
           );
         }
       } else {
-        console.log(
-          "✅ Configuration Manager (RESURRECTED) loaded successfully!"
-        );
+        console.log("✅ Configuration Manager (Modern) loaded successfully!");
         console.log(
           "ℹ️ No authenticated user detected - commands available when user logs in"
         );
@@ -1110,15 +847,10 @@ export default {
         error.message
       );
     }
-
-    console.log("🦜🎵 Ready for beautiful parrot duet with Extension 2!");
   },
 
   onunload: () => {
-    console.log("🎵 Configuration Manager (RESURRECTED) unloading...");
-    console.log(
-      "🦜 Parrot duet complete - 'O mio babbino caro' sung beautifully!"
-    );
+    console.log("⚙️ Configuration Manager (Modern) unloading...");
     console.log("✅ Configuration Manager cleanup complete!");
   },
 };
