@@ -1,7 +1,7 @@
 // ===================================================================
-// Extension 2.0: User Authentication + User Preferences + Profile System
+// Extension 2.0: User Authentication + User Preferences System
 // Complete clean implementation - depends only on Extension 1.5
-// Features: User authentication + user preferences + profile initialization
+// Features: User authentication + user preferences management
 // ===================================================================
 
 // ===================================================================
@@ -192,222 +192,11 @@ const initializeUserPreferences = async (username) => {
 };
 
 // ===================================================================
-// 👤 2.0 USER PROFILE SYSTEM - New Profile Initialization
+// 🔍 2.0 USER AUTHENTICATION - Simple Current User Detection
 // ===================================================================
 
 /**
- * 👤 2.1 Initialize user profile structure with default values
- * Creates the complete "My Info::" structure for a user if missing
- * @param {string} username - Username to initialize profile for
- * @returns {boolean} - Success status
- */
-const initializeUserProfile = async (username) => {
-  try {
-    console.log(`🎯 Initializing user profile structure for ${username}...`);
-
-    const platform = window.RoamExtensionSuite;
-    const cascadeToBlock = platform.getUtility("cascadeToBlock");
-
-    // Step 1: Ensure user page exists
-    const userPageUid = await cascadeToBlock(username, [], true);
-    if (!userPageUid) {
-      console.error(`❌ Failed to create/find user page for ${username}`);
-      return false;
-    }
-
-    console.log(`✅ User page ready: ${username} (${userPageUid})`);
-
-    // Step 2: Create/ensure "My Info::" block exists
-    const myInfoPath = ["My Info::"];
-    const myInfoUid = await cascadeToBlock(username, myInfoPath, false);
-
-    if (!myInfoUid) {
-      console.error(`❌ Failed to create "My Info::" block for ${username}`);
-      return false;
-    }
-
-    console.log(`✅ "My Info::" block ready (${myInfoUid})`);
-
-    // Step 3: Define required profile fields with default values
-    const profileFields = {
-      "Avatar::": "__not yet entered__",
-      "Location::": "__not yet entered__",
-      "Role::": "__not yet entered__",
-      "Timezone::": "__not yet entered__",
-      "About Me::": "__not yet entered__",
-    };
-
-    // Step 4: Create each profile field under "My Info::"
-    let createdCount = 0;
-    let skippedCount = 0;
-
-    for (const [fieldName, defaultValue] of Object.entries(profileFields)) {
-      try {
-        const fieldPath = ["My Info::", fieldName];
-        const fieldUid = await cascadeToBlock(username, fieldPath, false);
-
-        if (fieldUid) {
-          // Check if field already has content
-          const getDirectChildren = platform.getUtility("getDirectChildren");
-          const children = getDirectChildren(fieldUid);
-
-          if (children.length === 0) {
-            // Field exists but is empty - add default value
-            const valuePath = ["My Info::", fieldName, defaultValue];
-            const valueUid = await cascadeToBlock(username, valuePath, false);
-
-            if (valueUid) {
-              console.log(`✅ Created ${fieldName} with default value`);
-              createdCount++;
-            } else {
-              console.warn(`⚠️ Failed to add default value to ${fieldName}`);
-            }
-          } else {
-            console.log(`⏭️ ${fieldName} already has content, skipping`);
-            skippedCount++;
-          }
-        } else {
-          console.error(`❌ Failed to create ${fieldName} block`);
-        }
-      } catch (error) {
-        console.error(`❌ Error creating ${fieldName}:`, error);
-      }
-    }
-
-    console.log(`✅ Profile initialization complete for ${username}:`);
-    console.log(`   - ${createdCount} fields created with defaults`);
-    console.log(`   - ${skippedCount} fields already had content`);
-    console.log(`   - Total fields: ${Object.keys(profileFields).length}`);
-
-    return (
-      createdCount > 0 || skippedCount === Object.keys(profileFields).length
-    );
-  } catch (error) {
-    console.error(
-      `❌ Failed to initialize user profile for ${username}:`,
-      error
-    );
-    return false;
-  }
-};
-
-/**
- * 👤 2.2 Check if user profile is complete
- * Verifies that all required profile fields exist and are filled
- * @param {string} username - Username to check
- * @returns {Object} - Profile completeness info
- */
-const checkUserProfileCompleteness = async (username) => {
-  try {
-    const platform = window.RoamExtensionSuite;
-    const findNestedDataValuesExact = platform.getUtility(
-      "findNestedDataValuesExact"
-    );
-    const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
-
-    const userPageUid = getPageUidByTitle(username);
-    if (!userPageUid) {
-      return {
-        exists: false,
-        hasMyInfo: false,
-        completeness: 0,
-        missingFields: ["User page does not exist"],
-      };
-    }
-
-    const myInfoData = findNestedDataValuesExact(userPageUid, "My Info");
-    if (!myInfoData || Object.keys(myInfoData).length === 0) {
-      return {
-        exists: true,
-        hasMyInfo: false,
-        completeness: 0,
-        missingFields: ["My Info:: block missing"],
-      };
-    }
-
-    const requiredFields = [
-      "avatar",
-      "location",
-      "role",
-      "timezone",
-      "aboutMe",
-    ];
-    const missingFields = [];
-    const incompleteFields = [];
-
-    for (const field of requiredFields) {
-      const value = myInfoData[field];
-      if (!value || value === "__missing field__") {
-        missingFields.push(field);
-      } else if (value === "__not yet entered__") {
-        incompleteFields.push(field);
-      }
-    }
-
-    const completedFields =
-      requiredFields.length - missingFields.length - incompleteFields.length;
-    const completeness = Math.round(
-      (completedFields / requiredFields.length) * 100
-    );
-
-    return {
-      exists: true,
-      hasMyInfo: true,
-      completeness,
-      totalFields: requiredFields.length,
-      completedFields,
-      missingFields,
-      incompleteFields,
-      needsInitialization: missingFields.length > 0,
-    };
-  } catch (error) {
-    console.error(
-      `❌ Error checking profile completeness for ${username}:`,
-      error
-    );
-    return {
-      exists: false,
-      hasMyInfo: false,
-      completeness: 0,
-      missingFields: [`Error: ${error.message}`],
-    };
-  }
-};
-
-/**
- * 👤 2.3 Auto-initialize profile for current user
- * Convenience function to initialize profile for the currently authenticated user
- * @returns {boolean} - Success status
- */
-const initializeCurrentUserProfile = async () => {
-  const currentUser = getCurrentUsername();
-
-  if (!currentUser) {
-    console.error("❌ No current user found for profile initialization");
-    return false;
-  }
-
-  console.log(`🎯 Auto-initializing profile for current user: ${currentUser}`);
-
-  // First check completeness
-  const completeness = await checkUserProfileCompleteness(currentUser);
-  console.log(`📊 Current profile status:`, completeness);
-
-  if (completeness.needsInitialization) {
-    console.log(`🔧 Profile needs initialization, proceeding...`);
-    return await initializeUserProfile(currentUser);
-  } else {
-    console.log(`✅ Profile already complete (${completeness.completeness}%)`);
-    return true;
-  }
-};
-
-// ===================================================================
-// 🔍 3.0 USER AUTHENTICATION - Simple Current User Detection
-// ===================================================================
-
-/**
- * 🔍 3.1 Get current authenticated user
+ * 🔍 2.1 Get current authenticated user
  * Returns the current user detected by Extension 1.5
  * @returns {Object|null} - User object or null if not detected
  */
@@ -425,7 +214,7 @@ const getAuthenticatedUser = () => {
 };
 
 /**
- * 🔍 3.2 Check if user is authenticated (not a fallback user)
+ * 🔍 2.2 Check if user is authenticated (not a fallback user)
  * Determines if the current user is properly authenticated
  * @returns {boolean} - True if user is authenticated
  */
@@ -435,7 +224,7 @@ const isUserAuthenticated = () => {
 };
 
 /**
- * 🔍 3.3 Get current user's display name
+ * 🔍 2.3 Get current user's display name
  * Convenience function to get just the display name
  * @returns {string|null} - Display name or null
  */
@@ -445,11 +234,11 @@ const getCurrentUsername = () => {
 };
 
 // ===================================================================
-// 🧪 4.0 TESTING AND VALIDATION FUNCTIONS
+// 🧪 3.0 TESTING AND VALIDATION FUNCTIONS
 // ===================================================================
 
 /**
- * 🧪 4.1 Test user preferences functionality
+ * 🧪 3.1 Test user preferences functionality
  * Comprehensive test of all preference operations
  * @param {string} username - Optional username to test (defaults to current user)
  */
@@ -512,53 +301,7 @@ const testUserPreferences = async (username = null) => {
 };
 
 /**
- * 🧪 4.2 Test user profile functionality
- * Comprehensive test of profile initialization and checking
- * @param {string} username - Optional username to test (defaults to current user)
- */
-const testUserProfile = async (username = null) => {
-  console.group("🧪 TESTING: User Profile System");
-
-  try {
-    const currentUser = username || getCurrentUsername();
-
-    if (!currentUser) {
-      console.error("❌ No user specified and cannot get current user");
-      return;
-    }
-
-    console.log(`🎯 Testing profile for: ${currentUser}`);
-
-    // Test 1: Check current profile completeness
-    console.log("\n1️⃣ Testing checkUserProfileCompleteness...");
-    const completeness = await checkUserProfileCompleteness(currentUser);
-    console.log(`✅ Profile completeness:`, completeness);
-
-    // Test 2: Initialize profile if needed
-    console.log("\n2️⃣ Testing initializeUserProfile...");
-    const initialized = await initializeUserProfile(currentUser);
-    console.log(`✅ Profile initialization result: ${initialized}`);
-
-    // Test 3: Check completeness again
-    console.log("\n3️⃣ Re-checking profile completeness...");
-    const newCompleteness = await checkUserProfileCompleteness(currentUser);
-    console.log(`✅ Updated profile completeness:`, newCompleteness);
-
-    // Test 4: Test auto-initialization
-    console.log("\n4️⃣ Testing initializeCurrentUserProfile...");
-    const autoInitialized = await initializeCurrentUserProfile();
-    console.log(`✅ Auto-initialization result: ${autoInitialized}`);
-
-    console.log("\n🎉 User profile tests completed!");
-  } catch (error) {
-    console.error("❌ User profile test failed:", error);
-  }
-
-  console.groupEnd();
-};
-
-/**
- * 🧪 4.3 Test authentication functionality
+ * 🧪 3.2 Test authentication functionality
  * Tests user detection and authentication status
  */
 const testAuthentication = () => {
@@ -587,7 +330,7 @@ const testAuthentication = () => {
 };
 
 /**
- * 🧪 4.4 Test preference page creation
+ * 🧪 3.3 Test preference page creation
  * Tests the preference page creation process
  */
 const testPreferencePageCreation = async () => {
@@ -626,7 +369,7 @@ const testPreferencePageCreation = async () => {
 };
 
 /**
- * 🧪 4.5 Run all system tests
+ * 🧪 3.4 Run all system tests
  * Comprehensive test suite for Extension 2
  */
 const runAllTests = async () => {
@@ -649,12 +392,6 @@ const runAllTests = async () => {
     await testUserPreferences(user.displayName);
   }
 
-  // Test 4: Profile functionality
-  console.log("\n=== TEST 4: PROFILE FUNCTIONALITY ===");
-  if (user) {
-    await testUserProfile(user.displayName);
-  }
-
   console.log("\n✅ All Extension 2.0 tests completed!");
   console.log("💡 Check console output above for detailed results");
 
@@ -662,11 +399,11 @@ const runAllTests = async () => {
 };
 
 // ===================================================================
-// 🔧 5.0 UTILITY HELPER FUNCTIONS
+// 🔧 4.0 UTILITY HELPER FUNCTIONS
 // ===================================================================
 
 /**
- * 🔧 5.1 Get user preference with fallback chain
+ * 🔧 4.1 Get user preference with fallback chain
  * Gets a preference with multiple fallback options
  * @param {string} username - Username
  * @param {string} key - Preference key
@@ -696,7 +433,7 @@ const getUserPreferenceWithFallbacks = async (
 };
 
 /**
- * 🔧 5.2 Bulk set user preferences
+ * 🔧 4.2 Bulk set user preferences
  * Sets multiple preferences at once
  * @param {string} username - Username
  * @param {Object} preferences - Object of key-value pairs
@@ -732,7 +469,7 @@ const bulkSetUserPreferences = async (username, preferences) => {
 };
 
 /**
- * 🔧 5.3 Export user preferences
+ * 🔧 4.3 Export user preferences
  * Exports all preferences as a JSON-compatible object
  * @param {string} username - Username to export preferences for
  * @returns {Object} - Exportable preferences object
@@ -753,56 +490,14 @@ const exportUserPreferences = async (username) => {
   return exportData;
 };
 
-/**
- * 🔧 5.4 Complete user setup (preferences + profile)
- * Initializes both preferences and profile for a user
- * @param {string} username - Username to set up
- * @returns {Object} - Setup results
- */
-const completeUserSetup = async (username) => {
-  try {
-    console.log(`🎯 Running complete user setup for: ${username}`);
-
-    const results = {
-      username,
-      preferencesInitialized: false,
-      profileInitialized: false,
-      success: false,
-    };
-
-    // Initialize preferences
-    console.log("📋 Initializing user preferences...");
-    results.preferencesInitialized = await initializeUserPreferences(username);
-
-    // Initialize profile
-    console.log("👤 Initializing user profile...");
-    results.profileInitialized = await initializeUserProfile(username);
-
-    results.success =
-      results.preferencesInitialized && results.profileInitialized;
-
-    console.log(`✅ Complete user setup for ${username}:`, results);
-    return results;
-  } catch (error) {
-    console.error(`❌ Complete user setup failed for ${username}:`, error);
-    return {
-      username,
-      preferencesInitialized: false,
-      profileInitialized: false,
-      success: false,
-      error: error.message,
-    };
-  }
-};
-
 // ===================================================================
-// 🚀 6.0 ROAM EXTENSION EXPORT - Complete Registration
+// 🚀 5.0 ROAM EXTENSION EXPORT - Complete Registration
 // ===================================================================
 
 export default {
   onload: async ({ extensionAPI }) => {
     console.log(
-      "👥 Extension 2.0: User Authentication + Preferences + Profile starting..."
+      "👥 Extension 2.0: User Authentication + Preferences starting..."
     );
 
     // Verify Extension 1.5 is loaded
@@ -837,14 +532,6 @@ export default {
       exportUserPreferences,
     };
 
-    // 👤 Register user profile utilities
-    const userProfileUtilities = {
-      initializeUserProfile,
-      checkUserProfileCompleteness,
-      initializeCurrentUserProfile,
-      completeUserSetup,
-    };
-
     // 🔍 Register authentication utilities
     const authenticationUtilities = {
       getAuthenticatedUser,
@@ -855,7 +542,6 @@ export default {
     // 🧪 Register testing utilities
     const testingUtilities = {
       testUserPreferences,
-      testUserProfile,
       testAuthentication,
       testPreferencePageCreation,
       runAllTests,
@@ -864,7 +550,6 @@ export default {
     // Register all utilities with the platform
     Object.entries({
       ...userPreferencesUtilities,
-      ...userProfileUtilities,
       ...authenticationUtilities,
       ...testingUtilities,
     }).forEach(([name, utility]) => {
@@ -876,15 +561,14 @@ export default {
       "user-authentication",
       {
         userPreferences: userPreferencesUtilities,
-        userProfile: userProfileUtilities,
         authentication: authenticationUtilities,
         testing: testingUtilities,
         version: "2.0.0",
       },
       {
-        name: "Extension 2.0: User Authentication + Preferences + Profile",
+        name: "Extension 2.0: User Authentication + Preferences",
         description:
-          "Complete user authentication, preferences management, and profile initialization system",
+          "Complete user authentication and preferences management system",
         version: "2.0.0",
         dependencies: ["utility-library"],
       }
@@ -904,22 +588,11 @@ export default {
         },
       },
       {
-        label: "Auth: Test User Profile",
-        callback: async () => {
-          const currentUser = getCurrentUsername();
-          if (currentUser) {
-            await testUserProfile(currentUser);
-          } else {
-            console.error("❌ Cannot test - no current user found");
-          }
-        },
-      },
-      {
         label: "Auth: Test Authentication",
         callback: testAuthentication,
       },
       {
-        label: "Auth: Initialize My Preferences",
+        label: "Auth: Initialize Current User Preferences",
         callback: async () => {
           const currentUser = getCurrentUsername();
           if (currentUser) {
@@ -934,59 +607,6 @@ export default {
                 "💡 Check your user preferences page - defaults created"
               );
             }
-          } else {
-            console.error("❌ No current user found");
-          }
-        },
-      },
-      {
-        label: "Auth: Initialize My Profile",
-        callback: async () => {
-          const currentUser = getCurrentUsername();
-          if (currentUser) {
-            const success = await initializeUserProfile(currentUser);
-            console.log(
-              `🎯 Profile initialization: ${success ? "successful" : "failed"}`
-            );
-            if (success) {
-              console.log(
-                "💡 Check your user page - profile structure created with defaults"
-              );
-            }
-          } else {
-            console.error("❌ No current user found");
-          }
-        },
-      },
-      {
-        label: "Auth: Complete User Setup (Preferences + Profile)",
-        callback: async () => {
-          const currentUser = getCurrentUsername();
-          if (currentUser) {
-            const results = await completeUserSetup(currentUser);
-            console.log(`🎯 Complete setup results:`, results);
-            if (results.success) {
-              console.log(
-                "🎉 Complete user setup successful! Check your user page and preferences page."
-              );
-            }
-          } else {
-            console.error("❌ No current user found");
-          }
-        },
-      },
-      {
-        label: "Auth: Check My Profile Completeness",
-        callback: async () => {
-          const currentUser = getCurrentUsername();
-          if (currentUser) {
-            const completeness = await checkUserProfileCompleteness(
-              currentUser
-            );
-            console.log(
-              `📊 Profile completeness for ${currentUser}:`,
-              completeness
-            );
           } else {
             console.error("❌ No current user found");
           }
@@ -1018,12 +638,8 @@ export default {
 
     // 🎉 Startup complete
     const currentUser = getAuthenticatedUser();
-    console.log(
-      "✅ Extension 2.0: User Authentication + Preferences + Profile loaded!"
-    );
-    console.log(
-      "🦊 Features: User preferences + authentication + profile initialization"
-    );
+    console.log("✅ Extension 2.0: User Authentication + Preferences loaded!");
+    console.log("🦊 Features: User preferences + authentication + testing");
     console.log("🧹 Dependencies: Extension 1.5 utilities only");
     console.log(
       `👤 Current user: ${currentUser?.displayName || "Not detected"}`
@@ -1033,37 +649,26 @@ export default {
         isUserAuthenticated() ? "Authenticated" : "Fallback/Guest"
       }`
     );
-    console.log(
-      '💡 Try: Cmd+P → "Auth: Complete User Setup (Preferences + Profile)"'
-    );
+    console.log('💡 Try: Cmd+P → "Auth: Run All Tests"');
 
-    // Auto-setup current user on startup if detected
+    // Auto-test on startup if user is detected
     if (currentUser) {
-      console.log("🔍 Auto-running setup for current user...");
-      setTimeout(async () => {
+      console.log("🔍 Auto-running authentication test...");
+      setTimeout(() => {
         testAuthentication();
-
-        // Auto-initialize profile if needed
-        const completeness = await checkUserProfileCompleteness(
-          currentUser.displayName
-        );
-        if (completeness.needsInitialization) {
-          console.log("🔧 Auto-initializing profile for current user...");
-          await initializeCurrentUserProfile();
-        }
       }, 1000);
     }
   },
 
   onunload: () => {
     console.log(
-      "👥 Extension 2.0: User Authentication + Preferences + Profile unloading..."
+      "👥 Extension 2.0: User Authentication + Preferences unloading..."
     );
 
     // Any cleanup would be handled by the extension registry
 
     console.log(
-      "✅ Extension 2.0: User Authentication + Preferences + Profile cleanup complete!"
+      "✅ Extension 2.0: User Authentication + Preferences cleanup complete!"
     );
   },
 };
