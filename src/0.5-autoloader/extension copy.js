@@ -90,30 +90,6 @@ const MULTIUSER_EXTENSIONS = [
     critical: false,
     exportPattern: "standard",
   },
-  {
-    id: "floating-action-buttons",
-    name: "Floating Action Buttons",
-    url: "https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/refs/heads/main/src/10-floating-action-buttons/extension.js",
-    description: "Customizable floating action buttons for quick access",
-    critical: false,
-    exportPattern: "standard",
-  },
-  {
-    id: "comment-tagger",
-    name: "Comment Tagger",
-    url: "https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/refs/heads/main/src/11-comment-tagger/extension.js",
-    description: "Advanced comment tagging and categorization system",
-    critical: false,
-    exportPattern: "standard",
-  },
-  {
-    id: "notifications-core",
-    name: "Notifications Core",
-    url: "https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/refs/heads/main/src/12-notifications-core/extension.js",
-    description: "Core notification system for real-time updates",
-    critical: false,
-    exportPattern: "standard",
-  },
 ];
 
 // Global state
