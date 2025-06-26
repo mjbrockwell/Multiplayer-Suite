@@ -1,23 +1,22 @@
-// 🌟 Floating Message Actions - Slack-style hover buttons for conversation blocks
-// 🌟 Adds emoji and delete buttons that appear on hover over blocks with #[[username]] tags
+// 🗨️ Conversation UI Enhancement
+// Adds timestamps to conversation headers and reaction/delete buttons to messages
 
-const floatingMessageActions = (() => {
-  // 🌲 1.0 - Internal State
-  let currentUser = null;
+const conversationUIEnhancement = (() => {
+  // State
+  let observer = null;
   let styleElement = null;
-  let activeButtons = null;
-  let hoverTimeout = null;
+  let currentUser = null;
 
-  // 🌸 1.1 - Debug Function
   const debug = (message) => {
-    console.log("Floating Actions:", message);
+    console.log("🗨️ Conv UI:", message);
   };
 
-  // 🌺 1.2 - Current User Detection (from conversation UI)
+  // 🔍 Current User Detection
   const getCurrentUser = () => {
     if (currentUser) return currentUser;
 
     try {
+      // Find a recent block to identify current user
       const recentBlocks = window.roamAlphaAPI.data.q(`
         [:find ?uid ?createTime
          :limit 3
@@ -48,7 +47,7 @@ const floatingMessageActions = (() => {
         }
       }
 
-      debug("Could not detect current user from recent blocks");
+      debug("Could not detect current user");
       return null;
     } catch (error) {
       debug(`Error detecting current user: ${error.message}`);
@@ -56,13 +55,58 @@ const floatingMessageActions = (() => {
     }
   };
 
-  // 🌺 1.3 - Get Block Author (from conversation UI)
+  // 📅 Date Formatting
+  const formatTimestamp = (date) => {
+    const days = [
+      "Sunday",
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+    ];
+    const months = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ];
+
+    const dayName = days[date.getDay()];
+    const monthName = months[date.getMonth()];
+    const day = date.getDate();
+    const time = date.toLocaleTimeString("en-US", {
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    // Add ordinal suffix
+    const getOrdinal = (n) => {
+      const s = ["th", "st", "nd", "rd"];
+      const v = n % 100;
+      return n + (s[(v - 20) % 10] || s[v] || s[0]);
+    };
+
+    return `started ${time} on ${dayName}, ${monthName} ${getOrdinal(day)}`;
+  };
+
+  // 🎯 Block Author Detection
   const getBlockAuthor = (blockUid) => {
     try {
-      const blockData = window.roamAlphaAPI.pull(`[:block/uid :create/user]`, [
-        ":block/uid",
-        blockUid,
-      ]);
+      const blockData = window.roamAlphaAPI.pull(
+        `[:block/uid :create/user :create/time]`,
+        [":block/uid", blockUid]
+      );
 
       if (!blockData || !blockData[":create/user"]) {
         return null;
@@ -74,14 +118,22 @@ const floatingMessageActions = (() => {
         userDbId
       );
 
-      return userData?.[":user/display-name"] || null;
+      if (!userData) {
+        return null;
+      }
+
+      return {
+        displayName: userData[":user/display-name"] || "Unknown User",
+        createdAt: blockData[":create/time"] || null,
+        userDbId: userDbId,
+      };
     } catch (error) {
       debug(`Error getting block author: ${error.message}`);
       return null;
     }
   };
 
-  // 🌺 1.4 - Extract Block UID from DOM (from conversation UI)
+  // 🔍 Extract Block UID from DOM
   const getBlockUidFromDOM = (messageBlock) => {
     try {
       const blockElement = messageBlock.closest(".rm-block");
@@ -92,20 +144,18 @@ const floatingMessageActions = (() => {
         blockElement.id?.replace("block-input-", "") ||
         blockElement.querySelector("[data-uid]")?.getAttribute("data-uid");
 
-      if (!blockUid) {
-        const createTime = blockElement.getAttribute("data-create-time");
-        if (createTime) {
-          const timestampQuery = window.roamAlphaAPI.data.q(`
-            [:find ?uid
-             :where 
-             [?e :create/time ${createTime}]
-             [?e :block/uid ?uid]]
-          `);
+      // Fallback: try timestamp method
+      const createTime = blockElement.getAttribute("data-create-time");
+      if (createTime && !blockUid) {
+        const timestampQuery = window.roamAlphaAPI.data.q(`
+          [:find ?uid
+           :where 
+           [?e :create/time ${createTime}]
+           [?e :block/uid ?uid]]
+        `);
 
-          if (timestampQuery.length > 0) {
-            blockUid = timestampQuery[0][0];
-            debug(`Found block UID via timestamp: ${blockUid}`);
-          }
+        if (timestampQuery.length > 0) {
+          blockUid = timestampQuery[0][0];
         }
       }
 
@@ -116,15 +166,14 @@ const floatingMessageActions = (() => {
     }
   };
 
-  // 🌺 1.5 - Soft Delete Function (from conversation UI)
+  // 🗑️ Soft Delete Function
   const softDeleteBlock = async (blockUid, authorName) => {
     try {
       const confirmed = confirm(
-        `Replace content of this block by ${authorName} with deletion marker?`
+        `Replace content of this message by ${authorName} with deletion marker?`
       );
 
       if (!confirmed) {
-        debug("Soft delete cancelled by user");
         return false;
       }
 
@@ -134,17 +183,11 @@ const floatingMessageActions = (() => {
 
       if (window.roamAlphaAPI.data?.block?.update) {
         await window.roamAlphaAPI.data.block.update({
-          block: {
-            uid: blockUid,
-            string: deletionText,
-          },
+          block: { uid: blockUid, string: deletionText },
         });
       } else if (window.roamAlphaAPI.updateBlock) {
         await window.roamAlphaAPI.updateBlock({
-          block: {
-            uid: blockUid,
-            string: deletionText,
-          },
+          block: { uid: blockUid, string: deletionText },
         });
       } else {
         throw new Error("Update API not found");
@@ -159,7 +202,7 @@ const floatingMessageActions = (() => {
     }
   };
 
-  // 🌺 1.6 - Emoji Menu Trigger (from conversation UI)
+  // 🎨 Emoji Menu Trigger
   const findBlockBullet = (block) => {
     const possibleSelectors = [
       ".rm-bullet",
@@ -274,20 +317,17 @@ const floatingMessageActions = (() => {
         return false;
       }
 
-      const rightClickEvent = new MouseEvent("contextmenu", {
-        bubbles: true,
-        cancelable: true,
-        view: window,
-        button: 2,
-        buttons: 2,
-      });
+      bullet.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          button: 2,
+          buttons: 2,
+        })
+      );
 
-      bullet.dispatchEvent(rightClickEvent);
-
-      setTimeout(() => {
-        handleReactionSubmenu();
-      }, 150);
-
+      setTimeout(() => handleReactionSubmenu(), 150);
       return true;
     } catch (e) {
       console.error("Error triggering emoji menu:", e);
@@ -295,100 +335,213 @@ const floatingMessageActions = (() => {
     }
   };
 
-  // 🌲 2.0 - CSS Injection
+  // 🎨 CSS Injection
   const injectCSS = () => {
     if (styleElement) {
       styleElement.remove();
     }
 
     styleElement = document.createElement("style");
-    styleElement.id = "floating-message-actions-styles";
+    styleElement.id = "conversation-ui-enhanced-styles";
     styleElement.textContent = `
-      /* 🌟 Floating Message Actions Container */
-      .floating-message-actions {
+      /* 🗨️ Conversation Header Tag Styling */
+      span.rm-page-ref[data-tag="ch0"] {
+        font-size: 0pt;
+      }
+      
+      span.rm-page-ref[data-tag="ch0"]::before {
+        content: "💬";
+        position: relative;
+        top: 1px;
+        font-size: 14pt;
+        background-image: linear-gradient(90deg, #E6E9FF, #D6DBFF);
+        background-size: 100%;
+        border-radius: 5px;
+        padding: 2px 7px 2px 7px;
+        color: #130101 !important;
+        font-weight: 600;
+        box-shadow: 1px 3px 5px -1px #000000, 0px -1px 5px #DFDFDF;
+      }
+      
+      .rm-page-ref[data-tag="ch0"]::after {
+        font-size: 14pt;
+        content: ' ';
+      }
+
+      /* 🗨️ Conversation Header Block Styling */
+      [data-page-links*="ch0"] > .rm-block-main {
+        color: #2d3748;
+        background-color: #fafbff !important;
+        border: 1px outset #667eea;
+        border-radius: 7px;
+        border-style: solid !important;
+        margin-bottom: 5px;
+        box-shadow: 0px 1px 3px -1px #000000, 0px -1px 5px #DFDFDF;
+        border-left: 4px solid #667eea !important;
+        padding: 12px 16px;
+        font-weight: bold;
+        position: relative;
+      }
+
+      /* 📅 Conversation Header Timestamp */
+      .conv-header-timestamp {
         position: absolute;
-        top: 8px;
-        right: 35px; /* 25px + 10px for spacing from comment button */
-        display: flex;
-        gap: 6px;
-        background: white;
-        border-radius: 6px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        border: 1px solid #e1e5e9;
-        padding: 4px;
-        opacity: 0;
-        transform: translateY(-4px);
-        transition: all 0.2s ease;
-        z-index: 1000;
+        top: 50%;
+        right: 16px;
+        transform: translateY(-50%);
+        font-size: 12px;
+        color: #6b7280;
+        font-weight: 400;
+        opacity: 0.8;
+        white-space: nowrap;
         pointer-events: none;
       }
 
-      .floating-message-actions.show {
-        opacity: 1;
-        transform: translateY(0);
-        pointer-events: all;
+      /* 🗨️ Message Block Actions Container */
+      .conv-message-actions {
+        position: absolute;
+        top: 8px;
+        right: 70px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        opacity: 0.4;
+        transition: opacity 0.2s ease;
+        z-index: 10;
+        pointer-events: auto;
       }
 
-      /* 🌟 Action Buttons */
-      .floating-action-btn {
-        width: 24px;
-        height: 24px;
-        border: none;
-        background: transparent;
-        border-radius: 4px;
+      .rm-block:hover .conv-message-actions {
+        opacity: 0.8;
+      }
+
+      .conv-message-actions:hover {
+        opacity: 1 !important;
+      }
+
+      /* ❤️ Heart Button */
+      .conv-heart-btn {
+        width: 18px;
+        height: 18px;
         cursor: pointer;
+        transition: all 0.2s ease;
+        border-radius: 50%;
+        padding: 2px;
         display: flex;
         align-items: center;
         justify-content: center;
-        transition: all 0.2s ease;
-        opacity: 0.7;
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(4px);
+        border: 1px solid rgba(0, 0, 0, 0.1);
       }
 
-      .floating-action-btn:hover {
-        opacity: 1;
-        background-color: #f5f5f5;
+      .conv-heart-btn:hover {
         transform: scale(1.1);
+        background: rgba(255, 255, 255, 0.95);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
       }
 
-      .floating-action-btn:active {
+      .conv-heart-btn:active {
         transform: scale(0.95);
       }
 
-      /* 🌟 Emoji Button */
-      .floating-emoji-btn svg {
-        width: 16px;
-        height: 16px;
+      .conv-heart-btn svg {
+        width: 14px;
+        height: 14px;
         fill: none;
         stroke: #666;
         stroke-width: 2;
         transition: all 0.2s ease;
       }
 
-      .floating-emoji-btn:hover svg {
+      .conv-heart-btn:hover svg {
         fill: #e91e63;
         stroke: #e91e63;
       }
 
-      /* 🌟 Delete Button */
-      .floating-delete-btn {
-        color: #666;
-        font-size: 14px;
+      /* ❌ Delete Button */
+      .conv-delete-btn {
+        width: 18px;
+        height: 18px;
+        background: #9e9e9e !important;
+        color: white !important;
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 11px;
         font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
       }
 
-      .floating-delete-btn:hover {
-        color: #dc3545;
-        background-color: #ffe6e6;
+      .conv-delete-btn:hover {
+        transform: scale(1.1);
+        background: #757575 !important;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
       }
 
-      /* 🌟 Message Block Positioning Context */
-      .rm-block {
+      .conv-delete-btn:active {
+        transform: scale(0.95);
+        background: #616161 !important;
+      }
+
+      /* 🚫 Disabled Delete Button */
+      .conv-delete-btn.disabled {
+        background: #e0e0e0 !important;
+        color: #bdbdbd !important;
+        cursor: not-allowed !important;
+        opacity: 0.6 !important;
+        border: 1px solid #d0d0d0 !important;
+      }
+
+      .conv-delete-btn.disabled:hover {
+        background: #e0e0e0 !important;
+        color: #bdbdbd !important;
+        transform: none !important;
+        opacity: 0.6 !important;
+        cursor: not-allowed !important;
+        box-shadow: none !important;
+      }
+
+      /* 🗨️ Conversation Container Styling */
+      [data-page-links*="ch0"] > .rm-block-children {
+        background-color: #f8f9ff;
+        border: 1px solid #e6e9ff;
+        margin-bottom: 5px;
+        border-radius: 4px;
+        padding: 8px;
+      }
+
+      /* 📝 Message Block Styling */
+      .rm-block:has(span.rm-page-ref[data-tag="ch0"]) > .rm-block-children > .rm-block {
+        margin: 12px 0;
+        padding: 8px 12px;
+        background: white;
+        border-radius: 6px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        border-left: 3px solid #e0e6ed;
         position: relative;
       }
 
-      /* 🌟 Hide during edit mode */
-      .rm-block--edit .floating-message-actions {
-        display: none;
+      /* 🗑️ Soft Deleted Block Styling */
+      .soft-deleted-content {
+        opacity: 0.6;
+        font-style: italic;
+        color: #666;
+        background: #f5f5f5;
+        padding: 4px 8px;
+        border-radius: 4px;
+        border-left: 3px solid #ccc;
+        margin: 2px 0;
+      }
+
+      /* 🎯 Hide actions during edit mode */
+      .rm-block--edit .conv-message-actions {
+        opacity: 0.2;
+        pointer-events: none;
       }
     `;
 
@@ -396,246 +549,265 @@ const floatingMessageActions = (() => {
     debug("CSS styles injected");
   };
 
-  // 🌲 3.0 - Create Floating Buttons
-  const createFloatingButtons = (blockElement, blockUid, authorName) => {
-    const currentUserName = getCurrentUser();
-    const isOwnMessage = currentUserName && authorName === currentUserName;
+  // 📅 Add Conversation Header Timestamp
+  const addConversationTimestamp = (headerBlock) => {
+    try {
+      // Skip if already has timestamp
+      if (headerBlock.querySelector(".conv-header-timestamp")) {
+        return;
+      }
 
-    // Create container
-    const container = document.createElement("div");
-    container.className = "floating-message-actions";
+      const blockUid = getBlockUidFromDOM(headerBlock);
+      if (!blockUid) return;
 
-    // Create emoji button
-    const emojiBtn = document.createElement("button");
-    emojiBtn.className = "floating-action-btn floating-emoji-btn";
-    emojiBtn.title = "Add reaction";
-    emojiBtn.innerHTML = `
-      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-      </svg>
-    `;
+      const blockData = window.roamAlphaAPI.pull(`[:block/uid :create/time]`, [
+        ":block/uid",
+        blockUid,
+      ]);
 
-    emojiBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      debug(`Emoji button clicked for message by ${authorName}`);
+      if (!blockData || !blockData[":create/time"]) return;
 
-      // Add click animation
-      emojiBtn.style.transform = "scale(0.9)";
-      setTimeout(() => {
-        emojiBtn.style.transform = "";
-      }, 150);
+      const createdAt = blockData[":create/time"];
+      const createdDate = new Date(createdAt);
+      const timestampText = formatTimestamp(createdDate);
 
-      triggerEmojiMenu(blockElement);
-    });
+      const timestampElement = document.createElement("div");
+      timestampElement.className = "conv-header-timestamp";
+      timestampElement.textContent = timestampText;
 
-    container.appendChild(emojiBtn);
+      const blockMain = headerBlock.querySelector(".rm-block-main");
+      if (blockMain) {
+        blockMain.appendChild(timestampElement);
+        debug(`Added timestamp: ${timestampText}`);
+      }
+    } catch (error) {
+      debug(`Error adding conversation timestamp: ${error.message}`);
+    }
+  };
 
-    // Create delete button (only for own messages)
-    if (isOwnMessage) {
-      const deleteBtn = document.createElement("button");
-      deleteBtn.className = "floating-action-btn floating-delete-btn";
-      deleteBtn.title = "Delete message";
-      deleteBtn.innerHTML = "×";
+  // 🎯 Add Message Actions (Heart + Delete)
+  const addMessageActions = (messageBlock) => {
+    try {
+      // Skip if already has actions
+      if (messageBlock.querySelector(".conv-message-actions")) {
+        return;
+      }
 
-      deleteBtn.addEventListener("click", async (e) => {
+      const blockUid = getBlockUidFromDOM(messageBlock);
+      if (!blockUid) return;
+
+      const authorInfo = getBlockAuthor(blockUid);
+      if (!authorInfo) return;
+
+      const currentUserName = getCurrentUser();
+      const isOwnBlock =
+        currentUserName && authorInfo.displayName === currentUserName;
+
+      // Check if block is soft deleted
+      const blockContent = messageBlock.textContent || "";
+      const isAlreadyDeleted = blockContent.includes(
+        "__content deleted by author__"
+      );
+
+      // Create actions container
+      const actionsContainer = document.createElement("div");
+      actionsContainer.className = "conv-message-actions";
+
+      // Heart button (always show)
+      const heartBtn = document.createElement("div");
+      heartBtn.className = "conv-heart-btn";
+      heartBtn.title = "Add reaction";
+      heartBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+        </svg>
+      `;
+
+      heartBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
-        debug(`Delete button clicked for block ${blockUid} by ${authorName}`);
+        debug(`Heart clicked for message by ${authorInfo.displayName}`);
 
-        // Add click animation
-        deleteBtn.style.transform = "scale(0.9)";
+        // Visual feedback
+        heartBtn.style.transform = "scale(0.9)";
         setTimeout(() => {
-          deleteBtn.style.transform = "";
-        }, 100);
+          heartBtn.style.transform = "";
+        }, 150);
 
-        const deleted = await softDeleteBlock(blockUid, authorName);
-        if (deleted) {
-          debug(`Block ${blockUid} soft deleted successfully`);
-          // Hide buttons after successful deletion
-          container.remove();
-        }
+        triggerEmojiMenu(messageBlock);
       });
 
-      container.appendChild(deleteBtn);
-    }
+      actionsContainer.appendChild(heartBtn);
 
-    return container;
-  };
+      // Delete button (only for own blocks)
+      if (isOwnBlock) {
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "conv-delete-btn";
+        deleteBtn.innerHTML = "×";
 
-  // 🌲 4.0 - Show/Hide Floating Buttons
-  const showFloatingButtons = (blockElement) => {
-    // Clear any existing timeout
-    if (hoverTimeout) {
-      clearTimeout(hoverTimeout);
-      hoverTimeout = null;
-    }
+        if (isAlreadyDeleted) {
+          deleteBtn.classList.add("disabled");
+          deleteBtn.title = "Message is marked as deleted";
+          deleteBtn.disabled = true;
+        } else {
+          deleteBtn.title = "Soft delete: Replace content with deletion marker";
+          deleteBtn.disabled = false;
 
-    // Remove any existing buttons
-    hideFloatingButtons();
+          deleteBtn.addEventListener("click", async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
 
-    // Get block info
-    const blockUid = getBlockUidFromDOM(blockElement);
-    if (!blockUid) {
-      debug("Could not get block UID for floating buttons");
-      return;
-    }
+            debug(
+              `Delete clicked for block ${blockUid} by ${authorInfo.displayName}`
+            );
 
-    const authorName = getBlockAuthor(blockUid);
-    if (!authorName) {
-      debug("Could not get author name for floating buttons");
-      return;
-    }
+            // Visual feedback
+            deleteBtn.style.transform = "scale(0.9)";
+            setTimeout(() => {
+              deleteBtn.style.transform = "";
+            }, 100);
 
-    // Create and show buttons
-    activeButtons = createFloatingButtons(blockElement, blockUid, authorName);
-    blockElement.appendChild(activeButtons);
+            const deleted = await softDeleteBlock(
+              blockUid,
+              authorInfo.displayName
+            );
+            if (deleted) {
+              debug(`Block ${blockUid} soft deleted successfully`);
 
-    // Animate in
-    setTimeout(() => {
-      if (activeButtons) {
-        activeButtons.classList.add("show");
-      }
-    }, 10);
-
-    debug(`Showing floating buttons for message by ${authorName}`);
-  };
-
-  const hideFloatingButtons = () => {
-    if (activeButtons) {
-      activeButtons.remove();
-      activeButtons = null;
-    }
-  };
-
-  // 🌲 5.0 - Setup Hover Listeners
-  const setupHoverListeners = () => {
-    debug("Setting up hover listeners for username-tagged blocks...");
-
-    // Find all blocks containing #[[username]] patterns
-    const allBlocks = document.querySelectorAll(".rm-block");
-    let processedCount = 0;
-
-    allBlocks.forEach((block) => {
-      // Check if block contains #[[username]] pattern
-      const blockText = block.textContent || "";
-      const hasUsernameTag = /#\[\[.+\]\]/.test(blockText);
-
-      if (hasUsernameTag) {
-        // Skip if already has listeners
-        if (block.hasAttribute("data-floating-actions")) {
-          return;
+              // Mark content as soft deleted
+              const blockText = messageBlock.querySelector(".rm-block-text");
+              if (blockText) {
+                blockText.classList.add("soft-deleted-content");
+              }
+            }
+          });
         }
 
-        block.setAttribute("data-floating-actions", "true");
-
-        block.addEventListener("mouseenter", () => {
-          // Small delay to prevent flickering on quick mouse movements
-          hoverTimeout = setTimeout(() => {
-            showFloatingButtons(block);
-          }, 100);
-        });
-
-        block.addEventListener("mouseleave", () => {
-          // Clear timeout if mouse leaves quickly
-          if (hoverTimeout) {
-            clearTimeout(hoverTimeout);
-            hoverTimeout = null;
-          }
-
-          // Hide with small delay to allow moving to buttons
-          setTimeout(() => {
-            hideFloatingButtons();
-          }, 150);
-        });
-
-        processedCount++;
+        actionsContainer.appendChild(deleteBtn);
       }
+
+      // Add to message block
+      messageBlock.appendChild(actionsContainer);
+      debug(
+        `Added actions for message by ${authorInfo.displayName}${
+          isOwnBlock ? " (own)" : ""
+        }`
+      );
+    } catch (error) {
+      debug(`Error adding message actions: ${error.message}`);
+    }
+  };
+
+  // 🔄 Process Conversations
+  const processConversations = () => {
+    debug("Processing conversations...");
+
+    // Find conversation headers
+    const conversationHeaders = document.querySelectorAll(
+      '.rm-page-ref[data-tag="ch0"]'
+    );
+
+    conversationHeaders.forEach((header) => {
+      const headerBlock = header.closest(".rm-block");
+      if (!headerBlock) return;
+
+      // Add timestamp to header
+      addConversationTimestamp(headerBlock);
+
+      // Find and process message blocks
+      const messageBlocks = headerBlock.querySelectorAll(
+        ":scope > .rm-block-children > .rm-block"
+      );
+
+      messageBlocks.forEach((messageBlock) => {
+        addMessageActions(messageBlock);
+      });
     });
 
-    debug(
-      `Added hover listeners to ${processedCount} blocks with username tags`
-    );
+    debug("Conversation processing complete");
   };
 
-  // 🌲 6.0 - Page Navigation Handler
-  const handlePageChange = () => {
-    debug("Page change detected, setting up hover listeners");
-    hideFloatingButtons();
-    setTimeout(setupHoverListeners, 500);
+  // 👀 DOM Observer Setup
+  const setupObserver = () => {
+    const targetNode =
+      document.querySelector(".roam-body") ||
+      document.querySelector(".roam-app");
+
+    if (!targetNode) {
+      debug("Could not find target for observer");
+      return;
+    }
+
+    observer = new MutationObserver(() => {
+      setTimeout(processConversations, 200);
+    });
+
+    observer.observe(targetNode, {
+      childList: true,
+      subtree: true,
+    });
+
+    debug("Observer initialized");
   };
 
-  // 🍎 7.0 - Extension Lifecycle
+  // 🚀 Extension Lifecycle
   const onload = ({ extensionAPI }) => {
-    debug("🚀 Loading Floating Message Actions...");
+    debug("Loading Conversation UI Enhancement...");
 
-    // Create settings
+    // Create settings panel
     extensionAPI.settings.panel.create({
-      tabTitle: "Floating Message Actions",
+      tabTitle: "Conversation UI",
       settings: [
         {
-          id: "showForAllUsers",
-          name: "Show emoji button for all messages",
-          description:
-            "Display emoji reaction button on all messages, not just own messages",
-          action: { type: "switch" },
-        },
-        {
-          id: "hoverDelay",
-          name: "Hover delay (ms)",
-          description:
-            "Delay before showing buttons on hover (prevents flickering)",
-          action: { type: "input", placeholder: "100" },
+          id: "headerTag",
+          name: "Conversation Header Tag",
+          description: "Tag for conversation headers",
+          action: {
+            type: "input",
+            placeholder: "ch0",
+          },
         },
       ],
     });
 
     // Initialize
     injectCSS();
+    setupObserver();
 
-    // Setup initial hover listeners
-    setTimeout(setupHoverListeners, 1000);
+    // Process existing conversations
+    setTimeout(processConversations, 1000);
 
-    // Listen for page changes
-    window.addEventListener("hashchange", handlePageChange);
-    window.addEventListener("beforeunload", handlePageChange);
-
-    debug("✅ Floating Message Actions loaded successfully");
+    debug("Conversation UI Enhancement loaded successfully");
   };
 
   const onunload = () => {
-    debug("Unloading Floating Message Actions...");
+    debug("Unloading...");
 
-    // Clean up
-    hideFloatingButtons();
+    if (observer) {
+      observer.disconnect();
+      observer = null;
+    }
 
     if (styleElement) {
       styleElement.remove();
       styleElement = null;
     }
 
-    // Remove event listeners
-    window.removeEventListener("hashchange", handlePageChange);
-    window.removeEventListener("beforeunload", handlePageChange);
-
-    // Remove hover listeners and data attributes
-    document.querySelectorAll("[data-floating-actions]").forEach((block) => {
-      block.removeAttribute("data-floating-actions");
-      // Note: Event listeners are automatically removed when we remove the attribute
-      // since we're not storing references to the functions
+    // Clean up added elements
+    document
+      .querySelectorAll(".conv-message-actions")
+      .forEach((el) => el.remove());
+    document
+      .querySelectorAll(".conv-header-timestamp")
+      .forEach((el) => el.remove());
+    document.querySelectorAll(".soft-deleted-content").forEach((el) => {
+      el.classList.remove("soft-deleted-content");
     });
-
-    // Clear timeouts
-    if (hoverTimeout) {
-      clearTimeout(hoverTimeout);
-      hoverTimeout = null;
-    }
 
     // Reset state
     currentUser = null;
-    activeButtons = null;
 
-    debug("✅ Floating Message Actions unloaded");
+    debug("Unloaded successfully");
   };
 
   return {
@@ -644,4 +816,4 @@ const floatingMessageActions = (() => {
   };
 })();
 
-export default floatingMessageActions;
+export default conversationUIEnhancement;
