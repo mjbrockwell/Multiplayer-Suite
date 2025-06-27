@@ -1,7 +1,6 @@
-// 🌳 Extension 7: Journal Entry Creator - Lean & Robust v1.0 + COORDINATED BUTTONS
+// 🌳 Extension 7: Journal Entry Creator - Lean & Robust v1.0
 // 🎯 Target: ~150-200 lines vs original 800+ lines
 // 🚀 Leverages Extension Suite Infrastructure for Maximum Efficiency
-// ✨ NEW: Professional Button Coordination System
 
 const journalEntryCreator = (() => {
   // 🌟 State Management (Simplified)
@@ -649,7 +648,7 @@ const journalEntryCreator = (() => {
   };
 
   // ═══════════════════════════════════════════════════════════════
-  // 🎨 UI MANAGEMENT - COORDINATED BUTTON SYSTEM
+  // 🎨 UI MANAGEMENT - Leveraging UI Engine
   // ═══════════════════════════════════════════════════════════════
 
   // 🌟 Button management (Extension Six handles directory buttons)
@@ -746,11 +745,7 @@ const journalEntryCreator = (() => {
     }
   };
 
-  // ===================================================================
-  // 🎨 COORDINATED BUTTON SYSTEM - THE MICHELANGELO MASTERPIECE!
-  // ===================================================================
-
-  // 🌟 Enhanced Manual button creation with COORDINATION
+  // 🌟 Manual button creation (positioned within main content area)
   const createManualQuickEntryButton = (text, onClick) => {
     try {
       if (quickEntryButton) {
@@ -758,48 +753,12 @@ const journalEntryCreator = (() => {
         quickEntryButton = null;
       }
 
-      // ===================================================================
-      // 🎨 COORDINATION SYSTEM - Check for Profile Nudges button
-      // ===================================================================
-
-      const getJournalButtonCoordination = () => {
-        // Check if Profile Nudges button exists
-        const profileButton = document.querySelector("#profile-nudge-button");
-        const hasProfileButton = !!profileButton;
-
-        // Calculate coordinated positioning and styling
-        if (hasProfileButton) {
-          return {
-            // Position as primary button (Profile button will stack below)
-            top: "60px",
-            right: "20px",
-            // Refined golden gradient that complements purple
-            background: "linear-gradient(135deg, #fbbf24, #f59e0b)",
-            borderColor: "#d97706",
-            textColor: "#92400e",
-            // Enhanced shadow to match profile button quality
-            shadow: "0 4px 12px rgba(251, 191, 36, 0.3)",
-            coordination: "primary",
-          };
-        } else {
-          return {
-            // Solo positioning when no profile button
-            top: "60px",
-            right: "20px",
-            background: "linear-gradient(135deg, #fef3c7, #fde68a)",
-            borderColor: "#f59e0b",
-            textColor: "#92400e",
-            shadow: "0 4px 12px rgba(245, 158, 11, 0.3)",
-            coordination: "solo",
-          };
-        }
-      };
-
       // Calculate position within main content area (not over sidebar)
-      let calculatedRight = "20px";
+      let rightPosition = "20px";
+      let topPosition = "60px";
 
       try {
-        // Find main content container for responsive positioning
+        // Find main content container
         const mainContent =
           document.querySelector(".roam-main") ||
           document.querySelector(".roam-article") ||
@@ -820,11 +779,16 @@ const journalEntryCreator = (() => {
             rect.right - buttonWidth - margin,
             viewportWidth - buttonWidth - margin
           );
-          calculatedRight = `${viewportWidth - maxRight}px`;
+          rightPosition = `${viewportWidth - maxRight}px`;
 
           log(
-            `📍 Calculated button position: right=${calculatedRight}, within main content bounds`,
+            `📍 Calculated button position: right=${rightPosition}, within main content bounds`,
             "DEBUG"
+          );
+        } else {
+          log(
+            `⚠️ Could not find main content container, using fallback position`,
+            "WARN"
           );
         }
       } catch (positionError) {
@@ -834,56 +798,33 @@ const journalEntryCreator = (() => {
         );
       }
 
-      // Get coordination settings
-      const coordination = getJournalButtonCoordination();
-
-      // Use calculated positioning but override with coordination settings
-      const finalRight = calculatedRight;
-      const finalTop = coordination.top;
-
       quickEntryButton = document.createElement("div");
       quickEntryButton.id = "journal-quick-entry-button";
       quickEntryButton.style.cssText = `
         position: fixed;
-        top: ${finalTop};
-        right: ${finalRight};
-        background: ${coordination.background};
-        border: 2px solid ${coordination.borderColor};
+        top: ${topPosition};
+        right: ${rightPosition};
+        background: linear-gradient(135deg, #fef3c7, #fde68a);
+        border: 1px solid #f59e0b;
         border-radius: 12px;
-        box-shadow: ${coordination.shadow};
-        z-index: 9998;
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        z-index: 9997;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        color: ${coordination.textColor};
+        color: #92400e;
         cursor: pointer;
         user-select: none;
         transition: all 0.3s ease;
         display: flex;
         align-items: center;
         gap: 8px;
-        padding: 12px 20px;
+        padding: 10px 16px;
         font-weight: 600;
         font-size: 14px;
         opacity: 0;
-        transform: translateX(20px);
-        min-width: 200px;
-        justify-content: center;
+        transform: translateX(320px);
+        max-width: 200px;
         white-space: nowrap;
       `;
-
-      // Add coordination indicator
-      quickEntryButton.setAttribute(
-        "data-coordination",
-        coordination.coordination
-      );
-
-      if (coordination.coordination === "primary") {
-        log(
-          "Journal button positioned in PRIMARY mode (profile button will coordinate)",
-          "INFO"
-        );
-      } else {
-        log("Journal button positioned in SOLO mode", "INFO");
-      }
 
       quickEntryButton.innerHTML = `
         <span style="font-size: 16px;">✏️</span>
@@ -895,52 +836,48 @@ const journalEntryCreator = (() => {
         try {
           // Visual feedback BEFORE hiding
           quickEntryButton.innerHTML = `<span style="font-size: 16px;">⏳</span><span>Creating...</span>`;
-          quickEntryButton.style.background = coordination.background;
+          quickEntryButton.style.background =
+            "linear-gradient(135deg, #fef3c7, #fde68a)";
 
           await onClick();
 
-          // Success feedback - Enhanced for coordination
+          // Success feedback
           if (quickEntryButton) {
-            quickEntryButton.innerHTML = `<span style="font-size: 16px;">✅</span><span>Entry Added!</span>`;
+            quickEntryButton.innerHTML = `<span style="font-size: 16px;">✅</span><span>Banner Added!</span>`;
             quickEntryButton.style.background =
-              "linear-gradient(135deg, #10b981, #059669)";
-            quickEntryButton.style.borderColor = "#047857";
-            quickEntryButton.style.color = "#065f46";
+              "linear-gradient(135deg, #dcfce7, #bbf7d0)";
+            quickEntryButton.style.borderColor = "#16a34a";
+            quickEntryButton.style.color = "#15803d";
           }
 
           // Hide after delay to show success message
           setTimeout(() => {
             hideButtons();
-
-            // Trigger profile button re-coordination after journal button disappears
-            setTimeout(() => {
-              if (window.userProfileNudges?.checkAndShowButton) {
-                window.userProfileNudges.checkAndShowButton();
-              }
-            }, 300);
           }, 2000);
         } catch (error) {
           log(`❌ Button click error: ${error.message}`, "ERROR");
 
-          // Error feedback - Enhanced for coordination
+          // Error feedback with context-aware hiding
           if (quickEntryButton) {
             quickEntryButton.innerHTML = `<span style="font-size: 16px;">❌</span><span>Try Again</span>`;
             quickEntryButton.style.background =
-              "linear-gradient(135deg, #ef4444, #dc2626)";
-            quickEntryButton.style.borderColor = "#b91c1c";
-            quickEntryButton.style.color = "#7f1d1d";
+              "linear-gradient(135deg, #fecaca, #fca5a5)";
+            quickEntryButton.style.borderColor = "#dc2626";
+            quickEntryButton.style.color = "#991b1b";
           }
 
-          // Context-aware error handling
+          // For chat rooms, reset button after error
+          // For username pages, hide after delay
           const pageContext = detectPageContext();
           if (pageContext.type === "chatroom") {
             // Reset button for retry in chat room
             setTimeout(() => {
               if (quickEntryButton) {
                 quickEntryButton.innerHTML = `<span style="font-size: 16px;">✏️</span><span>Add a daily banner?</span>`;
-                quickEntryButton.style.background = coordination.background;
-                quickEntryButton.style.borderColor = coordination.borderColor;
-                quickEntryButton.style.color = coordination.textColor;
+                quickEntryButton.style.background =
+                  "linear-gradient(135deg, #fef3c7, #fde68a)";
+                quickEntryButton.style.borderColor = "#f59e0b";
+                quickEntryButton.style.color = "#92400e";
               }
             }, 2500);
           } else {
@@ -952,26 +889,21 @@ const journalEntryCreator = (() => {
         }
       });
 
-      // Enhanced hover effects that coordinate with profile button
+      // Hover effects
       quickEntryButton.addEventListener("mouseenter", () => {
         quickEntryButton.style.transform =
-          "translateX(0) translateY(-2px) scale(1.03)";
-        quickEntryButton.style.boxShadow = `0 6px 16px ${coordination.borderColor}40`;
-
-        if (coordination.coordination === "primary") {
-          quickEntryButton.style.background =
-            "linear-gradient(135deg, #f59e0b, #d97706)";
-        } else {
-          quickEntryButton.style.background =
-            "linear-gradient(135deg, #fde68a, #fcd34d)";
-        }
+          "translateX(0) translateY(-2px) scale(1.02)";
+        quickEntryButton.style.boxShadow = "0 6px 16px rgba(245, 158, 11, 0.4)";
+        quickEntryButton.style.background =
+          "linear-gradient(135deg, #fde68a, #fcd34d)";
       });
 
       quickEntryButton.addEventListener("mouseleave", () => {
         quickEntryButton.style.transform =
           "translateX(0) translateY(0) scale(1)";
-        quickEntryButton.style.boxShadow = coordination.shadow;
-        quickEntryButton.style.background = coordination.background;
+        quickEntryButton.style.boxShadow = "0 4px 12px rgba(245, 158, 11, 0.3)";
+        quickEntryButton.style.background =
+          "linear-gradient(135deg, #fef3c7, #fde68a)";
       });
 
       document.body.appendChild(quickEntryButton);
@@ -982,19 +914,9 @@ const journalEntryCreator = (() => {
         quickEntryButton.style.transform = "translateX(0)";
       }, 100);
 
-      // Trigger profile button coordination after journal button is visible
-      setTimeout(() => {
-        if (window.userProfileNudges?.checkAndShowButton) {
-          window.userProfileNudges.checkAndShowButton();
-        }
-      }, 200);
-
-      log(
-        `✅ Coordinated journal entry button created: "${text}" (${coordination.coordination} mode)`,
-        "SUCCESS"
-      );
+      log(`✅ Manual quick entry button created: "${text}"`, "SUCCESS");
     } catch (error) {
-      log(`❌ Error creating coordinated button: ${error.message}`, "ERROR");
+      log(`❌ Error creating manual button: ${error.message}`, "ERROR");
     }
   };
 
@@ -1111,10 +1033,7 @@ const journalEntryCreator = (() => {
     }
   };
 
-  // ===================================================================
-  // 🎨 ENHANCED HIDE FUNCTION - Triggers Re-coordination
-  // ===================================================================
-
+  // 🌟 Hide all buttons (UI Engine + Manual)
   const hideButtons = () => {
     // Hide quick entry button
     if (quickEntryButton) {
@@ -1148,13 +1067,6 @@ const journalEntryCreator = (() => {
     if (leftoverStanding) {
       leftoverStanding.remove();
     }
-
-    // Trigger profile button re-coordination after cleanup
-    setTimeout(() => {
-      if (window.userProfileNudges?.checkAndShowButton) {
-        window.userProfileNudges.checkAndShowButton();
-      }
-    }, 100);
   };
 
   // ═══════════════════════════════════════════════════════════════
@@ -1174,10 +1086,7 @@ const journalEntryCreator = (() => {
       }
       window.journalEntryCreatorActive = true;
 
-      log(
-        "🚀 Journal Entry Creator v1.0 + COORDINATED BUTTONS loading...",
-        "SUCCESS"
-      );
+      log("🚀 Journal Entry Creator v1.0 loading...", "SUCCESS");
       extensionAPI = api;
 
       // Settings panel
@@ -1210,10 +1119,10 @@ const journalEntryCreator = (() => {
           "journal-entry-creator",
           journalAPI,
           {
-            version: "1.0.0-coordinated",
+            version: "1.0.0",
             dependencies: ["core-data", "ui-engine", "extension-1.5"],
             description:
-              "Lean journal entry creation with smart context detection + COORDINATED BUTTONS",
+              "Lean journal entry creation with smart context detection",
           }
         );
       }
@@ -1229,10 +1138,7 @@ const journalEntryCreator = (() => {
         setupPageMonitoring();
       }, 1000);
 
-      log(
-        "✅ Journal Entry Creator loaded successfully with COORDINATED BUTTONS!",
-        "SUCCESS"
-      );
+      log("✅ Journal Entry Creator loaded successfully", "SUCCESS");
     } catch (error) {
       log(`Error loading Journal Entry Creator: ${error.message}`, "ERROR");
     }
