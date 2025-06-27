@@ -569,7 +569,7 @@ const journalEntryCreator = (() => {
       // ULTRA-NUCLEAR STYLING - BULLETPROOF POSITIONING
       const nuclearCSS = `
         position: fixed !important;
-        top: 180px !important;
+        top: 156px !important;
         right: 20px !important;
         left: auto !important;
         background: linear-gradient(135deg, #fef3c7, #fde68a) !important;
@@ -603,7 +603,7 @@ const journalEntryCreator = (() => {
 
       // DOUBLE INSURANCE - setProperty with important
       button.style.setProperty("position", "fixed", "important");
-      button.style.setProperty("top", "180px", "important");
+      button.style.setProperty("top", "156px", "important");
       button.style.setProperty("right", "20px", "important");
       button.style.setProperty("left", "auto", "important");
       button.style.setProperty("z-index", "99999", "important");
@@ -715,12 +715,12 @@ const journalEntryCreator = (() => {
         const computedTop = window.getComputedStyle(button).top;
         const computedRight = window.getComputedStyle(button).right;
 
-        if (computedTop !== "180px" || computedRight !== "20px") {
+        if (computedTop !== "156px" || computedRight !== "20px") {
           log(
             "🚨 INTERFERENCE DETECTED - Reapplying nuclear positioning",
             "WARN"
           );
-          button.style.setProperty("top", "180px", "important");
+          button.style.setProperty("top", "156px", "important");
           button.style.setProperty("right", "20px", "important");
           button.style.setProperty("left", "auto", "important");
           button.style.setProperty("position", "fixed", "important");
@@ -729,7 +729,7 @@ const journalEntryCreator = (() => {
 
       log("🚨 ULTRA-NUCLEAR BUTTON DEPLOYED SUCCESSFULLY!", "SUCCESS");
       log(
-        "📍 Position: 180px from top, 20px from right (IMMUNE TO INTERFERENCE)",
+        "📍 Position: 156px from top, 20px from right (IMMUNE TO INTERFERENCE)",
         "INFO"
       );
       log("📏 Width: 212px (perfect matching with purple button)", "INFO");
