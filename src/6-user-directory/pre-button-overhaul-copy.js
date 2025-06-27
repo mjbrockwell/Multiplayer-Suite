@@ -1,13 +1,13 @@
 // ===================================================================
-// Extension SIX: User Directory + Timezones - SURGICAL ENHANCEMENT
-// 🏥 SURGERY: Integrated with Button Utility Extension
-// 🗑️ REMOVED: ~150 lines of manual button positioning logic
-// ✅ USING: ExtensionButtonManager for professional button coordination
-// 🎯 RESULT: Clean, conflict-free, professional button management
+// Extension SIX: User Directory + Timezones - PHASE 2 REFACTORED
+// ✨ NEW: Completely independent button creation (no Extension 1.5 competition)
+// 🗑️ REMOVED: Navigation utility dependencies that caused flickering
+// ✅ USING: Extension 1.5 utilities for timezone, modal, profile analysis (kept)
+// 🎯 RESULT: Zero button competition, clean yellow button, stable interface
 // ===================================================================
 
 // ===================================================================
-// 🔧 DEPENDENCY MANAGEMENT - Enhanced with Button Utility
+// 🔧 DEPENDENCY MANAGEMENT - Extension 1.5 Required (Partial)
 // ===================================================================
 
 /**
@@ -33,6 +33,7 @@ const checkExtension15Dependencies = () => {
     "getCurrentUser",
     "getPageUidByTitle",
     "findNestedDataValuesExact",
+    // ✅ REMOVED: "navigationUtilities" - Extension 6 is now independent
   ];
 
   const missingUtilities = requiredUtilities.filter(
@@ -48,21 +49,6 @@ const checkExtension15Dependencies = () => {
   }
 
   console.log("✅ All Extension 1.5 dependencies available");
-  return true;
-};
-
-/**
- * 🏥 NEW: Check if Button Utility Extension is available
- */
-const checkButtonUtilityDependency = () => {
-  if (!window.ExtensionButtonManager) {
-    console.warn(
-      "⚠️ Button Utility Extension not available - using fallback positioning"
-    );
-    return false;
-  }
-
-  console.log("✅ Button Utility Extension available");
   return true;
 };
 
@@ -186,6 +172,8 @@ const getAllUserProfilesClean = async () => {
 
 /**
  * ✨ DIRECT ROAM API: Create avatar display using fresh data queries
+ * 🗑️ BYPASSES: All caching layers for real-time avatar updates
+ * 🎯 SOLVES: Avatar not updating when image changes mid-session
  */
 const createAvatarDisplay = async (profile) => {
   try {
@@ -319,6 +307,7 @@ const createInitialsAvatar = (username) => {
 
 /**
  * ✅ REFACTORED: Show user directory modal using Extension 1.5 utilities
+ * 🗑️ REMOVED: ~50 lines of manual modal creation code
  */
 const showUserDirectoryModalClean = async () => {
   try {
@@ -332,14 +321,14 @@ const showUserDirectoryModalClean = async () => {
       return;
     }
 
-    // ✅ STEP 1: Create modal using Extension 1.5 utilities
+    // ✅ STEP 1: Create modal using Extension 1.5 utilities (saves ~30 lines)
     const modal = modalUtilities.createModal("clean-user-directory-modal", {
       closeOnEscape: true,
       closeOnBackdrop: true,
       zIndex: 10000,
     });
 
-    // ✅ STEP 2: Create modal content using utilities
+    // ✅ STEP 2: Create modal content using utilities (saves ~15 lines)
     const content = modalUtilities.createModalContent({
       width: "90%",
       maxWidth: "1200px",
@@ -367,7 +356,7 @@ const showUserDirectoryModalClean = async () => {
     const profiles = await getAllUserProfilesClean();
     const currentUser = platform.getUtility("getCurrentUser")();
 
-    // ✅ STEP 3: Create modal header using utilities
+    // ✅ STEP 3: Create modal header using utilities (saves ~10 lines)
     const memberText =
       profiles.length === 1 ? "1 member" : `${profiles.length} members`;
     const cleanGraphName = cleanDisplayName(graphName);
@@ -508,179 +497,429 @@ const startRealtimeClockUpdatesClean = (modal) => {
 };
 
 // ===================================================================
-// 🏥 SURGICAL BUTTON MANAGEMENT - Button Utility Integration
+// 🧭 INDEPENDENT NAVIGATION BUTTONS - Complete Extension 6 Control
 // ===================================================================
 
 /**
- * 🏥 SURGICAL: Professional button management using Button Utility Extension
- * 🗑️ REMOVED: ~150 lines of manual positioning, font detection, monitoring
+ * 🔍 DETECT: Current font being used by Roam
  */
-let buttonManager = null;
-
-/**
- * 🏥 NEW: Initialize professional button management
- */
-const initializeButtonManagement = async () => {
+const detectRoamFont = () => {
   try {
-    console.log(
-      "🎯 User Directory: Initializing professional button management..."
-    );
+    const selectors = [
+      ".roam-article",
+      ".roam-main",
+      ".roam-block-container",
+      ".rm-block-text",
+      "body",
+      ".bp3-button",
+    ];
 
-    // Check if Button Utility Extension is available
-    if (!checkButtonUtilityDependency()) {
-      console.warn(
-        "⚠️ Button Utility not available, using fallback positioning"
-      );
-      return initializeFallbackButton();
+    for (const selector of selectors) {
+      const element = document.querySelector(selector);
+      if (element) {
+        const computedStyle = window.getComputedStyle(element);
+        const fontFamily = computedStyle.fontFamily;
+        if (
+          fontFamily &&
+          fontFamily !== "initial" &&
+          fontFamily !== "inherit"
+        ) {
+          console.log(`🔍 Detected Roam font from ${selector}: ${fontFamily}`);
+          return fontFamily;
+        }
+      }
     }
 
-    // Create button manager for this extension
-    buttonManager = new window.ExtensionButtonManager("User Directory");
-    await buttonManager.initialize();
-
-    // Register the directory button with professional styling
-    const result = await buttonManager.registerButton({
-      id: "directory-button",
-      text: "👥 User Directory",
-      onClick: showUserDirectoryModalClean,
-      stack: "top-left", // Professional left-side placement
-      priority: false, // Play nice with other extensions
-      style: {
-        background: "linear-gradient(135deg, #fef3c7, #fde68a)",
-        borderColor: "#f59e0b",
-        color: "#92400e",
-        fontWeight: "600",
-        padding: "10px 16px",
-        borderRadius: "12px",
-        boxShadow: "0 4px 12px rgba(245, 158, 11, 0.3)",
-      },
-      onDisplaced: (fromStack, toStack, reason) => {
-        console.log(
-          `📍 Directory button moved: ${fromStack} → ${toStack} (${reason})`
-        );
-      },
-      onRemoved: (reason) => {
-        console.warn(`⚠️ Directory button removed: ${reason}`);
-      },
-    });
-
-    if (result.success) {
-      console.log(
-        `✅ Directory button registered at ${result.stack} position #${result.position}`
-      );
-      return result;
-    } else {
-      console.error("❌ Failed to register directory button:", result.error);
-      return initializeFallbackButton();
-    }
+    return "inherit";
   } catch (error) {
-    console.error("❌ Button management initialization failed:", error);
-    return initializeFallbackButton();
+    console.warn("Font detection failed, using inherit:", error);
+    return "inherit";
   }
 };
 
 /**
- * 🛟 FALLBACK: Simple button positioning when Button Utility unavailable
+ * 🎯 INDEPENDENT: Find placement target (Extension 6's own logic)
  */
-const initializeFallbackButton = () => {
-  console.log("🛟 Using fallback button positioning...");
+const findPlacementTargetIndependent = () => {
+  const selectors = [
+    ".roam-article .roam-log-container",
+    ".roam-article",
+    ".roam-main .roam-article",
+    ".rm-reference-main",
+    ".roam-main",
+    "body",
+  ];
 
+  for (const selector of selectors) {
+    const element = document.querySelector(selector);
+    if (element) {
+      return { element, selector };
+    }
+  }
+  return { element: document.body, selector: "body" };
+};
+
+/**
+ * 🗑️ INDEPENDENT: Remove all competing directory buttons
+ */
+const removeAllDirectoryButtonsIndependent = () => {
+  console.log("🗑️ Extension 6: Cleaning up competing directory buttons...");
+
+  // Remove by class patterns
+  const buttonSelectors = [
+    ".ext6-directory-button",
+    ".clean-directory-nav-button",
+    ".user-directory-nav-button",
+    ".directory-nav-button",
+    '[class*="directory"]',
+  ];
+
+  let removedCount = 0;
+
+  buttonSelectors.forEach((selector) => {
+    const buttons = document.querySelectorAll(selector);
+    buttons.forEach((button) => {
+      const text = button.textContent || button.innerText || "";
+      if (text.includes("Directory") || text.includes("User")) {
+        console.log(`🗑️ Removing: ${selector} - "${text}"`);
+        button.remove();
+        removedCount++;
+      }
+    });
+  });
+
+  console.log(`✅ Removed ${removedCount} competing directory buttons`);
+};
+
+/**
+ * 🎯 INDEPENDENT: Create directory button (complete Extension 6 control)
+ */
+const addNavigationButtonsIndependent = () => {
   try {
-    // Find a reasonable container
-    const container =
-      document.querySelector(".roam-article") ||
-      document.querySelector(".roam-main") ||
-      document.body;
+    console.log("🎯 Extension 6: Creating independent directory button...");
 
-    if (getComputedStyle(container).position === "static") {
-      container.style.position = "relative";
+    // 🗑️ STEP 1: Remove ANY existing directory buttons
+    removeAllDirectoryButtonsIndependent();
+
+    // 🎯 STEP 2: Find placement target (Extension 6's own logic)
+    const { element: targetElement, selector } =
+      findPlacementTargetIndependent();
+
+    if (getComputedStyle(targetElement).position === "static") {
+      targetElement.style.position = "relative";
     }
 
-    // Create simple button
+    // 🎯 STEP 3: Create button (pure Extension 6 code)
     const button = document.createElement("button");
     button.textContent = "👥 User Directory";
+    button.className = "ext6-directory-button"; // Unique class name
     button.onclick = showUserDirectoryModalClean;
-    button.className = "user-directory-fallback-button";
 
-    // Apply fallback styling
+    // 🎯 STEP 4: Apply complete styling (single operation, no competition)
+    const roamFont = detectRoamFont();
     button.style.cssText = `
       position: absolute;
-      top: 20px;
+      top: 14px;
       left: 20px;
       background: linear-gradient(135deg, #fef3c7, #fde68a);
       border: 1px solid #f59e0b;
       border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+      z-index: 9997;
+      font-family: ${roamFont};
       color: #92400e;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
       padding: 10px 16px;
       font-weight: 600;
-      cursor: pointer;
-      z-index: 9999;
-      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
-      transition: all 0.3s ease;
+      font-size: 14px;
     `;
 
-    // Add hover effects
+    // 🎯 STEP 5: Add hover effects
     button.addEventListener("mouseenter", () => {
-      button.style.transform = "translateY(-2px) scale(1.02)";
+      button.style.transform = "translateX(0) translateY(-2px) scale(1.02)";
       button.style.boxShadow = "0 6px 16px rgba(245, 158, 11, 0.4)";
+      button.style.background = "linear-gradient(135deg, #fde68a, #fcd34d)";
     });
 
     button.addEventListener("mouseleave", () => {
-      button.style.transform = "translateY(0) scale(1)";
+      button.style.transform = "translateX(0) translateY(0) scale(1)";
       button.style.boxShadow = "0 4px 12px rgba(245, 158, 11, 0.3)";
+      button.style.background = "linear-gradient(135deg, #fef3c7, #fde68a)";
     });
 
-    container.appendChild(button);
+    targetElement.appendChild(button);
 
     // Store for cleanup
     if (window._extensionRegistry && window._extensionRegistry.elements) {
       window._extensionRegistry.elements.push(button);
     }
 
-    console.log("✅ Fallback directory button created");
-    return { success: true, type: "fallback", element: button };
+    console.log(`✅ Extension 6 independent button created: ${selector}`);
   } catch (error) {
-    console.error("❌ Fallback button creation failed:", error);
-    return { success: false, error: error.message };
+    console.error("❌ Extension 6 independent button creation failed:", error);
   }
 };
 
+/**
+ * 🎯 INDEPENDENT: Monitor page changes (Extension 6's own monitoring)
+ */
+const startNavigationMonitoringIndependent = () => {
+  console.log("📡 Extension 6: Starting independent navigation monitoring...");
+
+  // Initial button creation
+  setTimeout(addNavigationButtonsIndependent, 1000);
+
+  // Set up URL change monitoring (Extension 6's own logic)
+  let currentUrl = window.location.href;
+  let monitoringInterval = null;
+
+  const checkForPageChanges = () => {
+    if (window.location.href !== currentUrl) {
+      currentUrl = window.location.href;
+      console.log(
+        "📍 Extension 6: Page changed, re-adding directory button..."
+      );
+
+      // Small delay to let page settle
+      setTimeout(addNavigationButtonsIndependent, 500);
+    }
+  };
+
+  // Check for changes every 500ms
+  monitoringInterval = setInterval(checkForPageChanges, 500);
+
+  // Store interval for cleanup
+  if (window._extensionRegistry) {
+    window._extensionRegistry.intervals =
+      window._extensionRegistry.intervals || [];
+    window._extensionRegistry.intervals.push(monitoringInterval);
+  }
+
+  console.log("✅ Extension 6 independent monitoring started");
+};
+
+// Use the independent functions
+const addNavigationButtonsClean = addNavigationButtonsIndependent;
+const startNavigationMonitoringClean = startNavigationMonitoringIndependent;
+
 // ===================================================================
-// 🧪 INTEGRATION TESTING - Enhanced Testing Suite
+// 🧪 INTEGRATION TESTING - Test Extension 1.5 Integration
 // ===================================================================
 
 /**
- * 🧪 DEBUG: Test Button Utility integration
+ * 🧪 DEBUG: Manual avatar extraction test for current user
  */
-const testButtonUtilityIntegration = async () => {
-  console.group("🎯 Testing Button Utility Integration");
+const debugAvatarExtraction = async () => {
+  console.group("🧪 DEBUG: Manual Avatar Extraction Test");
 
   try {
-    // Test Button Utility availability
-    const hasButtonUtility = checkButtonUtilityDependency();
-    console.log("✅ Button Utility available:", hasButtonUtility);
+    const platform = window.RoamExtensionSuite;
+    const currentUser = platform.getUtility("getCurrentUser")();
 
-    if (hasButtonUtility) {
-      // Test API availability
-      const api = window.ButtonRegistryAPI;
-      console.log("✅ Button Registry API available:", !!api);
+    console.log("👤 Current user:", currentUser);
 
-      if (api) {
-        const capabilities = api.getCapabilities();
-        console.log("📊 Button Registry capabilities:", capabilities);
-
-        const isReady = await api.waitForReady(1000);
-        console.log("✅ Button Registry ready:", isReady);
-      }
-
-      // Test ExtensionButtonManager
-      const manager = window.ExtensionButtonManager;
-      console.log("✅ ExtensionButtonManager available:", !!manager);
+    if (!currentUser?.displayName) {
+      console.error("❌ No current user found");
+      console.groupEnd();
+      return;
     }
 
-    console.log("🎉 Button Utility integration test complete!");
+    console.log(`🔍 Testing avatar extraction for: ${currentUser.displayName}`);
+
+    // Test the actual avatar creation function
+    const avatarResult = await createAvatarDisplay({
+      username: currentUser.displayName,
+    });
+    console.log("🎨 Final avatar result:", avatarResult);
+
+    // Also test the profile extraction to see what avatar data we're getting
+    const profileData = await getUserProfileDataClean(currentUser.displayName);
+    console.log("📊 Full profile data:", profileData);
+    console.log("🖼️ Profile avatar field:", profileData.avatar);
   } catch (error) {
-    console.error("❌ Button Utility integration test failed:", error);
+    console.error("❌ Debug test failed:", error);
+  }
+
+  console.groupEnd();
+};
+
+/**
+ * 🧪 DEBUG: Manual block structure inspection
+ */
+const debugBlockStructure = async () => {
+  console.group("🧪 DEBUG: Block Structure Inspection");
+
+  try {
+    const platform = window.RoamExtensionSuite;
+    const currentUser = platform.getUtility("getCurrentUser")();
+    const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
+    const getDirectChildren = platform.getUtility("getDirectChildren");
+
+    if (!currentUser?.displayName) {
+      console.error("❌ No current user found");
+      console.groupEnd();
+      return;
+    }
+
+    const username = currentUser.displayName;
+    console.log(`🔍 Inspecting block structure for: ${username}`);
+
+    // Step 1: Find user page
+    const userPageUid = getPageUidByTitle(username);
+    console.log(`📄 User page UID: ${userPageUid}`);
+
+    if (!userPageUid) {
+      console.error("❌ User page not found");
+      console.groupEnd();
+      return;
+    }
+
+    // Step 2: Get all direct children of user page
+    const pageChildren = getDirectChildren(userPageUid);
+    console.log(
+      `📋 All blocks on user page (${pageChildren.length}):`,
+      pageChildren
+    );
+
+    // Step 3: Look for "My Info" variations
+    const myInfoVariations = [
+      "My Info::",
+      "My Info:",
+      "My Info",
+      "**My Info:**",
+      "**My Info::**",
+    ];
+    let myInfoBlock = null;
+
+    for (const variation of myInfoVariations) {
+      const found = pageChildren.find(
+        (child) =>
+          child.text.includes(variation) ||
+          child.text.trim() === variation ||
+          child.text.trim().startsWith(variation)
+      );
+      if (found) {
+        console.log(
+          `✅ Found My Info block with variation "${variation}":`,
+          found
+        );
+        myInfoBlock = found;
+        break;
+      }
+    }
+
+    if (!myInfoBlock) {
+      console.error("❌ No My Info block found with any variation");
+      console.log(
+        "🔍 Available block texts:",
+        pageChildren.map((c) => c.text)
+      );
+      console.groupEnd();
+      return;
+    }
+
+    // Step 4: Get children of My Info block
+    const myInfoChildren = getDirectChildren(myInfoBlock.uid);
+    console.log(
+      `📋 Children of My Info block (${myInfoChildren.length}):`,
+      myInfoChildren
+    );
+
+    // Step 5: Look for Avatar variations
+    const avatarVariations = [
+      "Avatar::",
+      "Avatar:",
+      "Avatar",
+      "**Avatar:**",
+      "**Avatar::**",
+    ];
+    let avatarBlock = null;
+
+    for (const variation of avatarVariations) {
+      const found = myInfoChildren.find(
+        (child) =>
+          child.text.includes(variation) ||
+          child.text.trim() === variation ||
+          child.text.trim().startsWith(variation)
+      );
+      if (found) {
+        console.log(
+          `✅ Found Avatar block with variation "${variation}":`,
+          found
+        );
+        avatarBlock = found;
+        break;
+      }
+    }
+
+    if (!avatarBlock) {
+      console.error("❌ No Avatar block found with any variation");
+      console.log(
+        "🔍 Available My Info children:",
+        myInfoChildren.map((c) => c.text)
+      );
+      console.groupEnd();
+      return;
+    }
+
+    // Step 6: Get children of Avatar block (should contain the image)
+    const avatarChildren = getDirectChildren(avatarBlock.uid);
+    console.log(
+      `📋 Children of Avatar block (${avatarChildren.length}):`,
+      avatarChildren
+    );
+
+    // Step 7: Test image extraction
+    const extractImageUrls = platform.getUtility("extractImageUrls");
+    const imageUrls = extractImageUrls(avatarBlock.uid, { validateUrls: true });
+    console.log(`🖼️ Images extracted from Avatar block:`, imageUrls);
+  } catch (error) {
+    console.error("❌ Block structure inspection failed:", error);
+  }
+
+  console.groupEnd();
+};
+
+const testExtension15Integration = async () => {
+  console.group("🔗 Testing Extension 1.5 Integration");
+
+  try {
+    const platform = window.RoamExtensionSuite;
+
+    // Test timezone utilities
+    const timezoneManager = platform.getUtility("timezoneManager");
+    console.log("✅ Timezone utilities available:", !!timezoneManager);
+
+    // Test modal utilities
+    const modalUtilities = platform.getUtility("modalUtilities");
+    console.log("✅ Modal utilities available:", !!modalUtilities);
+
+    // Test profile analysis utilities
+    const profileAnalysisUtilities = platform.getUtility(
+      "profileAnalysisUtilities"
+    );
+    console.log(
+      "✅ Profile analysis utilities available:",
+      !!profileAnalysisUtilities
+    );
+
+    // Test enhanced image processing
+    const processAvatarImages = platform.getUtility("processAvatarImages");
+    console.log(
+      "✅ Enhanced avatar processing available:",
+      !!processAvatarImages
+    );
+
+    console.log(
+      "🎉 Extension 1.5 utilities working (except navigation - now independent)!"
+    );
+  } catch (error) {
+    console.error("❌ Integration test failed:", error);
   }
 
   console.groupEnd();
@@ -690,27 +929,14 @@ const testButtonUtilityIntegration = async () => {
  * ✅ ENHANCED: Run complete system tests
  */
 const runCleanSystemTests = async () => {
-  console.group("🧪 Running Extension SIX System Tests (Surgical Version)");
+  console.group("🧪 Running Extension SIX System Tests (Independent Phase)");
 
   try {
     // Test Extension 1.5 integration
-    const platform = window.RoamExtensionSuite;
-    const timezoneManager = platform.getUtility("timezoneManager");
-    const modalUtilities = platform.getUtility("modalUtilities");
-    const profileAnalysisUtilities = platform.getUtility(
-      "profileAnalysisUtilities"
-    );
-
-    console.log("✅ Extension 1.5 utilities:", {
-      timezone: !!timezoneManager,
-      modal: !!modalUtilities,
-      profile: !!profileAnalysisUtilities,
-    });
-
-    // Test Button Utility integration
-    await testButtonUtilityIntegration();
+    await testExtension15Integration();
 
     // Test profile extraction
+    const platform = window.RoamExtensionSuite;
     const currentUser = platform.getUtility("getCurrentUser")();
     console.log(`👤 Current user: ${currentUser?.displayName}`);
 
@@ -727,6 +953,10 @@ const runCleanSystemTests = async () => {
     const members = getGraphMembersFromList("roam/graph members", "Directory");
     console.log(`📋 Curated members: ${members.length} found`);
 
+    // Test independent button creation
+    console.log("🎯 Testing independent button creation...");
+    addNavigationButtonsIndependent();
+
     console.log("✅ All system tests passed!");
   } catch (error) {
     console.error("❌ System test failed:", error);
@@ -736,7 +966,7 @@ const runCleanSystemTests = async () => {
 };
 
 // ===================================================================
-// 🔧 HELPER FUNCTIONS - Maintained and Enhanced
+// 🔧 HELPER FUNCTIONS - Maintained but Enhanced
 // ===================================================================
 
 /**
@@ -846,14 +1076,14 @@ window.navigateToUserPageClean = (username) => {
 };
 
 // ===================================================================
-// 🎯 EXTENSION REGISTRATION - Surgical Enhancement Complete
+// 🎯 EXTENSION REGISTRATION - Independent Phase Complete
 // ===================================================================
 
 export default {
   onload: () => {
-    console.log("🏥 User Directory loading (Surgical Enhancement)...");
+    console.log("🚀 User Directory loading (Independent Phase)...");
 
-    // ✅ STEP 1: Check Extension 1.5 dependencies
+    // ✅ STEP 1: Check Extension 1.5 dependencies (partial)
     if (!checkExtension15Dependencies()) {
       console.error(
         "❌ User Directory failed to load - missing Extension 1.5 dependencies"
@@ -877,9 +1107,9 @@ export default {
       getUserProfileData: getUserProfileDataClean,
       getAllUserProfiles: getAllUserProfilesClean,
       showUserDirectory: showUserDirectoryModalClean,
-      testButtonUtility: testButtonUtilityIntegration,
+      testIntegration: testExtension15Integration,
       runSystemTests: runCleanSystemTests,
-      initializeButtons: initializeButtonManagement, // 🏥 NEW: Professional button management
+      addNavigationButtons: addNavigationButtonsIndependent, // ✨ Independent version
     };
 
     // ✅ STEP 3: Register command palette functions
@@ -889,16 +1119,16 @@ export default {
         callback: showUserDirectoryModalClean,
       },
       {
-        label: "User Directory: Test Button Utility Integration",
-        callback: testButtonUtilityIntegration,
+        label: "User Directory: Test Extension 1.5 Integration",
+        callback: testExtension15Integration,
       },
       {
         label: "User Directory: Run System Tests",
         callback: runCleanSystemTests,
       },
       {
-        label: "User Directory: Initialize Professional Buttons",
-        callback: initializeButtonManagement,
+        label: "User Directory: Add Show Directory Button",
+        callback: addNavigationButtonsIndependent,
       },
     ];
 
@@ -913,86 +1143,75 @@ export default {
 
     // ✅ STEP 4: Register with platform
     const requiredDependencies = [
-      "utility-library", // Extension 1.5
-      "button-utility", // 🏥 NEW: Button Utility Extension
+      "utility-library", // Extension 1.5 (partial dependencies only)
     ];
 
     platform.register(
       "clean-user-directory",
       {
         services: cleanDirectoryServices,
-        version: "7.0.0", // 🏥 Surgical version
+        version: "6.9.0", // ✨ Independent version
       },
       {
         name: "✨ User Directory",
         description:
-          "Professional user directory with intelligent button coordination, timezone intelligence, and surgical code enhancement",
-        version: "7.0.0",
+          "Professional user directory with timezone intelligence, avatar support, and independent button management",
+        version: "6.9.0",
         dependencies: requiredDependencies,
       }
     );
 
-    // ✅ STEP 5: Initialize professional button management
-    setTimeout(async () => {
-      try {
-        await initializeButtonManagement();
-      } catch (error) {
-        console.error("❌ Failed to initialize button management:", error);
-      }
-    }, 1000);
+    // ✅ STEP 5: Start independent navigation monitoring
+    startNavigationMonitoringIndependent();
 
     // ✅ STEP 6: Success report
     const currentUser = platform.getUtility("getCurrentUser")();
-    console.log("🎉 Extension SIX loaded successfully (Surgical Enhancement)!");
-    console.log("🏥 SURGERY: ~150 lines of button positioning code removed");
-    console.log("🎯 BUTTON: Professional Button Utility integration");
-    console.log("✅ MODAL: Using Extension 1.5 utilities (unchanged)");
-    console.log("✅ TIMEZONE: Using Extension 1.5 utilities (unchanged)");
-    console.log("✅ PROFILE: Using Extension 1.5 utilities (unchanged)");
-    console.log("🛡️ SAFETY: Zero changes to core functionality");
+    console.log("🎉 Extension SIX loaded successfully (Independent Phase)!");
+    console.log(
+      "🎯 BUTTON: Completely independent creation (zero competition)"
+    );
+    console.log("✅ MODAL: Using Extension 1.5 utilities (working well)");
+    console.log("✅ TIMEZONE: Using Extension 1.5 utilities (working well)");
+    console.log("✅ PROFILE: Using Extension 1.5 utilities (working well)");
+    console.log("🛡️ SAFETY: Zero changes to Extension 1.5 (zero risk)");
     console.log(`👤 Current user: ${currentUser?.displayName}`);
     console.log('💡 Try: Cmd+P → "User Directory: Show Directory"');
 
     // Auto-test integration after a short delay
     setTimeout(async () => {
-      console.log("🔍 Auto-testing Surgical Enhancement integration...");
+      console.log("🔍 Auto-testing Independent Phase integration...");
       await runCleanSystemTests();
     }, 2000);
 
     return {
       extensionId: "clean-user-directory",
       services: cleanDirectoryServices,
-      version: "7.0.0",
-      status: "surgical_enhancement",
+      version: "6.9.0",
+      status: "independent",
     };
   },
 
   onunload: () => {
-    console.log("🏥 User Directory unloading (Surgical Enhancement)...");
+    console.log("👥 User Directory unloading...");
 
-    // 🏥 SURGICAL: Clean up button management
-    if (buttonManager) {
-      try {
-        buttonManager.cleanup();
-        console.log("✅ Professional button management cleaned up");
-      } catch (error) {
-        console.error("❌ Button manager cleanup error:", error);
-      }
-    }
-
-    // Clean up any fallback buttons
-    const fallbackButtons = document.querySelectorAll(
-      ".user-directory-fallback-button"
-    );
-    fallbackButtons.forEach((button) => button.remove());
-
-    // Clean up modals (unchanged)
+    // Clean up modals
     const modals = document.querySelectorAll(
       "#clean-user-directory-modal, #test-modal"
     );
     modals.forEach((modal) => modal.remove());
 
-    // Navigation helper cleanup (unchanged)
+    // Clean up independent buttons
+    removeAllDirectoryButtonsIndependent();
+
+    // Clean up intervals
+    if (window._extensionRegistry && window._extensionRegistry.intervals) {
+      window._extensionRegistry.intervals.forEach((interval) => {
+        clearInterval(interval);
+      });
+      window._extensionRegistry.intervals = [];
+    }
+
+    // Navigation helper cleanup
     delete window.navigateToUserPageClean;
 
     console.log("✅ User Directory cleanup complete!");
