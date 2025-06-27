@@ -1,6 +1,6 @@
-// 🌳 Extension 7: Journal Entry Creator - Final Version with Perfect Nuclear Button
-// 🎯 Fixed positioning, warm yellow colors, perfect width matching
-// ✨ Nuclear approach - simple, reliable, beautiful
+// 🌳 Extension 7: Journal Entry Creator - Ultra-Nuclear Version (Final Solution)
+// 🚨 Bulletproof positioning that cannot be hijacked by other extensions
+// ✨ Ultra-Nuclear approach - immune to interference, perfect alignment
 
 const journalEntryCreator = (() => {
   // 🌟 State Management (Simplified)
@@ -274,7 +274,7 @@ const journalEntryCreator = (() => {
     }
   };
 
-  // 🌟 Check if today's daily banner exists (Chat Room page) - FIXED LOGIC
+  // 🌟 Check if today's daily banner exists (Chat Room page)
   const shouldShowChatRoomButton = (pageName) => {
     try {
       log(`🔍 Checking if banner exists for chat room: "${pageName}"`, "DEBUG");
@@ -294,43 +294,26 @@ const journalEntryCreator = (() => {
       log(`🔍 Found ${pageChildren.length} direct children to check`, "DEBUG");
 
       // Check if today's banner exists (contains #st0 and today's date link)
-      let bannerCount = 0;
-      let todaysBannerCount = 0;
-
       const todaysBannerExists = pageChildren.some(([blockString]) => {
         const lowerString = blockString.toLowerCase();
         const hasStTag = lowerString.includes("#st0");
-
-        if (hasStTag) {
-          bannerCount++;
-          log(`📋 Found #st0 block: "${blockString}"`, "DEBUG");
-        }
-
-        // Check for today's date (exact match)
         const todaysDateLower = todaysDate.toLowerCase();
         const hasDateLink = lowerString.includes(`[[${todaysDateLower}]]`);
 
         if (hasStTag && hasDateLink) {
-          todaysBannerCount++;
-          log(
-            `🎯 Found TODAY'S banner #${todaysBannerCount}: "${blockString}"`,
-            "SUCCESS"
-          );
+          log(`🎯 Found TODAY'S banner: "${blockString}"`, "SUCCESS");
           return true;
         }
 
         return false;
       });
 
-      log(`📊 Found ${bannerCount} total #st0 blocks`, "DEBUG");
-      log(`📊 Found ${todaysBannerCount} today's banners`, "DEBUG");
       log(`🎯 Today's banner exists: ${todaysBannerExists}`, "DEBUG");
       log(`🔘 Should show button: ${!todaysBannerExists}`, "INFO");
 
       return !todaysBannerExists;
     } catch (error) {
       log(`❌ Error checking chat room button: ${error.message}`, "ERROR");
-      log(`❌ Error stack: ${error.stack}`, "ERROR");
       return false;
     }
   };
@@ -412,7 +395,7 @@ const journalEntryCreator = (() => {
     }
   };
 
-  // 🌟 Create daily banner in chat room (with smart placement + debug logging)
+  // 🌟 Create daily banner in chat room
   const createChatRoomEntry = async (pageName) => {
     try {
       log(
@@ -420,8 +403,7 @@ const journalEntryCreator = (() => {
         "INFO"
       );
 
-      // Step 1: Get page UID (following username pattern)
-      log("Step 1: Finding page UID...", "DEBUG");
+      // Get page UID
       const pageUid = window.roamAlphaAPI.data.q(`
         [:find ?uid .
          :where 
@@ -430,110 +412,22 @@ const journalEntryCreator = (() => {
       `);
 
       if (!pageUid) {
-        log(`❌ ERROR: Could not find page UID for "${pageName}"`, "ERROR");
         throw new Error(`Could not find Chat Room page UID for "${pageName}"`);
       }
-      log(`✅ Found page UID: ${pageUid}`, "SUCCESS");
 
-      // Step 2: Build banner content (following username pattern)
+      // Build banner content
       const todaysDate = getTodaysRoamDate();
       const dayName = getTodaysDayName();
       const bannerContent = `#st0 #clr-wht-act [[${todaysDate}]]  -  ${dayName}`;
-      log(`📅 Banner content: "${bannerContent}"`, "DEBUG");
 
-      // Step 3: Find existing date banners for placement logic
-      log("Step 3: Finding existing date banners...", "DEBUG");
+      // Create the banner block
+      await window.roamAlphaAPI.data.block.create({
+        location: { "parent-uid": pageUid, order: "last" },
+        block: { string: bannerContent },
+      });
 
-      // Declare insertLocation in broader scope
-      let insertLocation;
-
-      try {
-        // Simplified approach: get all direct children of the page first
-        const pageChildren = window.roamAlphaAPI.data.q(`
-          [:find ?uid ?string ?order
-           :where 
-           [?page :node/title "${pageName}"]
-           [?page :block/children ?child]
-           [?child :block/uid ?uid]
-           [?child :block/string ?string]
-           [?child :block/order ?order]]
-        `);
-
-        log(`Found ${pageChildren.length} direct children of page`, "DEBUG");
-
-        // Filter for date banners among direct children only
-        const dateBanners = pageChildren.filter(([uid, blockString, order]) => {
-          const lowerString = blockString.toLowerCase();
-          const hasStTag = lowerString.includes("#st0");
-          const hasDateLink = /\[\[.*\]\]/.test(blockString);
-          const isDateBanner = hasStTag && hasDateLink;
-
-          if (isDateBanner) {
-            log(
-              `📋 Found date banner: "${blockString}" (order: ${order})`,
-              "DEBUG"
-            );
-          }
-
-          return isDateBanner;
-        });
-
-        log(`Found ${dateBanners.length} existing date banners`, "INFO");
-
-        // Step 4: Determine placement
-        if (dateBanners.length === 0) {
-          log("📍 No existing banners - placing at BOTTOM of page", "INFO");
-          insertLocation = {
-            "parent-uid": pageUid,
-            order: "last",
-          };
-        } else {
-          // Find banner with lowest order (topmost)
-          const sortedBanners = dateBanners.sort(([, , a], [, , b]) => a - b);
-          const topmostOrder = sortedBanners[0][2];
-
-          log(
-            `📍 Placing ABOVE topmost banner (order: ${topmostOrder})`,
-            "INFO"
-          );
-          insertLocation = {
-            "parent-uid": pageUid,
-            order: topmostOrder,
-          };
-        }
-
-        log(
-          `📍 Insert location: parent=${insertLocation["parent-uid"]}, order=${insertLocation.order}`,
-          "DEBUG"
-        );
-      } catch (placementError) {
-        log(
-          `⚠️ Placement detection failed: ${placementError.message}, defaulting to bottom`,
-          "WARN"
-        );
-        insertLocation = {
-          "parent-uid": pageUid,
-          order: "last",
-        };
-      }
-
-      // Step 5: Create the banner block (following username pattern)
-      log("Step 5: Creating banner block...", "DEBUG");
-      try {
-        await window.roamAlphaAPI.data.block.create({
-          location: insertLocation,
-          block: { string: bannerContent },
-        });
-        log("✅ Banner block created successfully", "SUCCESS");
-      } catch (createError) {
-        log(`❌ Banner creation failed: ${createError.message}`, "ERROR");
-        throw createError;
-      }
-
-      // Step 6: Wait and find the newly created banner (following username pattern)
-      log("Step 6: Finding newly created banner...", "DEBUG");
+      // Find and focus on new block
       await new Promise((resolve) => setTimeout(resolve, 300));
-
       const newBannerUid = window.roamAlphaAPI.data.q(`
         [:find ?uid .
          :where 
@@ -543,75 +437,42 @@ const journalEntryCreator = (() => {
          [?child :block/string "${bannerContent}"]]
       `);
 
-      if (!newBannerUid) {
-        log(
-          `❌ Could not find newly created banner with content: "${bannerContent}"`,
-          "ERROR"
-        );
-        throw new Error("Could not find newly created banner");
-      }
-      log(`✅ Found new banner UID: ${newBannerUid}`, "SUCCESS");
-
-      // Step 7: Create child block (following username pattern)
-      log("Step 7: Creating child block...", "DEBUG");
-      try {
+      if (newBannerUid) {
         await window.roamAlphaAPI.data.block.create({
           location: { "parent-uid": newBannerUid, order: 0 },
           block: { string: "" },
         });
-        log("✅ Child block created successfully", "SUCCESS");
-      } catch (childError) {
-        log(`❌ Child block creation failed: ${childError.message}`, "ERROR");
-        throw childError;
-      }
 
-      // Step 8: Focus on child block (following username pattern)
-      log("Step 8: Setting focus on child block...", "DEBUG");
-      await new Promise((resolve) => setTimeout(resolve, 300));
+        // Focus cursor
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        const childUid = window.roamAlphaAPI.data.q(`
+          [:find ?uid .
+           :where 
+           [?parent :block/uid "${newBannerUid}"]
+           [?parent :block/children ?child]
+           [?child :block/uid ?uid]]
+        `);
 
-      const childUid = window.roamAlphaAPI.data.q(`
-        [:find ?uid .
-         :where 
-         [?parent :block/uid "${newBannerUid}"]
-         [?parent :block/children ?child]
-         [?child :block/uid ?uid]]
-      `);
-
-      if (childUid) {
-        try {
+        if (childUid) {
           window.roamAlphaAPI.ui.setBlockFocusAndSelection({
-            location: {
-              "block-uid": childUid,
-              "window-id": "main-window",
-            },
+            location: { "block-uid": childUid, "window-id": "main-window" },
           });
-          log(`✅ Focus set on child block: ${childUid}`, "SUCCESS");
-        } catch (focusError) {
-          log(`⚠️ Focus setting failed: ${focusError.message}`, "WARN");
-          // Don't throw - banner was created successfully
         }
-      } else {
-        log("⚠️ Could not find child block for focus", "WARN");
-        // Don't throw - banner was created successfully
       }
 
-      log(
-        "🎉 Daily banner created successfully with smart placement!",
-        "SUCCESS"
-      );
+      log("Daily banner created successfully", "SUCCESS");
       return true;
     } catch (error) {
-      log(`💥 FATAL ERROR in createChatRoomEntry: ${error.message}`, "ERROR");
-      log(`💥 Error stack: ${error.stack}`, "ERROR");
+      log(`Error in createChatRoomEntry: ${error.message}`, "ERROR");
       throw error;
     }
   };
 
   // ═══════════════════════════════════════════════════════════════
-  // 🎨 UI MANAGEMENT - NUCLEAR BUTTON SYSTEM
+  // 🚨 ULTRA-NUCLEAR BUTTON SYSTEM - IMMUNITY TO INTERFERENCE
   // ═══════════════════════════════════════════════════════════════
 
-  // 🌟 Button management (Extension Six handles directory buttons)
+  // 🌟 Button management
   const updateButtons = () => {
     try {
       log("🔄 Starting button update process...", "DEBUG");
@@ -623,7 +484,6 @@ const journalEntryCreator = (() => {
       );
 
       // Clear existing buttons
-      log("🧹 Clearing existing buttons...", "DEBUG");
       hideButtons();
 
       // Show quick entry button only where needed
@@ -645,32 +505,16 @@ const journalEntryCreator = (() => {
         );
       } else {
         log(`🚫 No button needed for page type: ${pageContext.type}`, "DEBUG");
-
-        // Additional debug info
-        if (pageContext.type === "username") {
-          log(
-            "👤 Username page detected but button condition not met",
-            "DEBUG"
-          );
-        } else if (pageContext.type === "chatroom") {
-          log(
-            "🗨️ Chat room page detected but button condition not met",
-            "DEBUG"
-          );
-        }
       }
 
       log("✅ Button update process completed", "DEBUG");
-
-      // Note: Extension Six handles all directory/navigation buttons
     } catch (error) {
       log(`❌ Error updating buttons: ${error.message}`, "ERROR");
-      log(`❌ Error stack: ${error.stack}`, "ERROR");
       console.error("Button update error details:", error);
     }
   };
 
-  // 🌟 Show quick entry button (UI Engine + Manual Fallback)
+  // 🌟 Show quick entry button (UI Engine + Ultra-Nuclear Fallback)
   const showQuickEntryButton = (text, onClick) => {
     const uiEngine = getUIEngine();
 
@@ -683,74 +527,58 @@ const journalEntryCreator = (() => {
         onClick: async () => {
           try {
             await onClick();
-            hideButtons(); // Hide after successful creation
-
-            // Visual feedback
-            if (quickEntryButton) {
-              quickEntryButton.innerHTML = `<span>✅</span><span>Entry Added!</span>`;
-            }
+            hideButtons();
           } catch (error) {
             log(`Button click error: ${error.message}`, "ERROR");
-            if (quickEntryButton) {
-              quickEntryButton.innerHTML = `<span>❌</span><span>Try Again</span>`;
-            }
           }
         },
       });
       log("Quick entry button created via UI Engine", "SUCCESS");
     } else {
-      // Fallback: Manual button creation
-      log("UI Engine not available, creating manual button", "INFO");
-      createManualQuickEntryButton(text, onClick);
+      // Fallback: Ultra-Nuclear button creation
+      log("UI Engine not available, creating ultra-nuclear button", "INFO");
+      createUltraNuclearButton(text, onClick);
     }
   };
 
   // ===================================================================
-  // 🚨 NUCLEAR BUTTON SYSTEM - PERFECT POSITIONING & WIDTH MATCHING
+  // 🚨 ULTRA-NUCLEAR BUTTON CREATION - IMMUNE TO ALL INTERFERENCE
   // ===================================================================
 
-  // 🌟 Nuclear Manual button creation with perfect positioning and size matching
-  const createManualQuickEntryButton = (text, onClick) => {
+  const createUltraNuclearButton = (text, onClick) => {
     try {
-      log(
-        "🌻 NUCLEAR BUTTON: Creating with perfect positioning and width matching...",
-        "INFO"
-      );
+      log("🚨 ULTRA-NUCLEAR BUTTON: Creating immunity-grade button...", "INFO");
 
-      // Remove any existing button
-      const existing = document.getElementById("journal-quick-entry-button");
-      if (existing) {
-        existing.remove();
-        log("🗑️ Removed existing button", "DEBUG");
-      }
+      // Remove any existing buttons (including hijacked ones)
+      const existingButtons = [
+        document.getElementById("journal-quick-entry-button"),
+        document.getElementById("journal-quick-entry-button-nuclear"),
+      ];
 
-      // PERFECT POSITIONING & BEAUTIFUL WARM YELLOW STYLING + 12PX WIDER
-      const styling = {
-        top: "180px", // Perfect position below purple button
-        right: "20px", // Perfect horizontal alignment
-        // 🌻 WARM YELLOW GRADIENT - beautiful and pleasant!
-        background: "linear-gradient(135deg, #fef3c7, #fde68a)",
-        borderColor: "#f59e0b",
-        textColor: "#92400e",
-        shadow: "0 4px 12px rgba(245, 158, 11, 0.3)",
-      };
+      existingButtons.forEach((btn) => {
+        if (btn) {
+          btn.remove();
+          log("🗑️ Removed existing button", "DEBUG");
+        }
+      });
 
-      log("📍 Nuclear positioning and styling:", styling);
-
-      // Create button with PERFECT positioning, warm colors, and matching width
+      // ULTRA-NUCLEAR BUTTON - IMMUNE TO INTERFERENCE
       const button = document.createElement("div");
-      button.id = "journal-quick-entry-button";
-      button.style.cssText = `
+      button.id = "journal-quick-entry-button-nuclear"; // Nuclear ID
+
+      // ULTRA-NUCLEAR STYLING - BULLETPROOF POSITIONING
+      const nuclearCSS = `
         position: fixed !important;
-        top: ${styling.top} !important;
-        right: ${styling.right} !important;
-        background: ${styling.background} !important;
-        border: 2px solid ${styling.borderColor} !important;
+        top: 180px !important;
+        right: 20px !important;
+        left: auto !important;
+        background: linear-gradient(135deg, #fef3c7, #fde68a) !important;
+        border: 2px solid #f59e0b !important;
         border-radius: 12px !important;
-        box-shadow: ${styling.shadow} !important;
-        z-index: 9998 !important;
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3) !important;
+        z-index: 99999 !important;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-        color: ${styling.textColor} !important;
+        color: #92400e !important;
         cursor: pointer !important;
         user-select: none !important;
         transition: all 0.3s ease !important;
@@ -767,91 +595,168 @@ const journalEntryCreator = (() => {
         margin: 0 !important;
         opacity: 1 !important;
         transform: none !important;
+        pointer-events: auto !important;
       `;
+
+      // Apply nuclear CSS with multiple methods for immunity
+      button.style.cssText = nuclearCSS;
+
+      // DOUBLE INSURANCE - setProperty with important
+      button.style.setProperty("position", "fixed", "important");
+      button.style.setProperty("top", "180px", "important");
+      button.style.setProperty("right", "20px", "important");
+      button.style.setProperty("left", "auto", "important");
+      button.style.setProperty("z-index", "99999", "important");
 
       button.innerHTML = `
         <span style="font-size: 16px;">✏️</span>
         <span>${text}</span>
       `;
 
-      // Click handler with warm color feedback
+      // ULTRA-NUCLEAR CLICK HANDLER
       button.addEventListener("click", async () => {
         try {
-          log("🔥 Nuclear button clicked!", "INFO");
+          log("🚨 Ultra-nuclear button clicked!", "INFO");
 
-          // Visual feedback - keep warm colors
+          // Visual feedback
           button.innerHTML = `<span style="font-size: 16px;">⏳</span><span>Creating...</span>`;
-          button.style.background =
-            "linear-gradient(135deg, #fde68a, #fcd34d) !important";
+          button.style.setProperty(
+            "background",
+            "linear-gradient(135deg, #fde68a, #fcd34d)",
+            "important"
+          );
 
           await onClick();
 
-          // Success - green but still warm
+          // Success feedback
           button.innerHTML = `<span style="font-size: 16px;">✅</span><span>Entry Added!</span>`;
-          button.style.background =
-            "linear-gradient(135deg, #10b981, #059669) !important";
-          button.style.borderColor = "#047857 !important";
-          button.style.color = "#065f46 !important";
+          button.style.setProperty(
+            "background",
+            "linear-gradient(135deg, #10b981, #059669)",
+            "important"
+          );
+          button.style.setProperty("border-color", "#047857", "important");
+          button.style.setProperty("color", "#065f46", "important");
 
           // Hide after success
           setTimeout(() => {
             if (button && button.parentNode) {
               button.remove();
+              quickEntryButton = null;
             }
           }, 2000);
         } catch (error) {
-          log(`Nuclear button click error: ${error.message}`, "ERROR");
+          log(`Ultra-nuclear button click error: ${error.message}`, "ERROR");
 
-          // Error feedback - red but not too harsh
+          // Error feedback
           button.innerHTML = `<span style="font-size: 16px;">❌</span><span>Try Again</span>`;
-          button.style.background =
-            "linear-gradient(135deg, #f87171, #ef4444) !important";
-          button.style.borderColor = "#dc2626 !important";
-          button.style.color = "#7f1d1d !important";
+          button.style.setProperty(
+            "background",
+            "linear-gradient(135deg, #f87171, #ef4444)",
+            "important"
+          );
+          button.style.setProperty("border-color", "#dc2626", "important");
+          button.style.setProperty("color", "#7f1d1d", "important");
 
-          // Reset after error back to warm yellow
+          // Reset after error
           setTimeout(() => {
             button.innerHTML = `<span style="font-size: 16px;">✏️</span><span>${text}</span>`;
-            button.style.background = styling.background + " !important";
-            button.style.borderColor = styling.borderColor + " !important";
-            button.style.color = styling.textColor + " !important";
+            button.style.setProperty(
+              "background",
+              "linear-gradient(135deg, #fef3c7, #fde68a)",
+              "important"
+            );
+            button.style.setProperty("border-color", "#f59e0b", "important");
+            button.style.setProperty("color", "#92400e", "important");
           }, 3000);
         }
       });
 
-      // Warm hover effects
+      // ULTRA-NUCLEAR HOVER EFFECTS
       button.addEventListener("mouseenter", () => {
-        button.style.transform = "translateY(-2px) scale(1.02) !important";
-        button.style.boxShadow =
-          "0 6px 16px rgba(245, 158, 11, 0.4) !important";
-        // Slightly deeper warm yellow on hover
-        button.style.background =
-          "linear-gradient(135deg, #fde68a, #fcd34d) !important";
+        button.style.setProperty(
+          "transform",
+          "translateY(-2px) scale(1.02)",
+          "important"
+        );
+        button.style.setProperty(
+          "box-shadow",
+          "0 6px 16px rgba(245, 158, 11, 0.4)",
+          "important"
+        );
+        button.style.setProperty(
+          "background",
+          "linear-gradient(135deg, #fde68a, #fcd34d)",
+          "important"
+        );
       });
 
       button.addEventListener("mouseleave", () => {
-        button.style.transform = "none !important";
-        button.style.boxShadow = styling.shadow + " !important";
-        button.style.background = styling.background + " !important";
+        button.style.setProperty("transform", "none", "important");
+        button.style.setProperty(
+          "box-shadow",
+          "0 4px 12px rgba(245, 158, 11, 0.3)",
+          "important"
+        );
+        button.style.setProperty(
+          "background",
+          "linear-gradient(135deg, #fef3c7, #fde68a)",
+          "important"
+        );
       });
 
-      // Add to page
+      // ULTRA-NUCLEAR DEPLOYMENT
       document.body.appendChild(button);
+      quickEntryButton = button;
 
-      log("🌻 PERFECT NUCLEAR BUTTON CREATED!", "SUCCESS");
-      log("📍 Position: 180px from top, 20px from right", "DEBUG");
-      log("📏 Width: 212px (12px wider for perfect matching)", "DEBUG");
+      // IMMUNITY GUARD - prevent interference
+      setTimeout(() => {
+        // Verify position hasn't been hijacked
+        const computedTop = window.getComputedStyle(button).top;
+        const computedRight = window.getComputedStyle(button).right;
+
+        if (computedTop !== "180px" || computedRight !== "20px") {
+          log(
+            "🚨 INTERFERENCE DETECTED - Reapplying nuclear positioning",
+            "WARN"
+          );
+          button.style.setProperty("top", "180px", "important");
+          button.style.setProperty("right", "20px", "important");
+          button.style.setProperty("left", "auto", "important");
+          button.style.setProperty("position", "fixed", "important");
+        }
+      }, 100);
+
+      log("🚨 ULTRA-NUCLEAR BUTTON DEPLOYED SUCCESSFULLY!", "SUCCESS");
+      log(
+        "📍 Position: 180px from top, 20px from right (IMMUNE TO INTERFERENCE)",
+        "INFO"
+      );
+      log("📏 Width: 212px (perfect matching with purple button)", "INFO");
 
       return button;
     } catch (error) {
-      log(`💥 Nuclear button creation failed: ${error.message}`, "ERROR");
+      log(`💥 Ultra-nuclear button creation failed: ${error.message}`, "ERROR");
       throw error;
     }
   };
 
-  // 🌟 Enhanced hide function
+  // 🌟 Enhanced hide function with nuclear cleanup
   const hideButtons = () => {
-    // Hide quick entry button
+    // Hide quick entry button (both IDs)
+    const buttonIds = [
+      "journal-quick-entry-button",
+      "journal-quick-entry-button-nuclear",
+    ];
+
+    buttonIds.forEach((id) => {
+      const button = document.getElementById(id);
+      if (button) {
+        button.remove();
+        log(`🗑️ Removed button: ${id}`, "DEBUG");
+      }
+    });
+
     if (quickEntryButton) {
       if (quickEntryButton.remove) {
         quickEntryButton.remove();
@@ -869,19 +774,6 @@ const journalEntryCreator = (() => {
         standingButton.parentNode.removeChild(standingButton);
       }
       standingButton = null;
-    }
-
-    // Additional cleanup - remove any leftover buttons by ID
-    const leftoverQuickEntry = document.getElementById(
-      "journal-quick-entry-button"
-    );
-    if (leftoverQuickEntry) {
-      leftoverQuickEntry.remove();
-    }
-
-    const leftoverStanding = document.getElementById("journal-standing-button");
-    if (leftoverStanding) {
-      leftoverStanding.remove();
     }
   };
 
@@ -903,7 +795,7 @@ const journalEntryCreator = (() => {
       window.journalEntryCreatorActive = true;
 
       log(
-        "Journal Entry Creator v1.0 + Perfect Nuclear Button loading...",
+        "Journal Entry Creator v1.0 + Ultra-Nuclear Button loading...",
         "SUCCESS"
       );
       extensionAPI = api;
@@ -938,10 +830,10 @@ const journalEntryCreator = (() => {
           "journal-entry-creator",
           journalAPI,
           {
-            version: "1.0.0-perfect-nuclear-button",
+            version: "1.0.0-ultra-nuclear",
             dependencies: ["core-data", "ui-engine", "extension-1.5"],
             description:
-              "Lean journal entry creation with smart context detection + Perfect Nuclear Button",
+              "Lean journal entry creation + Ultra-Nuclear Button (Immune to Interference)",
           }
         );
       }
@@ -958,7 +850,7 @@ const journalEntryCreator = (() => {
       }, 1000);
 
       log(
-        "Journal Entry Creator loaded successfully with Perfect Nuclear Button!",
+        "Journal Entry Creator loaded successfully with Ultra-Nuclear Button!",
         "SUCCESS"
       );
     } catch (error) {
@@ -1000,10 +892,7 @@ const journalEntryCreator = (() => {
       }
     });
 
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
+    observer.observe(document.body, { childList: true, subtree: true });
   };
 
   const onunload = () => {
