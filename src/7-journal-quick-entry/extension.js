@@ -1,6 +1,7 @@
 // 🌳 Extension 7: Journal Entry Creator - Ultra-Nuclear with Position Enforcement
 // 🚨 Includes Position Enforcement System to fight interference
 // ✨ Auto-corrects position multiple times to ensure perfect placement
+// 🎯 NEW: Smart banner placement above topmost existing date banner
 
 const journalEntryCreator = (() => {
   // 🌟 State Management (Simplified)
@@ -320,6 +321,95 @@ const journalEntryCreator = (() => {
   };
 
   // ═══════════════════════════════════════════════════════════════
+  // 🎯 NEW: SMART BANNER PLACEMENT LOGIC
+  // ═══════════════════════════════════════════════════════════════
+
+  // 🌟 Find topmost existing date banner for smart placement
+  const findTopmostDateBannerPosition = (pageUid) => {
+    try {
+      log(
+        `🔍 Finding topmost date banner position for page: ${pageUid}`,
+        "DEBUG"
+      );
+
+      // Get all direct children with their order
+      const pageChildren = window.roamAlphaAPI.data.q(`
+        [:find ?uid ?string ?order
+         :where 
+         [?page :block/uid "${pageUid}"]
+         [?page :block/children ?child]
+         [?child :block/uid ?uid]
+         [?child :block/string ?string]
+         [?child :block/order ?order]]
+      `);
+
+      log(
+        `📋 Found ${pageChildren.length} direct children to analyze`,
+        "DEBUG"
+      );
+
+      // Filter for existing date banners
+      const dateBanners = [];
+      const datePattern = /\[\[.+\]\]/; // Matches [[date]] pattern
+
+      pageChildren.forEach(([uid, blockString, order]) => {
+        const lowerString = blockString.toLowerCase();
+        const hasStTag = lowerString.includes("#st0");
+        const hasDateLink = datePattern.test(blockString);
+
+        if (hasStTag && hasDateLink) {
+          dateBanners.push({
+            uid,
+            order,
+            text: blockString,
+          });
+          log(
+            `📌 Found date banner: order=${order}, text="${blockString}"`,
+            "DEBUG"
+          );
+        }
+      });
+
+      if (dateBanners.length === 0) {
+        log(`📍 No existing date banners found, placing at top`, "INFO");
+        return {
+          strategy: "first",
+          order: 0,
+        };
+      }
+
+      // Find the topmost (lowest order number) date banner
+      const sortedBanners = dateBanners.sort((a, b) => a.order - b.order);
+      const topmostBanner = sortedBanners[0];
+
+      log(
+        `🎯 Topmost banner found: order=${topmostBanner.order}, uid=${topmostBanner.uid}`,
+        "SUCCESS"
+      );
+      log(
+        `📍 New banner will be placed at order=${topmostBanner.order}`,
+        "INFO"
+      );
+
+      return {
+        strategy: "before",
+        order: topmostBanner.order,
+        targetUid: topmostBanner.uid,
+      };
+    } catch (error) {
+      log(
+        `❌ Error finding topmost banner position: ${error.message}`,
+        "ERROR"
+      );
+      // Fallback to bottom placement
+      return {
+        strategy: "last",
+        order: "last",
+      };
+    }
+  };
+
+  // ═══════════════════════════════════════════════════════════════
   // 🏗️ ENTRY CREATION - Using Extension 1.5 Utilities
   // ═══════════════════════════════════════════════════════════════
 
@@ -396,11 +486,11 @@ const journalEntryCreator = (() => {
     }
   };
 
-  // 🌟 Create daily banner in chat room
+  // 🌟 Create daily banner in chat room with SMART PLACEMENT
   const createChatRoomEntry = async (pageName) => {
     try {
       log(
-        `🚀 STARTING chat room banner creation for page: "${pageName}"`,
+        `🚀 STARTING smart chat room banner creation for page: "${pageName}"`,
         "INFO"
       );
 
@@ -416,16 +506,28 @@ const journalEntryCreator = (() => {
         throw new Error(`Could not find Chat Room page UID for "${pageName}"`);
       }
 
+      // 🎯 NEW: Smart placement logic
+      const placement = findTopmostDateBannerPosition(pageUid);
+      log(
+        `📍 Placement strategy: ${placement.strategy}, order: ${placement.order}`,
+        "INFO"
+      );
+
       // Build banner content
       const todaysDate = getTodaysRoamDate();
       const dayName = getTodaysDayName();
       const bannerContent = `#st0 #clr-wht-act [[${todaysDate}]]  -  ${dayName}`;
 
-      // Create the banner block
+      // 🎯 Create the banner block with smart placement
       await window.roamAlphaAPI.data.block.create({
-        location: { "parent-uid": pageUid, order: "last" },
+        location: {
+          "parent-uid": pageUid,
+          order: placement.order, // This will push existing banners down when placing "before"
+        },
         block: { string: bannerContent },
       });
+
+      log(`✅ Banner created with order: ${placement.order}`, "SUCCESS");
 
       // Find and focus on new block
       await new Promise((resolve) => setTimeout(resolve, 300));
@@ -461,7 +563,7 @@ const journalEntryCreator = (() => {
         }
       }
 
-      log("Daily banner created successfully", "SUCCESS");
+      log("Daily banner created successfully with smart placement", "SUCCESS");
       return true;
     } catch (error) {
       log(`Error in createChatRoomEntry: ${error.message}`, "ERROR");
@@ -894,7 +996,7 @@ const journalEntryCreator = (() => {
       window.journalEntryCreatorActive = true;
 
       log(
-        "Journal Entry Creator v1.0 + Ultra-Nuclear with Position Enforcement loading...",
+        "Journal Entry Creator v1.1 - Ultra-Nuclear with Smart Banner Placement loading...",
         "SUCCESS"
       );
       extensionAPI = api;
@@ -922,6 +1024,7 @@ const journalEntryCreator = (() => {
         updateButtons,
         getTodaysRoamDate,
         getTodaysDayName,
+        findTopmostDateBannerPosition, // NEW: Expose smart placement function
       };
 
       if (window.RoamExtensionSuite) {
@@ -929,10 +1032,10 @@ const journalEntryCreator = (() => {
           "journal-entry-creator",
           journalAPI,
           {
-            version: "1.0.0-ultra-nuclear-enforcement",
+            version: "1.1.0-smart-placement",
             dependencies: ["core-data", "ui-engine", "extension-1.5"],
             description:
-              "Lean journal entry creation + Ultra-Nuclear Button with Position Enforcement",
+              "Lean journal entry creation + Smart Banner Placement + Ultra-Nuclear Button with Position Enforcement",
           }
         );
       }
@@ -949,7 +1052,7 @@ const journalEntryCreator = (() => {
       }, 1000);
 
       log(
-        "Journal Entry Creator loaded successfully with Position Enforcement!",
+        "Journal Entry Creator loaded successfully with Smart Banner Placement!",
         "SUCCESS"
       );
     } catch (error) {
