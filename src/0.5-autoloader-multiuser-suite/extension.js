@@ -681,6 +681,19 @@ export default {
     window.showMultiUserInstaller = showInstallerButton;
 
     console.log("✅ Multi-User Suite Installer Ready!");
+
+    // 🚀 AUTO-START: Automatically open modal and begin installation
+    console.log("🎬 Auto-starting Multi-User Suite installation...");
+
+    // Small delay to ensure everything is ready
+    setTimeout(() => {
+      createInstallerModal();
+      // Auto-start the installation process
+      setTimeout(() => {
+        autoInstallAll();
+      }, 1000); // 1 second delay to show the modal first
+    }, 500);
+
     console.log(
       "💡 Tip: If you dismissed the button, use Cmd+P and search for 'Show Multi-User Suite Installer'"
     );
