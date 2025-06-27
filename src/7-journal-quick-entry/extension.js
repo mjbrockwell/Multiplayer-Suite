@@ -1,12 +1,13 @@
-// 🌳 Extension 7: Journal Entry Creator - Ultra-Nuclear Version (Final Solution)
-// 🚨 Bulletproof positioning that cannot be hijacked by other extensions
-// ✨ Ultra-Nuclear approach - immune to interference, perfect alignment
+// 🌳 Extension 7: Journal Entry Creator - Ultra-Nuclear with Position Enforcement
+// 🚨 Includes Position Enforcement System to fight interference
+// ✨ Auto-corrects position multiple times to ensure perfect placement
 
 const journalEntryCreator = (() => {
   // 🌟 State Management (Simplified)
   let extensionAPI = null;
   let quickEntryButton = null;
   let isInitialized = false;
+  let positionEnforcer = null; // NEW: Position enforcement interval
 
   // Safety variable (Extension Six handles directory buttons)
   let standingButton = null;
@@ -469,7 +470,97 @@ const journalEntryCreator = (() => {
   };
 
   // ═══════════════════════════════════════════════════════════════
-  // 🚨 ULTRA-NUCLEAR BUTTON SYSTEM - IMMUNITY TO INTERFERENCE
+  // 🚨 POSITION ENFORCEMENT SYSTEM - FIGHTS INTERFERENCE
+  // ═══════════════════════════════════════════════════════════════
+
+  // 🌟 Position Enforcement System - Your console magic built-in!
+  const enforceButtonPosition = (
+    button,
+    targetTop = "138px",
+    targetRight = "20px"
+  ) => {
+    if (!button) return;
+
+    try {
+      const computedTop = window.getComputedStyle(button).top;
+      const computedRight = window.getComputedStyle(button).right;
+
+      if (computedTop !== targetTop || computedRight !== targetRight) {
+        log(
+          `🚨 INTERFERENCE DETECTED! Position is ${computedTop},${computedRight} but should be ${targetTop},${targetRight}`,
+          "WARN"
+        );
+
+        // Apply the console magic directly!
+        button.style.setProperty("top", targetTop, "important");
+        button.style.setProperty("right", targetRight, "important");
+        button.style.setProperty("left", "auto", "important");
+        button.style.setProperty("position", "fixed", "important");
+
+        log(`✅ Position corrected to ${targetTop},${targetRight}`, "SUCCESS");
+        return true; // Position was corrected
+      }
+
+      return false; // No correction needed
+    } catch (error) {
+      log(`❌ Error in position enforcement: ${error.message}`, "ERROR");
+      return false;
+    }
+  };
+
+  // 🌟 Start continuous position monitoring
+  const startPositionEnforcement = (button) => {
+    // Clear any existing enforcer
+    if (positionEnforcer) {
+      clearInterval(positionEnforcer);
+    }
+
+    log("🛡️ Starting position enforcement system...", "INFO");
+
+    // Check position every 500ms for 10 seconds, then every 2 seconds
+    let checkCount = 0;
+
+    positionEnforcer = setInterval(() => {
+      checkCount++;
+
+      if (!button || !button.parentNode) {
+        clearInterval(positionEnforcer);
+        positionEnforcer = null;
+        log("🛡️ Position enforcement stopped - button removed", "DEBUG");
+        return;
+      }
+
+      const wasCorrected = enforceButtonPosition(button, "138px", "20px");
+
+      if (wasCorrected) {
+        log(
+          `🛡️ Position enforcement #${checkCount} - interference blocked!`,
+          "INFO"
+        );
+      }
+
+      // After 20 checks (10 seconds), reduce frequency
+      if (checkCount >= 20) {
+        clearInterval(positionEnforcer);
+
+        // Start less frequent monitoring
+        positionEnforcer = setInterval(() => {
+          if (!button || !button.parentNode) {
+            clearInterval(positionEnforcer);
+            positionEnforcer = null;
+            return;
+          }
+
+          enforceButtonPosition(button, "138px", "20px");
+        }, 2000); // Every 2 seconds
+
+        log("🛡️ Position enforcement switched to maintenance mode", "DEBUG");
+      }
+    }, 500); // Every 500ms initially
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  // 🚨 ULTRA-NUCLEAR BUTTON SYSTEM - NOW WITH ENFORCEMENT
   // ═══════════════════════════════════════════════════════════════
 
   // 🌟 Button management
@@ -536,18 +627,24 @@ const journalEntryCreator = (() => {
       log("Quick entry button created via UI Engine", "SUCCESS");
     } else {
       // Fallback: Ultra-Nuclear button creation
-      log("UI Engine not available, creating ultra-nuclear button", "INFO");
+      log(
+        "UI Engine not available, creating ultra-nuclear button with enforcement",
+        "INFO"
+      );
       createUltraNuclearButton(text, onClick);
     }
   };
 
   // ===================================================================
-  // 🚨 ULTRA-NUCLEAR BUTTON CREATION - IMMUNE TO ALL INTERFERENCE
+  // 🚨 ULTRA-NUCLEAR BUTTON CREATION - WITH POSITION ENFORCEMENT
   // ===================================================================
 
   const createUltraNuclearButton = (text, onClick) => {
     try {
-      log("🚨 ULTRA-NUCLEAR BUTTON: Creating immunity-grade button...", "INFO");
+      log(
+        "🚨 ULTRA-NUCLEAR BUTTON: Creating with position enforcement...",
+        "INFO"
+      );
 
       // Remove any existing buttons (including hijacked ones)
       const existingButtons = [
@@ -566,10 +663,10 @@ const journalEntryCreator = (() => {
       const button = document.createElement("div");
       button.id = "journal-quick-entry-button-nuclear"; // Nuclear ID
 
-      // ULTRA-NUCLEAR STYLING - BULLETPROOF POSITIONING
+      // ULTRA-NUCLEAR STYLING - BULLETPROOF POSITIONING AT 138PX
       const nuclearCSS = `
         position: fixed !important;
-        top: 140px !important;
+        top: 138px !important;
         right: 20px !important;
         left: auto !important;
         background: linear-gradient(135deg, #fef3c7, #fde68a) !important;
@@ -601,9 +698,9 @@ const journalEntryCreator = (() => {
       // Apply nuclear CSS with multiple methods for immunity
       button.style.cssText = nuclearCSS;
 
-      // DOUBLE INSURANCE - setProperty with important
+      // TRIPLE INSURANCE - setProperty with important
       button.style.setProperty("position", "fixed", "important");
-      button.style.setProperty("top", "140px", "important");
+      button.style.setProperty("top", "138px", "important");
       button.style.setProperty("right", "20px", "important");
       button.style.setProperty("left", "auto", "important");
       button.style.setProperty("z-index", "99999", "important");
@@ -643,6 +740,11 @@ const journalEntryCreator = (() => {
             if (button && button.parentNode) {
               button.remove();
               quickEntryButton = null;
+              // Stop position enforcement when button is removed
+              if (positionEnforcer) {
+                clearInterval(positionEnforcer);
+                positionEnforcer = null;
+              }
             }
           }, 2000);
         } catch (error) {
@@ -709,30 +811,20 @@ const journalEntryCreator = (() => {
       document.body.appendChild(button);
       quickEntryButton = button;
 
-      // IMMUNITY GUARD - prevent interference
-      setTimeout(() => {
-        // Verify position hasn't been hijacked
-        const computedTop = window.getComputedStyle(button).top;
-        const computedRight = window.getComputedStyle(button).right;
+      // 🛡️ START POSITION ENFORCEMENT SYSTEM!
+      startPositionEnforcement(button);
 
-        if (computedTop !== "156px" || computedRight !== "20px") {
-          log(
-            "🚨 INTERFERENCE DETECTED - Reapplying nuclear positioning",
-            "WARN"
-          );
-          button.style.setProperty("top", "140px", "important");
-          button.style.setProperty("right", "20px", "important");
-          button.style.setProperty("left", "auto", "important");
-          button.style.setProperty("position", "fixed", "important");
-        }
-      }, 100);
+      // Immediate enforcement after creation
+      setTimeout(() => enforceButtonPosition(button, "138px", "20px"), 50);
+      setTimeout(() => enforceButtonPosition(button, "138px", "20px"), 200);
+      setTimeout(() => enforceButtonPosition(button, "138px", "20px"), 500);
 
-      log("🚨 ULTRA-NUCLEAR BUTTON DEPLOYED SUCCESSFULLY!", "SUCCESS");
       log(
-        "📍 Position: 140px from top, 20px from right (IMMUNE TO INTERFERENCE)",
-        "INFO"
+        "🚨 ULTRA-NUCLEAR BUTTON DEPLOYED WITH POSITION ENFORCEMENT!",
+        "SUCCESS"
       );
-      log("📏 Width: 212px (perfect matching with purple button)", "INFO");
+      log("📍 Target Position: 138px from top, 20px from right", "INFO");
+      log("🛡️ Position enforcement system activated", "INFO");
 
       return button;
     } catch (error) {
@@ -741,8 +833,15 @@ const journalEntryCreator = (() => {
     }
   };
 
-  // 🌟 Enhanced hide function with nuclear cleanup
+  // 🌟 Enhanced hide function with enforcement cleanup
   const hideButtons = () => {
+    // Stop position enforcement
+    if (positionEnforcer) {
+      clearInterval(positionEnforcer);
+      positionEnforcer = null;
+      log("🛡️ Position enforcement stopped", "DEBUG");
+    }
+
     // Hide quick entry button (both IDs)
     const buttonIds = [
       "journal-quick-entry-button",
@@ -795,7 +894,7 @@ const journalEntryCreator = (() => {
       window.journalEntryCreatorActive = true;
 
       log(
-        "Journal Entry Creator v1.0 + Ultra-Nuclear Button loading...",
+        "Journal Entry Creator v1.0 + Ultra-Nuclear with Position Enforcement loading...",
         "SUCCESS"
       );
       extensionAPI = api;
@@ -830,10 +929,10 @@ const journalEntryCreator = (() => {
           "journal-entry-creator",
           journalAPI,
           {
-            version: "1.0.0-ultra-nuclear",
+            version: "1.0.0-ultra-nuclear-enforcement",
             dependencies: ["core-data", "ui-engine", "extension-1.5"],
             description:
-              "Lean journal entry creation + Ultra-Nuclear Button (Immune to Interference)",
+              "Lean journal entry creation + Ultra-Nuclear Button with Position Enforcement",
           }
         );
       }
@@ -850,7 +949,7 @@ const journalEntryCreator = (() => {
       }, 1000);
 
       log(
-        "Journal Entry Creator loaded successfully with Ultra-Nuclear Button!",
+        "Journal Entry Creator loaded successfully with Position Enforcement!",
         "SUCCESS"
       );
     } catch (error) {
@@ -902,6 +1001,12 @@ const journalEntryCreator = (() => {
       hideButtons();
       isInitialized = false;
       extensionAPI = null;
+
+      // Clean up position enforcer
+      if (positionEnforcer) {
+        clearInterval(positionEnforcer);
+        positionEnforcer = null;
+      }
 
       // Clean up instance protection
       if (window.journalEntryCreatorActive) {
