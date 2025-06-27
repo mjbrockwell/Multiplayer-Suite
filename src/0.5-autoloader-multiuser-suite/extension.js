@@ -388,6 +388,126 @@ async function autoInstallAll() {
   }
 }
 
+// Create simple loading modal for auto-installation
+function createSimpleLoadingModal() {
+  const modalHTML = `
+    <div id="multiuser-simple-loading-modal" style="
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    ">
+      <div style="
+        background: white;
+        border-radius: 8px;
+        padding: 32px 40px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        text-align: center;
+        min-width: 300px;
+      ">
+        <div style="
+          font-size: 18px;
+          font-weight: 600;
+          color: #212529;
+          margin-bottom: 16px;
+        ">Multi User Suite Loading</div>
+        <div id="simple-progress-counter" style="
+          font-size: 24px;
+          font-weight: 700;
+          color: #20c997;
+          font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        ">0/${MULTIUSER_EXTENSIONS.length}</div>
+      </div>
+    </div>
+  `;
+
+  document.body.insertAdjacentHTML("beforeend", modalHTML);
+  return document.getElementById("multiuser-simple-loading-modal");
+}
+
+// Update simple progress counter
+function updateSimpleProgress(current, total) {
+  const counter = document.getElementById("simple-progress-counter");
+  if (counter) {
+    counter.textContent = `${current}/${total}`;
+  }
+}
+
+// Close simple loading modal
+function closeSimpleLoadingModal() {
+  const modal = document.getElementById("multiuser-simple-loading-modal");
+  if (modal) {
+    modal.remove();
+  }
+}
+
+// Auto-install with simple UI
+async function autoInstallAllSimple() {
+  const modal = createSimpleLoadingModal();
+
+  logMessage(
+    "🚀 Starting auto-installation of all Multi-User Suite extensions..."
+  );
+
+  let successCount = 0;
+  let failureCount = 0;
+  const totalCount = MULTIUSER_EXTENSIONS.length;
+
+  for (let i = 0; i < MULTIUSER_EXTENSIONS.length; i++) {
+    const extension = MULTIUSER_EXTENSIONS[i];
+    updateSimpleProgress(i, totalCount);
+
+    try {
+      await installExtension(extension.id);
+      successCount++;
+    } catch (error) {
+      failureCount++;
+      logMessage(`⚠️ Continuing despite ${extension.name} failure...`);
+    }
+
+    // Small delay to show progress
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+
+  // Show final count
+  updateSimpleProgress(successCount, totalCount);
+
+  // Keep modal open for a moment to show completion
+  setTimeout(() => {
+    closeSimpleLoadingModal();
+
+    // Show brief success message
+    if (successCount === totalCount) {
+      console.log(
+        `🎉 Multi User Suite loaded successfully! (${successCount}/${totalCount})`
+      );
+    } else {
+      console.log(
+        `⚠️ Multi User Suite loaded with issues: ${successCount}/${totalCount} successful`
+      );
+    }
+  }, 1500);
+
+  // Final report to log
+  if (successCount === totalCount) {
+    logMessage(
+      `🎉 Auto-installation complete! All ${successCount} extensions loaded.`,
+      "success"
+    );
+  } else {
+    logMessage(
+      `⚠️ Auto-installation finished: ${successCount}/${totalCount} successful, ${failureCount} failed.`
+    );
+  }
+}
+
 // Create installer modal UI
 function createInstallerModal() {
   const modalHTML = `
@@ -682,16 +802,12 @@ export default {
 
     console.log("✅ Multi-User Suite Installer Ready!");
 
-    // 🚀 AUTO-START: Automatically open modal and begin installation
+    // 🚀 AUTO-START: Automatically begin installation with simple UI
     console.log("🎬 Auto-starting Multi-User Suite installation...");
 
     // Small delay to ensure everything is ready
     setTimeout(() => {
-      createInstallerModal();
-      // Auto-start the installation process
-      setTimeout(() => {
-        autoInstallAll();
-      }, 1000); // 1 second delay to show the modal first
+      autoInstallAllSimple(); // Use the simple, minimal UI
     }, 500);
 
     console.log(

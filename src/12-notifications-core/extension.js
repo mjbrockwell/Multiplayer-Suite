@@ -159,7 +159,7 @@ const mentionNotifications = (() => {
         border: 1px solid #ddd;
         border-radius: 8px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-        z-index: 10000;
+        z-index: 999999;
         overflow: hidden;
         font-family: system-ui;
       }
@@ -522,7 +522,7 @@ const mentionNotifications = (() => {
           font-size: 16px;
           cursor: pointer;
           box-shadow: 0 4px 12px rgba(255, 107, 53, 0.4);
-          z-index: 9999;
+          z-index: 999999;
           transition: all 0.3s ease;
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
           user-select: none;
@@ -643,7 +643,7 @@ const mentionNotifications = (() => {
         background: white;
         border-radius: 12px;
         box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-        z-index: 9998;
+        z-index: 999999;
         display: none;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         overflow: hidden;
