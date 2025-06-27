@@ -1,7 +1,6 @@
-// 🌳 Extension 7: Journal Entry Creator - Lean & Robust v1.0 + COORDINATED BUTTONS
-// 🎯 Target: ~150-200 lines vs original 800+ lines
-// 🚀 Leverages Extension Suite Infrastructure for Maximum Efficiency
-// ✨ NEW: Professional Button Coordination System
+// 🌳 Extension 7: Journal Entry Creator - Final Version with Perfect Nuclear Button
+// 🎯 Fixed positioning, warm yellow colors, perfect width matching
+// ✨ Nuclear approach - simple, reliable, beautiful
 
 const journalEntryCreator = (() => {
   // 🌟 State Management (Simplified)
@@ -83,9 +82,23 @@ const journalEntryCreator = (() => {
       }
 
       // Check for username page
+      log(
+        `Comparing user "${currentUser.displayName}" with page "${pageTitle}"`,
+        "DEBUG"
+      );
       if (currentUser.displayName && pageTitle === currentUser.displayName) {
         log(`👤 Detected USERNAME page: "${pageTitle}"`, "SUCCESS");
         return { type: "username", page: pageTitle };
+      } else if (currentUser.displayName) {
+        log(
+          `👤 Not a username page: user="${currentUser.displayName}" != page="${pageTitle}"`,
+          "DEBUG"
+        );
+      } else {
+        log(
+          `👤 No current user detected, cannot determine if username page`,
+          "WARN"
+        );
       }
 
       log(`📝 Detected OTHER page type: "${pageTitle}"`, "INFO");
@@ -97,78 +110,24 @@ const journalEntryCreator = (() => {
     }
   };
 
-  // 🌟 Fallback current user detection (Enhanced)
+  // 🌟 Simple current user detection (Keep It Simple!)
   const getCurrentUserFallback = () => {
-    // Try official Roam API first
     try {
-      const userUid = window.roamAlphaAPI.graph?.getUser?.()?.uid;
+      const userUid = window.roamAlphaAPI.user.uid();
       if (userUid) {
         const userData = window.roamAlphaAPI.pull("[*]", [
           ":user/uid",
           userUid,
         ]);
         const displayName =
-          userData?.displayName ||
-          userData?.email ||
-          userData?.[":user/display-name"];
-        if (displayName) return displayName;
-      }
-    } catch (error) {
-      // Silent fallback
-    }
-
-    // Try newer Roam API method
-    try {
-      const userUid = window.roamAlphaAPI.user?.uid?.();
-      if (userUid) {
-        const userData = window.roamAlphaAPI.pull("[*]", [
-          ":user/uid",
-          userUid,
-        ]);
-        const displayName =
-          userData?.displayName ||
-          userData?.email ||
-          userData?.[":user/display-name"];
-        if (displayName) return displayName;
-      }
-    } catch (error) {
-      // Silent fallback
-    }
-
-    // Fallback to DOM detection (multiple selectors)
-    try {
-      const selectors = [
-        'button[data-testid="user-menu"]',
-        ".rm-user-name",
-        ".rm-profile-dropdown-content",
-        '[data-testid="user-profile"]',
-      ];
-
-      for (const selector of selectors) {
-        const element = document.querySelector(selector);
-        const text = element?.textContent?.trim();
-        if (text && text !== "User" && text.length > 0) {
-          return text;
+          userData?.[":user/display-name"] || userData?.displayName;
+        if (displayName) {
+          log(`User detected: ${displayName}`, "SUCCESS");
+          return displayName;
         }
       }
     } catch (error) {
-      // Silent fallback
-    }
-
-    // Last resort: try localStorage (David's method)
-    try {
-      const globalAppState = JSON.parse(
-        localStorage.getItem("globalAppState") || '["","",[]]'
-      );
-      const userIndex = globalAppState.findIndex((s) => s === "~:user");
-      if (userIndex > 0 && globalAppState[userIndex + 1]) {
-        const userData = globalAppState[userIndex + 1];
-        if (Array.isArray(userData) && userData.length > 0) {
-          return userData[0]; // Usually the display name
-        }
-      }
-    } catch (error) {
-      // Silent fallback
+      log(`User detection failed: ${error.message}`, "ERROR");
     }
 
     return "Current User";
@@ -649,7 +608,7 @@ const journalEntryCreator = (() => {
   };
 
   // ═══════════════════════════════════════════════════════════════
-  // 🎨 UI MANAGEMENT - COORDINATED BUTTON SYSTEM
+  // 🎨 UI MANAGEMENT - NUCLEAR BUTTON SYSTEM
   // ═══════════════════════════════════════════════════════════════
 
   // 🌟 Button management (Extension Six handles directory buttons)
@@ -747,374 +706,150 @@ const journalEntryCreator = (() => {
   };
 
   // ===================================================================
-  // 🎨 COORDINATED BUTTON SYSTEM - THE MICHELANGELO MASTERPIECE!
+  // 🚨 NUCLEAR BUTTON SYSTEM - PERFECT POSITIONING & WIDTH MATCHING
   // ===================================================================
 
-  // 🌟 Enhanced Manual button creation with COORDINATION
+  // 🌟 Nuclear Manual button creation with perfect positioning and size matching
   const createManualQuickEntryButton = (text, onClick) => {
     try {
-      if (quickEntryButton) {
-        quickEntryButton.remove();
-        quickEntryButton = null;
-      }
-
-      // ===================================================================
-      // 🎨 COORDINATION SYSTEM - Check for Profile Nudges button
-      // ===================================================================
-
-      const getJournalButtonCoordination = () => {
-        // Check if Profile Nudges button exists
-        const profileButton = document.querySelector("#profile-nudge-button");
-        const hasProfileButton = !!profileButton;
-
-        // Calculate coordinated positioning and styling
-        if (hasProfileButton) {
-          return {
-            // Position as primary button (Profile button will stack below)
-            top: "60px",
-            right: "20px",
-            // Refined golden gradient that complements purple
-            background: "linear-gradient(135deg, #fbbf24, #f59e0b)",
-            borderColor: "#d97706",
-            textColor: "#92400e",
-            // Enhanced shadow to match profile button quality
-            shadow: "0 4px 12px rgba(251, 191, 36, 0.3)",
-            coordination: "primary",
-          };
-        } else {
-          return {
-            // Solo positioning when no profile button
-            top: "60px",
-            right: "20px",
-            background: "linear-gradient(135deg, #fef3c7, #fde68a)",
-            borderColor: "#f59e0b",
-            textColor: "#92400e",
-            shadow: "0 4px 12px rgba(245, 158, 11, 0.3)",
-            coordination: "solo",
-          };
-        }
-      };
-
-      // Calculate position within main content area (not over sidebar)
-      let calculatedRight = "20px";
-
-      try {
-        // Find main content container for responsive positioning
-        const mainContent =
-          document.querySelector(".roam-main") ||
-          document.querySelector(".roam-article") ||
-          document.querySelector(".roam-body") ||
-          document.querySelector("#main-content") ||
-          document.querySelector(".roam-center");
-
-        if (mainContent) {
-          const rect = mainContent.getBoundingClientRect();
-          const viewportWidth = window.innerWidth;
-
-          // Position button within main content, not over sidebar
-          const buttonWidth = 200; // Approximate button width
-          const margin = 20;
-
-          // Calculate right position relative to main content right edge
-          const maxRight = Math.min(
-            rect.right - buttonWidth - margin,
-            viewportWidth - buttonWidth - margin
-          );
-          calculatedRight = `${viewportWidth - maxRight}px`;
-
-          log(
-            `📍 Calculated button position: right=${calculatedRight}, within main content bounds`,
-            "DEBUG"
-          );
-        }
-      } catch (positionError) {
-        log(
-          `⚠️ Position calculation failed: ${positionError.message}, using fallback`,
-          "WARN"
-        );
-      }
-
-      // Get coordination settings
-      const coordination = getJournalButtonCoordination();
-
-      // Use calculated positioning but override with coordination settings
-      const finalRight = calculatedRight;
-      const finalTop = coordination.top;
-
-      quickEntryButton = document.createElement("div");
-      quickEntryButton.id = "journal-quick-entry-button";
-      quickEntryButton.style.cssText = `
-        position: fixed;
-        top: ${finalTop};
-        right: ${finalRight};
-        background: ${coordination.background};
-        border: 2px solid ${coordination.borderColor};
-        border-radius: 12px;
-        box-shadow: ${coordination.shadow};
-        z-index: 9998;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        color: ${coordination.textColor};
-        cursor: pointer;
-        user-select: none;
-        transition: all 0.3s ease;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 12px 20px;
-        font-weight: 600;
-        font-size: 14px;
-        opacity: 0;
-        transform: translateX(20px);
-        min-width: 200px;
-        justify-content: center;
-        white-space: nowrap;
-      `;
-
-      // Add coordination indicator
-      quickEntryButton.setAttribute(
-        "data-coordination",
-        coordination.coordination
+      log(
+        "🌻 NUCLEAR BUTTON: Creating with perfect positioning and width matching...",
+        "INFO"
       );
 
-      if (coordination.coordination === "primary") {
-        log(
-          "Journal button positioned in PRIMARY mode (profile button will coordinate)",
-          "INFO"
-        );
-      } else {
-        log("Journal button positioned in SOLO mode", "INFO");
+      // Remove any existing button
+      const existing = document.getElementById("journal-quick-entry-button");
+      if (existing) {
+        existing.remove();
+        log("🗑️ Removed existing button", "DEBUG");
       }
 
-      quickEntryButton.innerHTML = `
+      // PERFECT POSITIONING & BEAUTIFUL WARM YELLOW STYLING + 12PX WIDER
+      const styling = {
+        top: "180px", // Perfect position below purple button
+        right: "20px", // Perfect horizontal alignment
+        // 🌻 WARM YELLOW GRADIENT - beautiful and pleasant!
+        background: "linear-gradient(135deg, #fef3c7, #fde68a)",
+        borderColor: "#f59e0b",
+        textColor: "#92400e",
+        shadow: "0 4px 12px rgba(245, 158, 11, 0.3)",
+      };
+
+      log("📍 Nuclear positioning and styling:", styling);
+
+      // Create button with PERFECT positioning, warm colors, and matching width
+      const button = document.createElement("div");
+      button.id = "journal-quick-entry-button";
+      button.style.cssText = `
+        position: fixed !important;
+        top: ${styling.top} !important;
+        right: ${styling.right} !important;
+        background: ${styling.background} !important;
+        border: 2px solid ${styling.borderColor} !important;
+        border-radius: 12px !important;
+        box-shadow: ${styling.shadow} !important;
+        z-index: 9998 !important;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+        color: ${styling.textColor} !important;
+        cursor: pointer !important;
+        user-select: none !important;
+        transition: all 0.3s ease !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        padding: 12px 26px !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+        min-width: 212px !important;
+        justify-content: center !important;
+        white-space: nowrap !important;
+        box-sizing: border-box !important;
+        margin: 0 !important;
+        opacity: 1 !important;
+        transform: none !important;
+      `;
+
+      button.innerHTML = `
         <span style="font-size: 16px;">✏️</span>
         <span>${text}</span>
       `;
 
-      // Click handler
-      quickEntryButton.addEventListener("click", async () => {
+      // Click handler with warm color feedback
+      button.addEventListener("click", async () => {
         try {
-          // Visual feedback BEFORE hiding
-          quickEntryButton.innerHTML = `<span style="font-size: 16px;">⏳</span><span>Creating...</span>`;
-          quickEntryButton.style.background = coordination.background;
+          log("🔥 Nuclear button clicked!", "INFO");
+
+          // Visual feedback - keep warm colors
+          button.innerHTML = `<span style="font-size: 16px;">⏳</span><span>Creating...</span>`;
+          button.style.background =
+            "linear-gradient(135deg, #fde68a, #fcd34d) !important";
 
           await onClick();
 
-          // Success feedback - Enhanced for coordination
-          if (quickEntryButton) {
-            quickEntryButton.innerHTML = `<span style="font-size: 16px;">✅</span><span>Entry Added!</span>`;
-            quickEntryButton.style.background =
-              "linear-gradient(135deg, #10b981, #059669)";
-            quickEntryButton.style.borderColor = "#047857";
-            quickEntryButton.style.color = "#065f46";
-          }
+          // Success - green but still warm
+          button.innerHTML = `<span style="font-size: 16px;">✅</span><span>Entry Added!</span>`;
+          button.style.background =
+            "linear-gradient(135deg, #10b981, #059669) !important";
+          button.style.borderColor = "#047857 !important";
+          button.style.color = "#065f46 !important";
 
-          // Hide after delay to show success message
+          // Hide after success
           setTimeout(() => {
-            hideButtons();
-
-            // Trigger profile button re-coordination after journal button disappears
-            setTimeout(() => {
-              if (window.userProfileNudges?.checkAndShowButton) {
-                window.userProfileNudges.checkAndShowButton();
-              }
-            }, 300);
+            if (button && button.parentNode) {
+              button.remove();
+            }
           }, 2000);
         } catch (error) {
-          log(`❌ Button click error: ${error.message}`, "ERROR");
+          log(`Nuclear button click error: ${error.message}`, "ERROR");
 
-          // Error feedback - Enhanced for coordination
-          if (quickEntryButton) {
-            quickEntryButton.innerHTML = `<span style="font-size: 16px;">❌</span><span>Try Again</span>`;
-            quickEntryButton.style.background =
-              "linear-gradient(135deg, #ef4444, #dc2626)";
-            quickEntryButton.style.borderColor = "#b91c1c";
-            quickEntryButton.style.color = "#7f1d1d";
-          }
+          // Error feedback - red but not too harsh
+          button.innerHTML = `<span style="font-size: 16px;">❌</span><span>Try Again</span>`;
+          button.style.background =
+            "linear-gradient(135deg, #f87171, #ef4444) !important";
+          button.style.borderColor = "#dc2626 !important";
+          button.style.color = "#7f1d1d !important";
 
-          // Context-aware error handling
-          const pageContext = detectPageContext();
-          if (pageContext.type === "chatroom") {
-            // Reset button for retry in chat room
-            setTimeout(() => {
-              if (quickEntryButton) {
-                quickEntryButton.innerHTML = `<span style="font-size: 16px;">✏️</span><span>Add a daily banner?</span>`;
-                quickEntryButton.style.background = coordination.background;
-                quickEntryButton.style.borderColor = coordination.borderColor;
-                quickEntryButton.style.color = coordination.textColor;
-              }
-            }, 2500);
-          } else {
-            // Hide after delay for username pages
-            setTimeout(() => {
-              hideButtons();
-            }, 3000);
-          }
+          // Reset after error back to warm yellow
+          setTimeout(() => {
+            button.innerHTML = `<span style="font-size: 16px;">✏️</span><span>${text}</span>`;
+            button.style.background = styling.background + " !important";
+            button.style.borderColor = styling.borderColor + " !important";
+            button.style.color = styling.textColor + " !important";
+          }, 3000);
         }
       });
 
-      // Enhanced hover effects that coordinate with profile button
-      quickEntryButton.addEventListener("mouseenter", () => {
-        quickEntryButton.style.transform =
-          "translateX(0) translateY(-2px) scale(1.03)";
-        quickEntryButton.style.boxShadow = `0 6px 16px ${coordination.borderColor}40`;
-
-        if (coordination.coordination === "primary") {
-          quickEntryButton.style.background =
-            "linear-gradient(135deg, #f59e0b, #d97706)";
-        } else {
-          quickEntryButton.style.background =
-            "linear-gradient(135deg, #fde68a, #fcd34d)";
-        }
+      // Warm hover effects
+      button.addEventListener("mouseenter", () => {
+        button.style.transform = "translateY(-2px) scale(1.02) !important";
+        button.style.boxShadow =
+          "0 6px 16px rgba(245, 158, 11, 0.4) !important";
+        // Slightly deeper warm yellow on hover
+        button.style.background =
+          "linear-gradient(135deg, #fde68a, #fcd34d) !important";
       });
 
-      quickEntryButton.addEventListener("mouseleave", () => {
-        quickEntryButton.style.transform =
-          "translateX(0) translateY(0) scale(1)";
-        quickEntryButton.style.boxShadow = coordination.shadow;
-        quickEntryButton.style.background = coordination.background;
+      button.addEventListener("mouseleave", () => {
+        button.style.transform = "none !important";
+        button.style.boxShadow = styling.shadow + " !important";
+        button.style.background = styling.background + " !important";
       });
 
-      document.body.appendChild(quickEntryButton);
+      // Add to page
+      document.body.appendChild(button);
 
-      // Animate in
-      setTimeout(() => {
-        quickEntryButton.style.opacity = "1";
-        quickEntryButton.style.transform = "translateX(0)";
-      }, 100);
+      log("🌻 PERFECT NUCLEAR BUTTON CREATED!", "SUCCESS");
+      log("📍 Position: 180px from top, 20px from right", "DEBUG");
+      log("📏 Width: 212px (12px wider for perfect matching)", "DEBUG");
 
-      // Trigger profile button coordination after journal button is visible
-      setTimeout(() => {
-        if (window.userProfileNudges?.checkAndShowButton) {
-          window.userProfileNudges.checkAndShowButton();
-        }
-      }, 200);
-
-      log(
-        `✅ Coordinated journal entry button created: "${text}" (${coordination.coordination} mode)`,
-        "SUCCESS"
-      );
+      return button;
     } catch (error) {
-      log(`❌ Error creating coordinated button: ${error.message}`, "ERROR");
+      log(`💥 Nuclear button creation failed: ${error.message}`, "ERROR");
+      throw error;
     }
   };
 
-  // 🌟 Show standing navigation button (UI Engine + Manual Fallback)
-  const showStandingButton = (pageContext) => {
-    const uiEngine = getUIEngine();
-
-    // Try UI Engine first
-    if (uiEngine?.showButton) {
-      const config =
-        pageContext.type === "username"
-          ? {
-              text: "User Data",
-              icon: "📋",
-              onClick: () => navigateToUserData(pageContext.page),
-            }
-          : { text: "User Directory", icon: "👥", onClick: showDirectoryModal };
-
-      standingButton = uiEngine.showButton({
-        ...config,
-        position: "top-left",
-        className: "journal-standing-button",
-      });
-      log("Standing button created via UI Engine", "SUCCESS");
-    } else {
-      // Fallback: Manual button creation
-      log("UI Engine not available, creating manual standing button", "INFO");
-      createManualStandingButton(pageContext);
-    }
-  };
-
-  // 🌟 Manual standing button creation (fallback)
-  const createManualStandingButton = (pageContext) => {
-    try {
-      if (standingButton) {
-        standingButton.remove();
-        standingButton = null;
-      }
-
-      const config =
-        pageContext.type === "username"
-          ? {
-              text: "User Data",
-              icon: "📋",
-              onClick: () => navigateToUserData(pageContext.page),
-            }
-          : { text: "User Directory", icon: "👥", onClick: showDirectoryModal };
-
-      // Calculate left position
-      let leftPosition = "320px";
-      try {
-        const mainContent =
-          document.querySelector(".roam-main") ||
-          document.querySelector(".roam-body") ||
-          document.querySelector("#main-content");
-        if (mainContent) {
-          const rect = mainContent.getBoundingClientRect();
-          leftPosition = `${rect.left + 20}px`;
-        }
-      } catch (error) {
-        // Use fallback position
-      }
-
-      standingButton = document.createElement("div");
-      standingButton.id = "journal-standing-button";
-      standingButton.style.cssText = `
-        position: fixed;
-        top: 60px;
-        left: ${leftPosition};
-        background: linear-gradient(135deg, #fef3c7, #fde68a);
-        border: 1px solid #f59e0b;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
-        z-index: 9999;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        color: #92400e;
-        cursor: pointer;
-        user-select: none;
-        transition: all 0.3s ease;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 10px 16px;
-        font-weight: 600;
-        font-size: 14px;
-      `;
-
-      standingButton.innerHTML = `
-        <span style="font-size: 16px;">${config.icon}</span>
-        <span>${config.text}</span>
-      `;
-
-      standingButton.addEventListener("click", config.onClick);
-
-      // Hover effects
-      standingButton.addEventListener("mouseenter", () => {
-        standingButton.style.transform = "translateY(-2px) scale(1.02)";
-        standingButton.style.boxShadow = "0 6px 16px rgba(245, 158, 11, 0.4)";
-        standingButton.style.background =
-          "linear-gradient(135deg, #fde68a, #fcd34d)";
-      });
-
-      standingButton.addEventListener("mouseleave", () => {
-        standingButton.style.transform = "translateY(0) scale(1)";
-        standingButton.style.boxShadow = "0 4px 12px rgba(245, 158, 11, 0.3)";
-        standingButton.style.background =
-          "linear-gradient(135deg, #fef3c7, #fde68a)";
-      });
-
-      document.body.appendChild(standingButton);
-      log(`Manual standing button created: ${config.text}`, "SUCCESS");
-    } catch (error) {
-      log(`Error creating manual standing button: ${error.message}`, "ERROR");
-    }
-  };
-
-  // ===================================================================
-  // 🎨 ENHANCED HIDE FUNCTION - Triggers Re-coordination
-  // ===================================================================
-
+  // 🌟 Enhanced hide function
   const hideButtons = () => {
     // Hide quick entry button
     if (quickEntryButton) {
@@ -1148,13 +883,6 @@ const journalEntryCreator = (() => {
     if (leftoverStanding) {
       leftoverStanding.remove();
     }
-
-    // Trigger profile button re-coordination after cleanup
-    setTimeout(() => {
-      if (window.userProfileNudges?.checkAndShowButton) {
-        window.userProfileNudges.checkAndShowButton();
-      }
-    }, 100);
   };
 
   // ═══════════════════════════════════════════════════════════════
@@ -1167,7 +895,7 @@ const journalEntryCreator = (() => {
       // Prevent multiple instances
       if (window.journalEntryCreatorActive) {
         log(
-          "⚠️ Extension already loaded, skipping duplicate initialization",
+          "Extension already loaded, skipping duplicate initialization",
           "WARN"
         );
         return;
@@ -1175,7 +903,7 @@ const journalEntryCreator = (() => {
       window.journalEntryCreatorActive = true;
 
       log(
-        "🚀 Journal Entry Creator v1.0 + COORDINATED BUTTONS loading...",
+        "Journal Entry Creator v1.0 + Perfect Nuclear Button loading...",
         "SUCCESS"
       );
       extensionAPI = api;
@@ -1210,10 +938,10 @@ const journalEntryCreator = (() => {
           "journal-entry-creator",
           journalAPI,
           {
-            version: "1.0.0-coordinated",
+            version: "1.0.0-perfect-nuclear-button",
             dependencies: ["core-data", "ui-engine", "extension-1.5"],
             description:
-              "Lean journal entry creation with smart context detection + COORDINATED BUTTONS",
+              "Lean journal entry creation with smart context detection + Perfect Nuclear Button",
           }
         );
       }
@@ -1230,7 +958,7 @@ const journalEntryCreator = (() => {
       }, 1000);
 
       log(
-        "✅ Journal Entry Creator loaded successfully with COORDINATED BUTTONS!",
+        "Journal Entry Creator loaded successfully with Perfect Nuclear Button!",
         "SUCCESS"
       );
     } catch (error) {
@@ -1295,7 +1023,7 @@ const journalEntryCreator = (() => {
         delete window.journalEntryCreator;
       }
 
-      log("✅ Journal Entry Creator unloaded successfully", "SUCCESS");
+      log("Journal Entry Creator unloaded successfully", "SUCCESS");
     } catch (error) {
       log(`Error unloading: ${error.message}`, "ERROR");
     }
