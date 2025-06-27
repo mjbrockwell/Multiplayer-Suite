@@ -1,5 +1,5 @@
-// 👥 Multi-User Suite Auto-Loader
-// Automatically loads all Multi-User Suite extensions on startup
+// 👥 Multi-User Suite Modal Installer
+// Complete autoloader for all Multi-User Suite extensions
 
 const MULTIUSER_EXTENSIONS = [
   {
@@ -114,13 +114,23 @@ const MULTIUSER_EXTENSIONS = [
     critical: false,
     exportPattern: "standard",
   },
+  {
+    id: "profile-nudge",
+    name: "Profile Nudge",
+    url: "https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/refs/heads/main/src/13-profile-nudge/extension.js",
+    description:
+      "Smart profile completion prompts and user engagement features",
+    critical: false,
+    exportPattern: "standard",
+  },
 ];
 
 // Global state
 let loadedExtensions = new Map();
-let loadingModal = null;
+let installerModal = null;
+let installLog = [];
 
-// Create mock extension API
+// Create mock extension API with CORRECT structure
 function createMockExtensionAPI(extId) {
   return {
     settings: {
@@ -131,8 +141,10 @@ function createMockExtensionAPI(extId) {
         create: (config) => ({ id: Date.now(), config }),
       },
     },
+    // CRITICAL: ui namespace required
     ui: {
       commandPalette: {
+        // CRITICAL: under ui, not root
         addCommand: (command) => {
           console.log(`📋 Command added: ${command.label}`);
           return { id: Date.now(), ...command };
@@ -151,78 +163,76 @@ function createMockExtensionAPI(extId) {
   };
 }
 
-// Update loading progress
-function updateLoadingProgress(current, total, currentExtension) {
-  const progressElement = document.getElementById("multiuser-progress");
-  const statusElement = document.getElementById("multiuser-status");
-
-  if (progressElement) {
-    const percentage = Math.round((current / total) * 100);
-    progressElement.style.width = `${percentage}%`;
-  }
-
-  if (statusElement) {
-    statusElement.textContent = `Loading ${currentExtension}... (${current}/${total})`;
-  }
+// Logging utility
+function logMessage(message, type = "info") {
+  const timestamp = new Date().toLocaleTimeString();
+  installLog.push({ timestamp, message, type });
+  console.log(`[${timestamp}] ${message}`);
+  updateInstallLog();
 }
 
-// Create simple loading modal
-function createLoadingModal() {
-  const modalHTML = `
-    <div id="multiuser-loading-modal" style="
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.7);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 10000;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    ">
-      <div style="
-        background: white;
-        border-radius: 12px;
-        padding: 32px;
-        text-align: center;
-        min-width: 300px;
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-      ">
-        <div style="font-size: 48px; margin-bottom: 16px;">👥</div>
-        <h2 style="margin: 0 0 16px 0; color: #212529; font-size: 22px;">Loading Multi-User Suite</h2>
-        <p id="multiuser-status" style="margin: 0 0 20px 0; color: #6c757d; font-size: 14px;">Initializing...</p>
-        <div style="
-          width: 100%;
-          height: 8px;
-          background: #e9ecef;
-          border-radius: 4px;
-          overflow: hidden;
-          margin-bottom: 16px;
-        ">
-          <div id="multiuser-progress" style="
-            height: 100%;
-            background: linear-gradient(135deg, #20c997, #17a2b8);
-            width: 0%;
-            transition: width 0.3s ease;
-            border-radius: 4px;
-          "></div>
-        </div>
-        <p style="margin: 0; color: #adb5bd; font-size: 12px;">Please wait while all extensions load...</p>
-      </div>
-    </div>
-  `;
+// Update install log UI
+function updateInstallLog() {
+  const logContainer = document.getElementById("multiuser-install-log");
+  if (!logContainer) return;
 
-  document.body.insertAdjacentHTML("beforeend", modalHTML);
-  loadingModal = document.getElementById("multiuser-loading-modal");
+  logContainer.innerHTML = installLog
+    .map((entry) => {
+      const color =
+        entry.type === "error"
+          ? "#ff6b6b"
+          : entry.type === "success"
+          ? "#51cf66"
+          : "#74c0fc";
+      return `<div style="color: ${color}; margin: 2px 0;">
+      [${entry.timestamp}] ${entry.message}
+    </div>`;
+    })
+    .join("");
+
+  logContainer.scrollTop = logContainer.scrollHeight;
 }
 
-// Close loading modal
-function closeLoadingModal() {
-  if (loadingModal) {
-    loadingModal.remove();
-    loadingModal = null;
+// Update extension status in UI
+function updateExtensionStatus(extId, status, error = null) {
+  const row = document.getElementById(`ext-${extId}`);
+  if (!row) return;
+
+  const statusIcon = row.querySelector(".status-icon");
+  const button = row.querySelector("button");
+
+  switch (status) {
+    case "pending":
+      statusIcon.textContent = "⭕";
+      button.textContent = "Install";
+      button.disabled = false;
+      button.style.background = "linear-gradient(135deg, #51cf66, #40c057)";
+      row.style.border = "1px solid #e9ecef";
+      break;
+
+    case "loading":
+      statusIcon.textContent = "🔄";
+      button.textContent = "Loading...";
+      button.disabled = true;
+      button.style.background = "#adb5bd";
+      row.style.border = "1px solid #74c0fc";
+      break;
+
+    case "success":
+      statusIcon.textContent = "✅";
+      button.textContent = "Installed";
+      button.disabled = true;
+      button.style.background = "#51cf66";
+      row.style.border = "2px solid #51cf66";
+      break;
+
+    case "error":
+      statusIcon.textContent = "❌";
+      button.textContent = "Retry";
+      button.disabled = false;
+      button.style.background = "linear-gradient(135deg, #ff6b6b, #fa5252)";
+      row.style.border = "2px solid #ff6b6b";
+      break;
   }
 }
 
@@ -233,47 +243,77 @@ async function installExtension(extId) {
     throw new Error(`Extension ${extId} not found`);
   }
 
-  console.log(`🔄 Installing ${extension.name}...`);
+  logMessage(`🔄 Installing ${extension.name}...`);
+  updateExtensionStatus(extId, "loading");
 
   try {
     // Fetch extension code
+    logMessage(`📡 Fetching from GitHub: ${extension.name}`);
     const response = await fetch(extension.url);
+
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
     const code = await response.text();
-    console.log(`📝 ${extension.name}: Code retrieved (${code.length} bytes)`);
+    logMessage(`📝 Code retrieved (${code.length} bytes)`);
 
     // Create blob URL to bypass MIME type restrictions
     const blob = new Blob([code], { type: "application/javascript" });
     const blobUrl = URL.createObjectURL(blob);
 
     try {
-      // Setup mock API
+      // Setup mock API with CORRECT structure
       const mockAPI = createMockExtensionAPI(extId);
 
-      // Make API globally available
+      // CRITICAL: Debug pre-execution API structure
+      console.log(`🔍 PRE-EXECUTION DEBUG for ${extension.name}:`);
+      console.log(`  mockAPI exists:`, !!mockAPI);
+      console.log(`  mockAPI.ui exists:`, !!mockAPI.ui);
+      console.log(
+        `  mockAPI.ui.commandPalette exists:`,
+        !!mockAPI.ui.commandPalette
+      );
+
+      // Test addCommand function
+      try {
+        const testResult = mockAPI.ui.commandPalette.addCommand({
+          label: "test",
+        });
+        console.log(`  ✅ addCommand test successful:`, testResult);
+      } catch (testError) {
+        console.log(`  ❌ addCommand test failed:`, testError);
+      }
+
+      // Make API globally available (multiple locations for compatibility)
       window.extensionAPI = mockAPI;
       window._extensionAPI = mockAPI;
       if (!window.roamExtensions) window.roamExtensions = {};
       window.roamExtensions.extensionAPI = mockAPI;
 
-      // Import and execute module
+      // Import module
+      logMessage(`⚡ Importing module: ${extension.name}`);
       const module = await import(blobUrl);
+
+      // Handle different export patterns
       let executed = false;
 
       if (module.default?.onload) {
+        logMessage(`🎯 Executing standard onload: ${extension.name}`);
         await module.default.onload({ extensionAPI: mockAPI });
         executed = true;
       } else if (module.onload) {
+        logMessage(`🎯 Executing named onload: ${extension.name}`);
         await module.onload({ extensionAPI: mockAPI });
         executed = true;
       } else if (typeof module.default === "function") {
+        logMessage(`🎯 Executing function export: ${extension.name}`);
         await module.default({ extensionAPI: mockAPI });
         executed = true;
       } else {
-        executed = true; // Self-executing extension
+        // Self-executing extension
+        logMessage(`🎯 Self-executing extension detected: ${extension.name}`);
+        executed = true;
       }
 
       // Clean up global API references
@@ -288,84 +328,366 @@ async function installExtension(extId) {
         executed,
       });
 
-      console.log(`✅ ${extension.name} loaded successfully!`);
-      return true;
+      updateExtensionStatus(extId, "success");
+      logMessage(`✅ ${extension.name} installed successfully!`, "success");
     } finally {
+      // Always clean up blob URL
       URL.revokeObjectURL(blobUrl);
     }
   } catch (error) {
     console.error(`❌ ${extension.name} failed:`, error);
-    throw error;
+    updateExtensionStatus(extId, "error");
+    logMessage(`❌ ${extension.name} failed: ${error.message}`, "error");
+    throw error; // Re-throw for caller handling
   }
 }
 
-// Auto-load all extensions
-async function autoLoadAllExtensions() {
-  console.log("🚀 Auto-loading Multi-User Suite extensions...");
+// Auto-install all extensions
+async function autoInstallAll() {
+  const autoBtn = document.getElementById("auto-install-btn");
+  if (autoBtn) {
+    autoBtn.disabled = true;
+    autoBtn.textContent = "Installing...";
+  }
 
-  createLoadingModal();
+  logMessage(
+    "🚀 Starting auto-installation of all Multi-User Suite extensions..."
+  );
 
   let successCount = 0;
   let failureCount = 0;
-  const totalCount = MULTIUSER_EXTENSIONS.length;
 
-  for (let i = 0; i < MULTIUSER_EXTENSIONS.length; i++) {
-    const extension = MULTIUSER_EXTENSIONS[i];
-
-    updateLoadingProgress(i, totalCount, extension.name);
-
+  for (const extension of MULTIUSER_EXTENSIONS) {
     try {
       await installExtension(extension.id);
       successCount++;
+      // Small delay to prevent overwhelming
+      await new Promise((resolve) => setTimeout(resolve, 500));
     } catch (error) {
       failureCount++;
-      console.warn(`⚠️ Continuing despite ${extension.name} failure...`);
-    }
-
-    // Small delay to show progress
-    await new Promise((resolve) => setTimeout(resolve, 300));
-  }
-
-  // Final update
-  updateLoadingProgress(totalCount, totalCount, "Complete");
-
-  // Show completion status briefly
-  const statusElement = document.getElementById("multiuser-status");
-  if (statusElement) {
-    if (successCount === totalCount) {
-      statusElement.textContent = `🎉 All ${successCount} extensions loaded successfully!`;
-      statusElement.style.color = "#28a745";
-    } else {
-      statusElement.textContent = `✅ ${successCount}/${totalCount} extensions loaded (${failureCount} failed)`;
-      statusElement.style.color = "#ffc107";
+      logMessage(`⚠️ Continuing despite ${extension.name} failure...`);
     }
   }
 
-  // Close modal after brief delay
-  setTimeout(() => {
-    closeLoadingModal();
-    console.log(
-      `🎯 Multi-User Suite loading complete: ${successCount}/${totalCount} successful`
+  // Final report
+  const totalCount = MULTIUSER_EXTENSIONS.length;
+  if (successCount === totalCount) {
+    logMessage(
+      `🎉 Auto-installation complete! All ${successCount} extensions loaded.`,
+      "success"
     );
-  }, 2000);
+  } else {
+    logMessage(
+      `⚠️ Auto-installation finished: ${successCount}/${totalCount} successful, ${failureCount} failed.`
+    );
+  }
+
+  if (autoBtn) {
+    autoBtn.disabled = false;
+    autoBtn.textContent = "Auto-Install All Extensions";
+  }
+}
+
+// Create installer modal UI
+function createInstallerModal() {
+  const modalHTML = `
+    <div id="multiuser-installer-modal" style="
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    ">
+      <div style="
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+      ">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h2 style="margin: 0 0 8px 0; color: #212529; font-size: 24px;">👥 Multi-User Suite Installer</h2>
+          <p style="margin: 0; color: #6c757d; font-size: 14px;">Load all Multi-User Suite extensions with one click</p>
+        </div>
+        
+        <button id="auto-install-btn" style="
+          width: 100%;
+          padding: 12px 24px;
+          background: linear-gradient(135deg, #20c997, #17a2b8);
+          color: white;
+          border: none;
+          border-radius: 8px;
+          font-size: 16px;
+          font-weight: 600;
+          cursor: pointer;
+          margin-bottom: 20px;
+          transition: all 0.2s;
+        " onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='translateY(0)'">
+          Auto-Install All Extensions
+        </button>
+        
+        <div style="margin-bottom: 20px;">
+          ${MULTIUSER_EXTENSIONS.map(
+            (ext) => `
+            <div id="ext-${ext.id}" style="
+              display: flex;
+              align-items: center;
+              padding: 12px;
+              border: 1px solid #e9ecef;
+              border-radius: 8px;
+              margin-bottom: 8px;
+              transition: all 0.2s;
+            ">
+              <span class="status-icon" style="font-size: 16px; margin-right: 12px;">⭕</span>
+              <div style="flex: 1;">
+                <div style="font-weight: 600; color: #212529; margin-bottom: 2px;">
+                  ${ext.name}${ext.critical ? " ⚡" : ""}
+                </div>
+                <div style="font-size: 12px; color: #6c757d;">${
+                  ext.description
+                }</div>
+              </div>
+              <button data-ext-id="${ext.id}" class="install-btn" style="
+                padding: 6px 16px;
+                background: linear-gradient(135deg, #51cf66, #40c057);
+                color: white;
+                border: none;
+                border-radius: 6px;
+                font-size: 12px;
+                font-weight: 600;
+                cursor: pointer;
+                min-width: 70px;
+                transition: all 0.2s;
+              ">Install</button>
+            </div>
+          `
+          ).join("")}
+        </div>
+        
+        <details style="margin-bottom: 20px;">
+          <summary style="cursor: pointer; font-weight: 600; color: #495057; margin-bottom: 8px;">
+            📋 Installation Log
+          </summary>
+          <div id="multiuser-install-log" style="
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 12px;
+            max-height: 150px;
+            overflow-y: auto;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 11px;
+            line-height: 1.4;
+          "></div>
+        </details>
+        
+        <div style="text-align: right;">
+          <button id="close-installer-btn" style="
+            padding: 8px 16px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+          ">Close</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.insertAdjacentHTML("beforeend", modalHTML);
+  installerModal = document.getElementById("multiuser-installer-modal");
+
+  // Event listeners
+  document
+    .getElementById("auto-install-btn")
+    .addEventListener("click", autoInstallAll);
+  document
+    .getElementById("close-installer-btn")
+    .addEventListener("click", closeInstaller);
+
+  // Add event listeners for individual install buttons
+  document.querySelectorAll(".install-btn").forEach((button) => {
+    const extId = button.getAttribute("data-ext-id");
+    button.addEventListener("click", () => installExtension(extId));
+  });
+
+  // Close on backdrop click
+  installerModal.addEventListener("click", (e) => {
+    if (e.target === installerModal) {
+      closeInstaller();
+    }
+  });
+
+  logMessage("📱 Multi-User Suite Installer opened");
+}
+
+// Close installer modal
+function closeInstaller() {
+  if (installerModal) {
+    installerModal.remove();
+    installerModal = null;
+  }
+}
+
+// Dismiss the installer button
+function dismissInstallerButton() {
+  const buttonContainer = document.getElementById(
+    "multiuser-installer-container"
+  );
+  if (buttonContainer) {
+    buttonContainer.style.display = "none";
+    // Store dismissal preference
+    localStorage.setItem("multiuser-installer-dismissed", "true");
+    console.log("👥 Multi-User Suite Installer button dismissed");
+  }
+}
+
+// Show the installer button (in case user wants to bring it back)
+function showInstallerButton() {
+  // First clear the dismissal preference
+  localStorage.removeItem("multiuser-installer-dismissed");
+
+  // Check if container already exists
+  const existingContainer = document.getElementById(
+    "multiuser-installer-container"
+  );
+  if (existingContainer) {
+    existingContainer.style.display = "block";
+    console.log("👥 Multi-User Suite Installer button restored (was hidden)");
+    return;
+  }
+
+  // If container doesn't exist, create it
+  addInstallerButton();
+  console.log("👥 Multi-User Suite Installer button created");
+}
+
+// Add installer button to Roam
+function addInstallerButton() {
+  // Check if user has dismissed the button
+  if (localStorage.getItem("multiuser-installer-dismissed") === "true") {
+    console.log(
+      "👥 Multi-User Suite Installer button dismissed by user, not showing"
+    );
+    return;
+  }
+
+  const containerHTML = `
+    <div id="multiuser-installer-container" style="
+      position: fixed;
+      top: 70px;
+      right: 10px;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    ">
+      <button id="multiuser-installer-btn" style="
+        padding: 8px 12px;
+        background: linear-gradient(135deg, #20c997, #17a2b8);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        transition: all 0.2s;
+      ">👥 Install Multi-User Suite</button>
+      <button id="multiuser-installer-dismiss" style="
+        width: 20px;
+        height: 20px;
+        background: rgba(108, 117, 125, 0.8);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        font-size: 10px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        line-height: 1;
+        padding: 0;
+      " title="Dismiss installer button">×</button>
+    </div>
+  `;
+
+  document.body.insertAdjacentHTML("beforeend", containerHTML);
+
+  const installerBtn = document.getElementById("multiuser-installer-btn");
+  const dismissBtn = document.getElementById("multiuser-installer-dismiss");
+
+  // Main button event listeners
+  installerBtn.addEventListener("click", createInstallerModal);
+  installerBtn.addEventListener("mouseover", () => {
+    installerBtn.style.transform = "translateY(-1px)";
+    installerBtn.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.2)";
+  });
+  installerBtn.addEventListener("mouseout", () => {
+    installerBtn.style.transform = "translateY(0)";
+    installerBtn.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.15)";
+  });
+
+  // Dismiss button event listeners
+  dismissBtn.addEventListener("click", dismissInstallerButton);
+  dismissBtn.addEventListener("mouseover", () => {
+    dismissBtn.style.background = "rgba(220, 53, 69, 0.8)";
+    dismissBtn.style.transform = "scale(1.1)";
+  });
+  dismissBtn.addEventListener("mouseout", () => {
+    dismissBtn.style.background = "rgba(108, 117, 125, 0.8)";
+    dismissBtn.style.transform = "scale(1)";
+  });
+
+  console.log("👥 Multi-User Suite Installer button added");
 }
 
 // Main extension export
 export default {
   onload: async ({ extensionAPI }) => {
-    console.log("🚀 Multi-User Suite Auto-Loader Starting...");
+    console.log("🚀 Multi-User Suite Installer Loading...");
 
     // Reset state
     loadedExtensions.clear();
+    installLog = [];
 
-    // Immediately start auto-loading all extensions
-    autoLoadAllExtensions();
+    // Add installer button
+    addInstallerButton();
 
-    console.log("✅ Multi-User Suite Auto-Loader Initialized!");
+    // Add command palette command to show installer button
+    extensionAPI.ui.commandPalette.addCommand({
+      label: "👥 Show Multi-User Suite Installer",
+      callback: () => {
+        showInstallerButton();
+        console.log(
+          "👥 Multi-User Suite Installer button restored via command palette"
+        );
+      },
+    });
+
+    // Add global function to re-show button if needed (fallback)
+    window.showMultiUserInstaller = showInstallerButton;
+
+    console.log("✅ Multi-User Suite Installer Ready!");
+    console.log(
+      "💡 Tip: If you dismissed the button, use Cmd+P and search for 'Show Multi-User Suite Installer'"
+    );
   },
 
   onunload: () => {
-    console.log("🔄 Multi-User Suite Auto-Loader Unloading...");
+    console.log("🔄 Multi-User Suite Installer Unloading...");
 
     // Unload all installed extensions
     loadedExtensions.forEach((ext, id) => {
@@ -380,11 +702,21 @@ export default {
     });
 
     // Clean up UI
-    closeLoadingModal();
+    closeInstaller();
+    const installerContainer = document.getElementById(
+      "multiuser-installer-container"
+    );
+    if (installerContainer) {
+      installerContainer.remove();
+    }
+
+    // Clean up global function
+    delete window.showMultiUserInstaller;
 
     // Reset state
     loadedExtensions.clear();
+    installLog = [];
 
-    console.log("✅ Multi-User Suite Auto-Loader Unloaded");
+    console.log("✅ Multi-User Suite Installer Unloaded");
   },
 };
