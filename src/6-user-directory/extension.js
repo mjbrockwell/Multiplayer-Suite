@@ -1,13 +1,12 @@
 // ===================================================================
-// Extension SIX: User Directory + Timezones - SURGICAL ENHANCEMENT
-// 🏥 SURGERY: Integrated with Button Utility Extension
-// 🗑️ REMOVED: ~150 lines of manual button positioning logic
-// ✅ USING: ExtensionButtonManager for professional button coordination
-// 🎯 RESULT: Clean, conflict-free, professional button management
+// Extension SIX: User Directory + Timezones - PROPER BUTTON MANAGEMENT
+// 🎯 FIXED: Proper Extension 1.6 integration with no fallback
+// 🗑️ REMOVED: All fallback button logic (fails gracefully instead)
+// ✅ CONDITIONAL: Button only appears on username pages or "chat room" pages
 // ===================================================================
 
 // ===================================================================
-// 🔧 DEPENDENCY MANAGEMENT - Enhanced with Button Utility
+// 🔧 DEPENDENCY MANAGEMENT - Enhanced with Proper Button Utility
 // ===================================================================
 
 /**
@@ -52,18 +51,83 @@ const checkExtension15Dependencies = () => {
 };
 
 /**
- * 🏥 NEW: Check if Button Utility Extension is available
+ * 🎯 FIXED: Check if Extension 1.6 Button Utility is properly available
  */
 const checkButtonUtilityDependency = () => {
+  // Check for Extension 1.6 components
   if (!window.ExtensionButtonManager) {
-    console.warn(
-      "⚠️ Button Utility Extension not available - using fallback positioning"
-    );
+    console.warn("❌ Extension 1.6 ExtensionButtonManager not found");
     return false;
   }
 
-  console.log("✅ Button Utility Extension available");
+  if (!window.RoamButtonRegistry) {
+    console.warn("❌ Extension 1.6 RoamButtonRegistry not found");
+    return false;
+  }
+
+  if (!window.ButtonRegistryAPI) {
+    console.warn("❌ Extension 1.6 ButtonRegistryAPI not found");
+    return false;
+  }
+
+  console.log("✅ Extension 1.6 Button Utility properly available");
   return true;
+};
+
+// ===================================================================
+// 🎯 CONDITIONAL LOGIC - Chat Room Page Detection
+// ===================================================================
+
+/**
+ * 💬 Register custom context detector for chat room pages
+ * This detects any page with "chat room" in the title (case insensitive)
+ */
+const registerChatRoomContextDetector = () => {
+  try {
+    // Register the custom context detector with Extension 1.6
+    window.ButtonRegistryAPI?.registerContextDetector("chat-room-pages", () => {
+      // Get current page title
+      const getCurrentPageTitle = () => {
+        try {
+          // Method 1: Extract from URL (most reliable)
+          const url = window.location.href;
+          const pageMatch = url.match(/\/page\/([^/?#]+)/);
+          if (pageMatch) {
+            return decodeURIComponent(pageMatch[1]);
+          }
+
+          // Method 2: Extract from page title element (fallback)
+          const titleElement = document.querySelector(
+            ".roam-article h1, .rm-page-title"
+          );
+          if (titleElement) {
+            return titleElement.textContent?.trim();
+          }
+
+          return null;
+        } catch (error) {
+          console.error("❌ Failed to get current page title:", error);
+          return null;
+        }
+      };
+
+      const pageTitle = getCurrentPageTitle();
+      if (!pageTitle) return false;
+
+      // 🎯 THE MAGIC: Case-insensitive "chat room" detection
+      const hasMatchingText = pageTitle.toLowerCase().includes("chat room");
+
+      if (hasMatchingText) {
+        console.log(`💬 Chat room page detected: "${pageTitle}"`);
+      }
+
+      return hasMatchingText;
+    });
+
+    console.log("✅ Chat room context detector registered");
+  } catch (error) {
+    console.error("❌ Failed to register chat room context detector:", error);
+  }
 };
 
 // ===================================================================
@@ -508,51 +572,83 @@ const startRealtimeClockUpdatesClean = (modal) => {
 };
 
 // ===================================================================
-// 🏥 SURGICAL BUTTON MANAGEMENT - Button Utility Integration
+// 🎯 PROPER BUTTON MANAGEMENT - Extension 1.6 Integration
 // ===================================================================
 
-/**
- * 🏥 SURGICAL: Professional button management using Button Utility Extension
- * 🗑️ REMOVED: ~150 lines of manual positioning, font detection, monitoring
- */
 let buttonManager = null;
 
 /**
- * 🏥 NEW: Initialize professional button management
+ * 🎯 FIXED: Proper Extension 1.6 button management with NO FALLBACK
  */
 const initializeButtonManagement = async () => {
   try {
-    console.log(
-      "🎯 User Directory: Initializing professional button management..."
-    );
+    console.log("🎯 User Directory: Initializing proper button management...");
 
-    // Check if Button Utility Extension is available
+    // 🎯 CRITICAL: Check Extension 1.6 availability first
     if (!checkButtonUtilityDependency()) {
       console.warn(
-        "⚠️ Button Utility not available, using fallback positioning"
+        "❌ Extension 1.6 not available - NO BUTTON will be created"
       );
-      return initializeFallbackButton();
+      console.warn("💡 Please load Extension 1.6 Button Utility first");
+      return { success: false, reason: "Extension 1.6 not available" };
     }
 
-    // Create button manager for this extension
-    buttonManager = new window.ExtensionButtonManager("User Directory");
-    await buttonManager.initialize();
+    // 🎯 STEP 1: Register chat room context detector FIRST
+    registerChatRoomContextDetector();
 
-    // Register the directory button with professional styling
+    // 🎯 STEP 2: Wait for Extension 1.6 to be ready
+    let retries = 0;
+    const maxRetries = 10;
+
+    while (retries < maxRetries) {
+      try {
+        // 🎯 STEP 3: Create button manager for this extension
+        buttonManager = new window.ExtensionButtonManager("UserDirectory");
+        await buttonManager.initialize();
+        break;
+      } catch (error) {
+        retries++;
+        console.log(
+          `⏳ Extension 1.6 not ready, retrying... (${retries}/${maxRetries})`
+        );
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+    }
+
+    if (retries >= maxRetries) {
+      console.error("❌ Failed to initialize Extension 1.6 after 10 retries");
+      return { success: false, reason: "Extension 1.6 initialization timeout" };
+    }
+
+    // 🎯 STEP 4: Register the directory button with proper conditional logic
     const result = await buttonManager.registerButton({
       id: "directory-button",
-      text: "👥  User Directory",
+      text: "👥 User Directory",
       onClick: showUserDirectoryModalClean,
       stack: "top-left", // Professional left-side placement
       priority: false, // Play nice with other extensions
       style: {
-        background: "linear-gradient(135deg, #fef3c7, #fde68a)",
-        borderColor: "#9a5835",
-        color: "#92400e",
+        // 🎨 ELEGANT: Warm yellow pastel with elegant brown border
+        background: "linear-gradient(135deg, #fffbeb, #fef3c7)", // Softer warm yellow
+        border: "1.5px solid #8b4513", // Elegant brown border
+        color: "#78716c", // Muted brown text
         fontWeight: "600",
         padding: "10px 16px",
         borderRadius: "12px",
         boxShadow: "0 4px 12px rgba(245, 158, 11, 0.3)",
+      },
+      // 🎯 THE CONDITIONAL MAGIC: Only show on username OR chat room pages
+      contextRules: {
+        showOn: ["username-pages", "chat-room-pages"],
+      },
+      // 🐛 DEBUG: Optional callbacks to see conditional logic working
+      onShow: () => {
+        console.log(
+          "👥 User Directory button shown (conditional page detected)"
+        );
+      },
+      onHide: () => {
+        console.log("👥 User Directory button hidden (not a conditional page)");
       },
       onDisplaced: (fromStack, toStack, reason) => {
         console.log(
@@ -568,80 +664,17 @@ const initializeButtonManagement = async () => {
       console.log(
         `✅ Directory button registered at ${result.stack} position #${result.position}`
       );
+      console.log(
+        "🎯 Button will only appear on username pages or pages containing 'chat room'"
+      );
       return result;
     } else {
       console.error("❌ Failed to register directory button:", result.error);
-      return initializeFallbackButton();
+      return { success: false, reason: result.error };
     }
   } catch (error) {
     console.error("❌ Button management initialization failed:", error);
-    return initializeFallbackButton();
-  }
-};
-
-/**
- * 🛟 FALLBACK: Simple button positioning when Button Utility unavailable
- */
-const initializeFallbackButton = () => {
-  console.log("🛟 Using fallback button positioning...");
-
-  try {
-    // Find a reasonable container
-    const container =
-      document.querySelector(".roam-article") ||
-      document.querySelector(".roam-main") ||
-      document.body;
-
-    if (getComputedStyle(container).position === "static") {
-      container.style.position = "relative";
-    }
-
-    // Create simple button
-    const button = document.createElement("button");
-    button.textContent = "👥 User Directory";
-    button.onclick = showUserDirectoryModalClean;
-    button.className = "user-directory-fallback-button";
-
-    // Apply fallback styling
-    button.style.cssText = `
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      background: linear-gradient(135deg, #fef3c7, #fde68a);
-      border: 1px solid #f59e0b;
-      border-radius: 12px;
-      color: #92400e;
-      padding: 10px 16px;
-      font-weight: 600;
-      cursor: pointer;
-      z-index: 9999;
-      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
-      transition: all 0.3s ease;
-    `;
-
-    // Add hover effects
-    button.addEventListener("mouseenter", () => {
-      button.style.transform = "translateY(-2px) scale(1.02)";
-      button.style.boxShadow = "0 6px 16px rgba(245, 158, 11, 0.4)";
-    });
-
-    button.addEventListener("mouseleave", () => {
-      button.style.transform = "translateY(0) scale(1)";
-      button.style.boxShadow = "0 4px 12px rgba(245, 158, 11, 0.3)";
-    });
-
-    container.appendChild(button);
-
-    // Store for cleanup
-    if (window._extensionRegistry && window._extensionRegistry.elements) {
-      window._extensionRegistry.elements.push(button);
-    }
-
-    console.log("✅ Fallback directory button created");
-    return { success: true, type: "fallback", element: button };
-  } catch (error) {
-    console.error("❌ Fallback button creation failed:", error);
-    return { success: false, error: error.message };
+    return { success: false, reason: error.message };
   }
 };
 
@@ -650,15 +683,15 @@ const initializeFallbackButton = () => {
 // ===================================================================
 
 /**
- * 🧪 DEBUG: Test Button Utility integration
+ * 🧪 DEBUG: Test Extension 1.6 integration
  */
 const testButtonUtilityIntegration = async () => {
-  console.group("🎯 Testing Button Utility Integration");
+  console.group("🎯 Testing Extension 1.6 Integration");
 
   try {
-    // Test Button Utility availability
+    // Test Extension 1.6 availability
     const hasButtonUtility = checkButtonUtilityDependency();
-    console.log("✅ Button Utility available:", hasButtonUtility);
+    console.log("✅ Extension 1.6 available:", hasButtonUtility);
 
     if (hasButtonUtility) {
       // Test API availability
@@ -668,19 +701,55 @@ const testButtonUtilityIntegration = async () => {
       if (api) {
         const capabilities = api.getCapabilities();
         console.log("📊 Button Registry capabilities:", capabilities);
-
-        const isReady = await api.waitForReady(1000);
-        console.log("✅ Button Registry ready:", isReady);
       }
 
       // Test ExtensionButtonManager
       const manager = window.ExtensionButtonManager;
       console.log("✅ ExtensionButtonManager available:", !!manager);
+
+      // Test registry status
+      const registry = window.RoamButtonRegistry;
+      if (registry) {
+        console.log("📊 Registry status:", registry.getStatus());
+      }
     }
 
-    console.log("🎉 Button Utility integration test complete!");
+    console.log("🎉 Extension 1.6 integration test complete!");
   } catch (error) {
-    console.error("❌ Button Utility integration test failed:", error);
+    console.error("❌ Extension 1.6 integration test failed:", error);
+  }
+
+  console.groupEnd();
+};
+
+/**
+ * 🎯 NEW: Test conditional logic functionality
+ */
+const testConditionalLogic = () => {
+  console.group("🎯 Testing Conditional Logic");
+
+  try {
+    // Get current context from Extension 1.6
+    const registry = window.RoamButtonRegistry;
+    if (registry) {
+      const currentContext = registry.pageMonitor.getCurrentContext();
+      console.log("📋 Current context:", Array.from(currentContext));
+
+      const hasUsernameContext = currentContext.has("username-pages");
+      const hasChatRoomContext = currentContext.has("chat-room-pages");
+
+      console.log("👤 Is username page:", hasUsernameContext);
+      console.log("💬 Is chat room page:", hasChatRoomContext);
+
+      const shouldShowButton = hasUsernameContext || hasChatRoomContext;
+      console.log("🎯 Should show button:", shouldShowButton);
+    } else {
+      console.warn("❌ Extension 1.6 registry not available for testing");
+    }
+
+    console.log("✅ Conditional logic test complete!");
+  } catch (error) {
+    console.error("❌ Conditional logic test failed:", error);
   }
 
   console.groupEnd();
@@ -690,7 +759,9 @@ const testButtonUtilityIntegration = async () => {
  * ✅ ENHANCED: Run complete system tests
  */
 const runCleanSystemTests = async () => {
-  console.group("🧪 Running Extension SIX System Tests (Surgical Version)");
+  console.group(
+    "🧪 Running Extension SIX System Tests (Fixed Button Management)"
+  );
 
   try {
     // Test Extension 1.5 integration
@@ -707,8 +778,11 @@ const runCleanSystemTests = async () => {
       profile: !!profileAnalysisUtilities,
     });
 
-    // Test Button Utility integration
+    // Test Extension 1.6 integration
     await testButtonUtilityIntegration();
+
+    // Test conditional logic
+    testConditionalLogic();
 
     // Test profile extraction
     const currentUser = platform.getUtility("getCurrentUser")();
@@ -846,12 +920,12 @@ window.navigateToUserPageClean = (username) => {
 };
 
 // ===================================================================
-// 🎯 EXTENSION REGISTRATION - Surgical Enhancement Complete
+// 🎯 EXTENSION REGISTRATION - Fixed Button Management
 // ===================================================================
 
 export default {
   onload: () => {
-    console.log("🏥 User Directory loading (Surgical Enhancement)...");
+    console.log("🎯 User Directory loading (Fixed Button Management)...");
 
     // ✅ STEP 1: Check Extension 1.5 dependencies
     if (!checkExtension15Dependencies()) {
@@ -878,8 +952,10 @@ export default {
       getAllUserProfiles: getAllUserProfilesClean,
       showUserDirectory: showUserDirectoryModalClean,
       testButtonUtility: testButtonUtilityIntegration,
+      testConditionalLogic: testConditionalLogic,
       runSystemTests: runCleanSystemTests,
-      initializeButtons: initializeButtonManagement, // 🏥 NEW: Professional button management
+      initializeButtons: initializeButtonManagement, // 🎯 Fixed button management
+      registerChatRoomDetector: registerChatRoomContextDetector,
     };
 
     // ✅ STEP 3: Register command palette functions
@@ -889,15 +965,19 @@ export default {
         callback: showUserDirectoryModalClean,
       },
       {
-        label: "User Directory: Test Button Utility Integration",
+        label: "User Directory: Test Extension 1.6 Integration",
         callback: testButtonUtilityIntegration,
+      },
+      {
+        label: "User Directory: Test Conditional Logic",
+        callback: testConditionalLogic,
       },
       {
         label: "User Directory: Run System Tests",
         callback: runCleanSystemTests,
       },
       {
-        label: "User Directory: Initialize Professional Buttons",
+        label: "User Directory: Initialize Buttons",
         callback: initializeButtonManagement,
       },
     ];
@@ -914,77 +994,81 @@ export default {
     // ✅ STEP 4: Register with platform
     const requiredDependencies = [
       "utility-library", // Extension 1.5
-      "button-utility", // 🏥 NEW: Button Utility Extension
+      "button-utility", // Extension 1.6
     ];
 
     platform.register(
       "clean-user-directory",
       {
         services: cleanDirectoryServices,
-        version: "7.0.0", // 🏥 Surgical version
+        version: "9.0.0", // 🎯 Fixed version
       },
       {
         name: "✨ User Directory",
         description:
-          "Professional user directory with intelligent button coordination, timezone intelligence, and surgical code enhancement",
-        version: "7.0.0",
+          "Professional user directory with proper Extension 1.6 integration, conditional button logic, and NO fallback buttons",
+        version: "9.0.0",
         dependencies: requiredDependencies,
       }
     );
 
-    // ✅ STEP 5: Initialize professional button management
+    // ✅ STEP 5: Initialize button management (with proper delay)
     setTimeout(async () => {
       try {
-        await initializeButtonManagement();
+        const result = await initializeButtonManagement();
+        if (result.success) {
+          console.log("🎉 Button management initialized successfully!");
+        } else {
+          console.warn(`⚠️ Button management failed: ${result.reason}`);
+        }
       } catch (error) {
         console.error("❌ Failed to initialize button management:", error);
       }
-    }, 1000);
+    }, 2000); // Longer delay to ensure Extension 1.6 is ready
 
     // ✅ STEP 6: Success report
     const currentUser = platform.getUtility("getCurrentUser")();
-    console.log("🎉 Extension SIX loaded successfully (Surgical Enhancement)!");
-    console.log("🏥 SURGERY: ~150 lines of button positioning code removed");
-    console.log("🎯 BUTTON: Professional Button Utility integration");
-    console.log("✅ MODAL: Using Extension 1.5 utilities (unchanged)");
-    console.log("✅ TIMEZONE: Using Extension 1.5 utilities (unchanged)");
-    console.log("✅ PROFILE: Using Extension 1.5 utilities (unchanged)");
-    console.log("🛡️ SAFETY: Zero changes to core functionality");
+    console.log(
+      "🎉 Extension SIX loaded successfully (Fixed Button Management)!"
+    );
+    console.log("🗑️ REMOVED: All fallback button logic");
+    console.log("🎯 FIXED: Proper Extension 1.6 integration");
+    console.log(
+      "🎯 CONDITIONAL: Button only appears on username or chat room pages"
+    );
+    console.log("🎨 STYLING: Elegant warm yellow with brown border");
+    console.log("🛡️ SAFETY: Fails gracefully if Extension 1.6 not available");
     console.log(`👤 Current user: ${currentUser?.displayName}`);
     console.log('💡 Try: Cmd+P → "User Directory: Show Directory"');
 
-    // Auto-test integration after a short delay
+    // Auto-test integration after a delay
     setTimeout(async () => {
-      console.log("🔍 Auto-testing Surgical Enhancement integration...");
+      console.log("🔍 Auto-testing Fixed Button Management integration...");
       await runCleanSystemTests();
-    }, 2000);
+    }, 3000);
 
     return {
       extensionId: "clean-user-directory",
       services: cleanDirectoryServices,
-      version: "7.0.0",
-      status: "surgical_enhancement",
+      version: "9.0.0",
+      status: "fixed_button_management",
     };
   },
 
   onunload: () => {
-    console.log("🏥 User Directory unloading (Surgical Enhancement)...");
+    console.log("🎯 User Directory unloading (Fixed Button Management)...");
 
-    // 🏥 SURGICAL: Clean up button management
+    // 🎯 CLEAN: Proper button management cleanup
     if (buttonManager) {
       try {
         buttonManager.cleanup();
-        console.log("✅ Professional button management cleaned up");
+        console.log("✅ Extension 1.6 button management cleaned up");
       } catch (error) {
         console.error("❌ Button manager cleanup error:", error);
       }
     }
 
-    // Clean up any fallback buttons
-    const fallbackButtons = document.querySelectorAll(
-      ".user-directory-fallback-button"
-    );
-    fallbackButtons.forEach((button) => button.remove());
+    // 🗑️ REMOVED: No fallback button cleanup needed!
 
     // Clean up modals (unchanged)
     const modals = document.querySelectorAll(
@@ -995,6 +1079,6 @@ export default {
     // Navigation helper cleanup (unchanged)
     delete window.navigateToUserPageClean;
 
-    console.log("✅ User Directory cleanup complete!");
+    console.log("✅ User Directory cleanup complete (no fallback mess)!");
   },
 };
