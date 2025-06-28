@@ -1,6 +1,6 @@
 // ===================================================================
-// Extension SIX: User Directory + Timezones - PROPER BUTTON MANAGEMENT
-// 🎯 FIXED: Proper Extension 1.6 integration with no fallback
+// Extension SIX: User Directory + Timezones - SIMPLE BUTTON UTILITY 2.0 INTEGRATION
+// 🎯 FIXED: Proper Simple Button Utility 2.0 integration with no fallback
 // 🗑️ REMOVED: All fallback button logic (fails gracefully instead)
 // ✅ CONDITIONAL: Button only appears on username pages or "chat room" pages
 // ===================================================================
@@ -51,26 +51,23 @@ const checkExtension15Dependencies = () => {
 };
 
 /**
- * 🎯 FIXED: Check if Extension 1.6 Button Utility is properly available
+ * 🎯 FIXED: Check if Simple Button Utility 2.0 is properly available
  */
 const checkButtonUtilityDependency = () => {
-  // Check for Extension 1.6 components
-  if (!window.ExtensionButtonManager) {
-    console.warn("❌ Extension 1.6 ExtensionButtonManager not found");
+  // Check for Simple Button Utility 2.0 components (the actual running system!)
+  if (!window.SimpleExtensionButtonManager) {
+    console.warn(
+      "❌ Simple Button Utility 2.0 SimpleExtensionButtonManager not found"
+    );
     return false;
   }
 
-  if (!window.RoamButtonRegistry) {
-    console.warn("❌ Extension 1.6 RoamButtonRegistry not found");
+  if (!window.ButtonConditions) {
+    console.warn("❌ Simple Button Utility 2.0 ButtonConditions not found");
     return false;
   }
 
-  if (!window.ButtonRegistryAPI) {
-    console.warn("❌ Extension 1.6 ButtonRegistryAPI not found");
-    return false;
-  }
-
-  console.log("✅ Extension 1.6 Button Utility properly available");
+  console.log("✅ Simple Button Utility 2.0 properly available");
   return true;
 };
 
@@ -84,27 +81,27 @@ const checkButtonUtilityDependency = () => {
  */
 const registerChatRoomContextDetector = () => {
   try {
-    // Register the custom context detector with Extension 1.6
-    window.ButtonRegistryAPI?.registerContextDetector("chat-room-pages", () => {
-      // Get current page title
+    // Check if we have the Simple Button Utility 2.0 system
+    if (!window.ButtonConditions) {
+      console.warn(
+        "⚠️ ButtonConditions not available - cannot register chat room detector"
+      );
+      return;
+    }
+
+    // Add chat room detection to ButtonConditions
+    window.ButtonConditions.isChatRoom = () => {
       const getCurrentPageTitle = () => {
         try {
-          // Method 1: Extract from URL (most reliable)
           const url = window.location.href;
           const pageMatch = url.match(/\/page\/([^/?#]+)/);
           if (pageMatch) {
             return decodeURIComponent(pageMatch[1]);
           }
-
-          // Method 2: Extract from page title element (fallback)
           const titleElement = document.querySelector(
             ".roam-article h1, .rm-page-title"
           );
-          if (titleElement) {
-            return titleElement.textContent?.trim();
-          }
-
-          return null;
+          return titleElement?.textContent?.trim() || null;
         } catch (error) {
           console.error("❌ Failed to get current page title:", error);
           return null;
@@ -122,9 +119,9 @@ const registerChatRoomContextDetector = () => {
       }
 
       return hasMatchingText;
-    });
+    };
 
-    console.log("✅ Chat room context detector registered");
+    console.log("✅ Chat room condition added to ButtonConditions");
   } catch (error) {
     console.error("❌ Failed to register chat room context detector:", error);
   }
@@ -578,49 +575,59 @@ const startRealtimeClockUpdatesClean = (modal) => {
 let buttonManager = null;
 
 /**
- * 🎯 FIXED: Proper Extension 1.6 button management with NO FALLBACK
+ * 🎯 FIXED: Proper Simple Button Utility 2.0 integration with NO FALLBACK
  */
 const initializeButtonManagement = async () => {
   try {
-    console.log("🎯 User Directory: Initializing proper button management...");
+    console.log("🎯 User Directory: Initializing Simple Button Utility 2.0...");
 
-    // 🎯 CRITICAL: Check Extension 1.6 availability first
+    // 🎯 CRITICAL: Check Simple Button Utility 2.0 availability first
     if (!checkButtonUtilityDependency()) {
       console.warn(
-        "❌ Extension 1.6 not available - NO BUTTON will be created"
+        "❌ Simple Button Utility 2.0 not available - NO BUTTON will be created"
       );
-      console.warn("💡 Please load Extension 1.6 Button Utility first");
-      return { success: false, reason: "Extension 1.6 not available" };
+      console.warn("💡 Please load Simple Button Utility 2.0 first");
+      return {
+        success: false,
+        reason: "Simple Button Utility 2.0 not available",
+      };
     }
 
     // 🎯 STEP 1: Register chat room context detector FIRST
     registerChatRoomContextDetector();
 
-    // 🎯 STEP 2: Wait for Extension 1.6 to be ready
+    // 🎯 STEP 2: Wait for Simple Button Utility 2.0 to be ready
     let retries = 0;
     const maxRetries = 10;
 
     while (retries < maxRetries) {
       try {
-        // 🎯 STEP 3: Create button manager for this extension
-        buttonManager = new window.ExtensionButtonManager("UserDirectory");
+        // 🎯 STEP 3: Create button manager using the CORRECT API
+        buttonManager = new window.SimpleExtensionButtonManager(
+          "UserDirectory"
+        );
         await buttonManager.initialize();
         break;
       } catch (error) {
         retries++;
         console.log(
-          `⏳ Extension 1.6 not ready, retrying... (${retries}/${maxRetries})`
+          `⏳ Simple Button Utility 2.0 not ready, retrying... (${retries}/${maxRetries})`
         );
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
     }
 
     if (retries >= maxRetries) {
-      console.error("❌ Failed to initialize Extension 1.6 after 10 retries");
-      return { success: false, reason: "Extension 1.6 initialization timeout" };
+      console.error(
+        "❌ Failed to initialize Simple Button Utility 2.0 after 10 retries"
+      );
+      return {
+        success: false,
+        reason: "Simple Button Utility 2.0 initialization timeout",
+      };
     }
 
-    // 🎯 STEP 4: Register the directory button with proper conditional logic
+    // 🎯 STEP 4: Register the directory button with CORRECT API syntax
     const result = await buttonManager.registerButton({
       id: "directory-button",
       text: "👥 User Directory",
@@ -638,32 +645,12 @@ const initializeButtonManagement = async () => {
         boxShadow: "0 4px 12px rgba(245, 158, 11, 0.3)",
       },
       // 🎯 THE CONDITIONAL MAGIC: Only show on username OR chat room pages
-      contextRules: {
-        showOn: ["username-pages", "chat-room-pages"],
-      },
-      // 🐛 DEBUG: Optional callbacks to see conditional logic working
-      onShow: () => {
-        console.log(
-          "👥 User Directory button shown (conditional page detected)"
-        );
-      },
-      onHide: () => {
-        console.log("👥 User Directory button hidden (not a conditional page)");
-      },
-      onDisplaced: (fromStack, toStack, reason) => {
-        console.log(
-          `📍 Directory button moved: ${fromStack} → ${toStack} (${reason})`
-        );
-      },
-      onRemoved: (reason) => {
-        console.warn(`⚠️ Directory button removed: ${reason}`);
-      },
+      // Using Simple Button Utility 2.0 syntax!
+      showOn: ["isUsernamePage", "isChatRoom"],
     });
 
     if (result.success) {
-      console.log(
-        `✅ Directory button registered at ${result.stack} position #${result.position}`
-      );
+      console.log(`✅ Directory button registered at ${result.stack}`);
       console.log(
         "🎯 Button will only appear on username pages or pages containing 'chat room'"
       );
@@ -683,40 +670,42 @@ const initializeButtonManagement = async () => {
 // ===================================================================
 
 /**
- * 🧪 DEBUG: Test Extension 1.6 integration
+ * 🧪 DEBUG: Test Simple Button Utility 2.0 integration
  */
 const testButtonUtilityIntegration = async () => {
-  console.group("🎯 Testing Extension 1.6 Integration");
+  console.group("🎯 Testing Simple Button Utility 2.0 Integration");
 
   try {
-    // Test Extension 1.6 availability
+    // Test Simple Button Utility 2.0 availability
     const hasButtonUtility = checkButtonUtilityDependency();
-    console.log("✅ Extension 1.6 available:", hasButtonUtility);
+    console.log("✅ Simple Button Utility 2.0 available:", hasButtonUtility);
 
     if (hasButtonUtility) {
-      // Test API availability
-      const api = window.ButtonRegistryAPI;
-      console.log("✅ Button Registry API available:", !!api);
+      // Test ButtonConditions
+      const conditions = window.ButtonConditions;
+      console.log("✅ ButtonConditions available:", !!conditions);
 
-      if (api) {
-        const capabilities = api.getCapabilities();
-        console.log("📊 Button Registry capabilities:", capabilities);
+      if (conditions) {
+        console.log("📊 Available conditions:", Object.keys(conditions));
       }
 
-      // Test ExtensionButtonManager
-      const manager = window.ExtensionButtonManager;
-      console.log("✅ ExtensionButtonManager available:", !!manager);
+      // Test SimpleExtensionButtonManager
+      const manager = window.SimpleExtensionButtonManager;
+      console.log("✅ SimpleExtensionButtonManager available:", !!manager);
 
       // Test registry status
-      const registry = window.RoamButtonRegistry;
+      const registry = window.SimpleButtonRegistry;
       if (registry) {
         console.log("📊 Registry status:", registry.getStatus());
       }
     }
 
-    console.log("🎉 Extension 1.6 integration test complete!");
+    console.log("🎉 Simple Button Utility 2.0 integration test complete!");
   } catch (error) {
-    console.error("❌ Extension 1.6 integration test failed:", error);
+    console.error(
+      "❌ Simple Button Utility 2.0 integration test failed:",
+      error
+    );
   }
 
   console.groupEnd();
@@ -729,22 +718,35 @@ const testConditionalLogic = () => {
   console.group("🎯 Testing Conditional Logic");
 
   try {
-    // Get current context from Extension 1.6
-    const registry = window.RoamButtonRegistry;
-    if (registry) {
-      const currentContext = registry.pageMonitor.getCurrentContext();
-      console.log("📋 Current context:", Array.from(currentContext));
+    // Get current conditions from Simple Button Utility 2.0
+    const conditions = window.ButtonConditions;
+    if (conditions) {
+      console.log("📋 Available conditions:", Object.keys(conditions));
 
-      const hasUsernameContext = currentContext.has("username-pages");
-      const hasChatRoomContext = currentContext.has("chat-room-pages");
+      // Test each condition
+      const results = {};
+      Object.keys(conditions).forEach((conditionName) => {
+        if (typeof conditions[conditionName] === "function") {
+          try {
+            results[conditionName] = conditions[conditionName]();
+          } catch (error) {
+            results[conditionName] = `Error: ${error.message}`;
+          }
+        }
+      });
 
-      console.log("👤 Is username page:", hasUsernameContext);
-      console.log("💬 Is chat room page:", hasChatRoomContext);
+      console.log("🧪 Current condition results:", results);
 
-      const shouldShowButton = hasUsernameContext || hasChatRoomContext;
+      const hasUsernameCondition = results.isUsernamePage;
+      const hasChatRoomCondition = results.isChatRoom;
+
+      console.log("👤 Is username page:", hasUsernameCondition);
+      console.log("💬 Is chat room page:", hasChatRoomCondition);
+
+      const shouldShowButton = hasUsernameCondition || hasChatRoomCondition;
       console.log("🎯 Should show button:", shouldShowButton);
     } else {
-      console.warn("❌ Extension 1.6 registry not available for testing");
+      console.warn("❌ ButtonConditions not available for testing");
     }
 
     console.log("✅ Conditional logic test complete!");
@@ -760,7 +762,7 @@ const testConditionalLogic = () => {
  */
 const runCleanSystemTests = async () => {
   console.group(
-    "🧪 Running Extension SIX System Tests (Fixed Button Management)"
+    "🧪 Running Extension SIX System Tests (Simple Button Utility 2.0 Integration)"
   );
 
   try {
@@ -778,7 +780,7 @@ const runCleanSystemTests = async () => {
       profile: !!profileAnalysisUtilities,
     });
 
-    // Test Extension 1.6 integration
+    // Test Simple Button Utility 2.0 integration
     await testButtonUtilityIntegration();
 
     // Test conditional logic
@@ -965,7 +967,7 @@ export default {
         callback: showUserDirectoryModalClean,
       },
       {
-        label: "User Directory: Test Extension 1.6 Integration",
+        label: "User Directory: Test Simple Button Utility 2.0 Integration",
         callback: testButtonUtilityIntegration,
       },
       {
@@ -994,20 +996,20 @@ export default {
     // ✅ STEP 4: Register with platform
     const requiredDependencies = [
       "utility-library", // Extension 1.5
-      "button-utility", // Extension 1.6
+      "simple-button-utility", // Simple Button Utility 2.0
     ];
 
     platform.register(
       "clean-user-directory",
       {
         services: cleanDirectoryServices,
-        version: "9.0.0", // 🎯 Fixed version
+        version: "9.1.0", // 🎯 Fixed API version
       },
       {
         name: "✨ User Directory",
         description:
-          "Professional user directory with proper Extension 1.6 integration, conditional button logic, and NO fallback buttons",
-        version: "9.0.0",
+          "Professional user directory with proper Simple Button Utility 2.0 integration, conditional button logic, and NO fallback buttons",
+        version: "9.1.0",
         dependencies: requiredDependencies,
       }
     );
@@ -1029,46 +1031,50 @@ export default {
     // ✅ STEP 6: Success report
     const currentUser = platform.getUtility("getCurrentUser")();
     console.log(
-      "🎉 Extension SIX loaded successfully (Fixed Button Management)!"
+      "🎉 Extension SIX loaded successfully (Simple Button Utility 2.0 Integration)!"
     );
     console.log("🗑️ REMOVED: All fallback button logic");
-    console.log("🎯 FIXED: Proper Extension 1.6 integration");
+    console.log("🎯 FIXED: Proper Simple Button Utility 2.0 integration");
     console.log(
       "🎯 CONDITIONAL: Button only appears on username or chat room pages"
     );
     console.log("🎨 STYLING: Elegant warm yellow with brown border");
-    console.log("🛡️ SAFETY: Fails gracefully if Extension 1.6 not available");
+    console.log(
+      "🛡️ SAFETY: Fails gracefully if Simple Button Utility 2.0 not available"
+    );
     console.log(`👤 Current user: ${currentUser?.displayName}`);
     console.log('💡 Try: Cmd+P → "User Directory: Show Directory"');
 
     // Auto-test integration after a delay
     setTimeout(async () => {
-      console.log("🔍 Auto-testing Fixed Button Management integration...");
+      console.log("🔍 Auto-testing Simple Button Utility 2.0 integration...");
       await runCleanSystemTests();
     }, 3000);
 
     return {
       extensionId: "clean-user-directory",
       services: cleanDirectoryServices,
-      version: "9.0.0",
-      status: "fixed_button_management",
+      version: "9.1.0",
+      status: "simple_button_utility_integration",
     };
   },
 
   onunload: () => {
-    console.log("🎯 User Directory unloading (Fixed Button Management)...");
+    console.log(
+      "🎯 User Directory unloading (Simple Button Utility 2.0 Integration)..."
+    );
 
     // 🎯 CLEAN: Proper button management cleanup
     if (buttonManager) {
       try {
         buttonManager.cleanup();
-        console.log("✅ Extension 1.6 button management cleaned up");
+        console.log(
+          "✅ Simple Button Utility 2.0 button management cleaned up"
+        );
       } catch (error) {
         console.error("❌ Button manager cleanup error:", error);
       }
     }
-
-    // 🗑️ REMOVED: No fallback button cleanup needed!
 
     // Clean up modals (unchanged)
     const modals = document.querySelectorAll(
@@ -1079,6 +1085,8 @@ export default {
     // Navigation helper cleanup (unchanged)
     delete window.navigateToUserPageClean;
 
-    console.log("✅ User Directory cleanup complete (no fallback mess)!");
+    console.log(
+      "✅ User Directory cleanup complete (using Simple Button Utility 2.0)!"
+    );
   },
 };
