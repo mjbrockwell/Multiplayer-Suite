@@ -541,13 +541,13 @@ const initializeButtonManagement = async () => {
     // Register the directory button with professional styling
     const result = await buttonManager.registerButton({
       id: "directory-button",
-      text: "👥 User Directory",
+      text: "👥  User Directory",
       onClick: showUserDirectoryModalClean,
       stack: "top-left", // Professional left-side placement
       priority: false, // Play nice with other extensions
       style: {
         background: "linear-gradient(135deg, #fef3c7, #fde68a)",
-        borderColor: "#f59e0b",
+        borderColor: "#9a5835",
         color: "#92400e",
         fontWeight: "600",
         padding: "10px 16px",

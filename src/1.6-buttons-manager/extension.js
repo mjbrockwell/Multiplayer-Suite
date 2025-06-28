@@ -1,5 +1,6 @@
 // ===================================================================
 // Enhanced Button Utility Extension 1.6 - Event-Driven & Context-Aware
+// 🧙‍♂️ FIXED WITH SANDBOX WISDOM - No more positioning issues!
 // With Username Page Detection
 // ===================================================================
 
@@ -9,26 +10,26 @@
   // ==================== CONFIGURATION ====================
 
   const EXTENSION_NAME = "Enhanced Button Utility";
-  const EXTENSION_VERSION = "1.6.0";
+  const EXTENSION_VERSION = "1.6.1"; // Incremented for the fix
   const ANIMATION_DURATION = 200;
 
-  // Button stack configuration
+  // 🧙‍♂️ SANDBOX WISDOM: Fixed button stack configuration
   const BUTTON_STACKS = {
     "top-left": {
       maxButtons: 2,
       positions: [
-        { x: 10, y: 10 },
-        { x: 10, y: 50 },
+        { x: 20, y: 8 }, // ← Sandbox coordinates: relative to content area
+        { x: 20, y: 50 }, // ← Proper spacing for content positioning
       ],
     },
     "top-right": {
       maxButtons: 5,
       positions: [
-        { x: -10, y: 10 },
-        { x: -10, y: 50 },
-        { x: -10, y: 90 },
-        { x: -10, y: 130 },
-        { x: -10, y: 170 },
+        { x: -100, y: 8 }, // ← Sandbox coordinates: -100px from right edge
+        { x: -100, y: 50 },
+        { x: -100, y: 92 },
+        { x: -100, y: 134 },
+        { x: -100, y: 176 },
       ],
     },
   };
@@ -842,61 +843,57 @@
       }
     }
 
+    // 🧙‍♂️ SANDBOX WISDOM: Completely rewritten setupContainer method
     async setupContainer() {
-      // Wait for Roam to be ready
-      const maxAttempts = 50;
-      let attempts = 0;
+      // 🧙‍♂️ SANDBOX WISDOM: Find the content area, not the viewport!
+      this.container = this.findBestContainer();
 
-      const waitForRoam = () => {
-        return new Promise((resolve, reject) => {
-          const check = () => {
-            attempts++;
-            const roamMain = document.querySelector(".roam-main, .roam-app");
-
-            if (roamMain) {
-              resolve(roamMain);
-            } else if (attempts >= maxAttempts) {
-              reject(new Error("Roam container not found"));
-            } else {
-              setTimeout(check, 100);
-            }
-          };
-          check();
-        });
-      };
-
-      const roamContainer = await waitForRoam();
-
-      // Create button container
-      const existingContainer = document.getElementById(
-        "roam-button-registry-container"
-      );
-      if (existingContainer) {
-        existingContainer.remove();
+      if (!this.container) {
+        console.error("❌ No suitable container found for button registry");
+        throw new Error("Button container setup failed");
       }
-
-      const container = document.createElement("div");
-      container.id = "roam-button-registry-container";
-      container.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        pointer-events: none;
-        z-index: 9999;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      `;
-
-      document.body.appendChild(container);
-      this.container = {
-        element: container,
-        selector: "#roam-button-registry-container",
-      };
 
       if (this.debugMode) {
-        console.log("✅ Button container created");
+        console.log(`✅ Container found: ${this.container.selector}`);
       }
+
+      // 🧙‍♂️ SANDBOX WISDOM: Use relative positioning within content area
+      if (getComputedStyle(this.container.element).position === "static") {
+        this.container.element.style.position = "relative";
+      }
+
+      if (this.debugMode) {
+        console.log("✅ Button container configured with sandbox wisdom");
+      }
+    }
+
+    // 🧙‍♂️ SANDBOX WISDOM: Add the genius container discovery method
+    findBestContainer() {
+      // 🧙‍♂️ SANDBOX WISDOM: Try content areas in order of preference
+      const candidates = [
+        ".roam-article", // Main content area (best choice)
+        ".roam-main .roam-article", // Article within main
+        ".rm-article-wrapper", // Alternative article wrapper
+        ".roam-main", // Main area fallback
+        ".rm-reference-main", // Reference area fallback
+      ];
+
+      for (const selector of candidates) {
+        const element = document.querySelector(selector);
+        if (element) {
+          // 🧙‍♂️ SANDBOX WISDOM: Validate container size (avoid tiny elements)
+          const rect = element.getBoundingClientRect();
+          if (rect.width > 400 && rect.height > 200) {
+            return {
+              element,
+              selector,
+              rect,
+            };
+          }
+        }
+      }
+
+      return null;
     }
 
     handleContextChange(change) {
@@ -1140,6 +1137,7 @@
         }
       });
 
+      // 🧙‍♂️ SANDBOX WISDOM: Append to content container, not overlay
       this.container.element.appendChild(button);
       buttonConfig.element = button;
     }
@@ -1257,7 +1255,11 @@
       this.pageMonitor.stopMonitoring();
 
       if (this.container?.element) {
-        this.container.element.remove();
+        // 🧙‍♂️ SANDBOX WISDOM: Don't remove the content container!
+        // Just reset its position if we modified it
+        if (this.container.element.style.position === "relative") {
+          this.container.element.style.position = "";
+        }
         this.container = null;
       }
 
@@ -1484,6 +1486,6 @@
   }
 
   console.log(
-    `✅ ${EXTENSION_NAME} v${EXTENSION_VERSION} loaded with username detection`
+    `✅ ${EXTENSION_NAME} v${EXTENSION_VERSION} loaded with sandbox wisdom! 🧙‍♂️`
   );
 })();
