@@ -1,10 +1,106 @@
 // ===================================================================
-// Extension 1.5: Enhanced Utility Library - COMPLETE FIXED VERSION
-// ✅ FIXED: autoRegisterUser now properly registered and triggered
-// ✅ FIXED: All functions accessible globally and via platform
-// ✅ FIXED: Auto-registration triggers on startup with real users
-// Features: User authentication + user preferences management + utilities
+// Extension 1.5: Enhanced Utility Library - WITH MEMBER CACHE SYSTEM
+// ✅ NEW: GraphMemberCache - Single source of truth for graph members
+// ✅ ENHANCED: Auto-registration with cache integration
+// ✅ ENHANCED: All member management functions update cache
+// Features: User authentication + member management + utilities + caching
 // ===================================================================
+
+// ===================================================================
+// 📝 GRAPH MEMBER CACHE SYSTEM - Single Source of Truth
+// ===================================================================
+
+/**
+ * 📝 Global member cache - Single source of truth for graph members
+ */
+window.GraphMemberCache = {
+  members: [],
+  lastUpdated: null,
+  isInitialized: false,
+
+  /**
+   * Refresh cache from the authoritative source
+   */
+  refresh() {
+    try {
+      this.members = getGraphMembersFromList("roam/graph members", "Directory");
+      this.lastUpdated = new Date();
+      this.isInitialized = true;
+      console.log(
+        `📝 Member cache refreshed: ${this.members.length} members`,
+        this.members
+      );
+      return this.members;
+    } catch (error) {
+      console.error("❌ Failed to refresh member cache:", error);
+      return this.members; // Return existing cache on error
+    }
+  },
+
+  /**
+   * Check if username is a graph member (exact match)
+   */
+  isMember(username) {
+    if (!username) return false;
+    if (!this.isInitialized) {
+      console.log("🔄 Cache not initialized, refreshing...");
+      this.refresh();
+    }
+    const result = this.members.includes(username);
+    console.log(`🔍 isMember("${username}"): ${result}`);
+    return result;
+  },
+
+  /**
+   * Add member to cache (call after successful registration)
+   */
+  addMember(username) {
+    if (!username || this.members.includes(username)) return;
+
+    this.members.push(username);
+    this.lastUpdated = new Date();
+    console.log(`➕ Added to member cache: ${username}`);
+  },
+
+  /**
+   * Remove member from cache
+   */
+  removeMember(username) {
+    const index = this.members.indexOf(username);
+    if (index > -1) {
+      this.members.splice(index, 1);
+      this.lastUpdated = new Date();
+      console.log(`🗑️ Removed from member cache: ${username}`);
+      return true;
+    }
+    return false;
+  },
+
+  /**
+   * Get cache status for debugging
+   */
+  getStatus() {
+    return {
+      memberCount: this.members.length,
+      members: [...this.members],
+      lastUpdated: this.lastUpdated,
+      isInitialized: this.isInitialized,
+      cacheAge: this.lastUpdated
+        ? Date.now() - this.lastUpdated.getTime()
+        : null,
+    };
+  },
+
+  /**
+   * Force cache initialization if needed
+   */
+  ensureInitialized() {
+    if (!this.isInitialized) {
+      this.refresh();
+    }
+    return this.isInitialized;
+  },
+};
 
 // ===================================================================
 // 🌍 TIMEZONE INTELLIGENCE UTILITIES - Moved from Extension SIX
@@ -1067,7 +1163,7 @@ const getCurrentUserViaOfficialAPI = () => {
 };
 
 /**
- * 🎯 FIXED: Auto-registration system using cascadeToBlock
+ * 🎯 ENHANCED: Auto-registration system with cache integration
  */
 const autoRegisterUser = async (username) => {
   if (
@@ -1081,8 +1177,17 @@ const autoRegisterUser = async (username) => {
   try {
     console.log(`🎯 Auto-registering: ${username}`);
 
+    // Check if already registered (avoid duplicate registration)
+    if (window.GraphMemberCache.isMember(username)) {
+      console.log(`✅ User already registered: ${username}`);
+      return;
+    }
+
     // ✅ FIXED: Use cascadeToBlock for elegant page creation
     await cascadeToBlock("roam/graph members", ["Directory::", username], true);
+
+    // ✅ NEW: Update cache immediately after successful registration
+    window.GraphMemberCache.addMember(username);
 
     console.log(`✅ Auto-registered user: ${username}`);
   } catch (error) {
@@ -1091,7 +1196,7 @@ const autoRegisterUser = async (username) => {
 };
 
 // ===================================================================
-// 👥 ENHANCED GRAPH MEMBER MANAGEMENT - COMPLETELY FIXED
+// 👥 ENHANCED GRAPH MEMBER MANAGEMENT - WITH CACHE INTEGRATION
 // ===================================================================
 
 /**
@@ -1134,7 +1239,7 @@ const getGraphMembersFromList = (
 };
 
 /**
- * Add member to managed list
+ * Add member to managed list with cache integration
  */
 const addGraphMember = async (
   username,
@@ -1147,7 +1252,14 @@ const addGraphMember = async (
     const directoryUid = await ensureBlockExists(pageUid, "Directory::");
     if (!directoryUid) return false;
 
-    return await addToBlockList(directoryUid, username);
+    const success = await addToBlockList(directoryUid, username);
+
+    // ✅ NEW: Update cache after successful addition
+    if (success && window.GraphMemberCache) {
+      window.GraphMemberCache.addMember(username);
+    }
+
+    return success;
   } catch (error) {
     console.error("Error adding graph member:", error);
     return false;
@@ -1155,7 +1267,7 @@ const addGraphMember = async (
 };
 
 /**
- * Remove member from managed list
+ * Remove member from managed list with cache integration
  */
 const removeGraphMember = async (
   username,
@@ -1168,7 +1280,14 @@ const removeGraphMember = async (
     const directoryUid = findBlockByText(pageUid, "Directory::");
     if (!directoryUid) return false;
 
-    return await removeFromBlockList(directoryUid, username);
+    const success = await removeFromBlockList(directoryUid, username);
+
+    // ✅ NEW: Update cache after successful removal
+    if (success && window.GraphMemberCache) {
+      window.GraphMemberCache.removeMember(username);
+    }
+
+    return success;
   } catch (error) {
     console.error("Error removing graph member:", error);
     return false;
@@ -1541,7 +1660,7 @@ const clearUserCache = () => {
 };
 
 // ===================================================================
-// 🧪 TEST FUNCTIONS
+// 🧪 TEST FUNCTIONS - INCLUDING MEMBER CACHE TESTS
 // ===================================================================
 
 /**
@@ -1894,31 +2013,6 @@ const testEnhancedMemberManagement = async () => {
 };
 
 /**
- * Test complete graph members workflow
- */
-const testGraphMembersWorkflow = async () => {
-  console.group("👥 Testing Graph Members Workflow");
-
-  try {
-    const members = getGraphMembers();
-    console.log(
-      `📋 Found ${members.length} graph members:`,
-      members.slice(0, 5)
-    );
-
-    // Test adding current user to a test list
-    const currentUser = getCurrentUser();
-    console.log(`👤 Current user: ${currentUser.displayName}`);
-
-    console.log("✅ Graph members workflow test completed!");
-  } catch (error) {
-    console.error("❌ Graph members workflow test failed:", error);
-  }
-
-  console.groupEnd();
-};
-
-/**
  * Test image extraction utility
  */
 const testImageExtraction = async () => {
@@ -2004,8 +2098,146 @@ const diagnoseMemberListStructure = () => {
   console.groupEnd();
 };
 
+/**
+ * Test the member cache system
+ */
+const testMemberCache = () => {
+  console.group("📝 Testing Member Cache System");
+
+  try {
+    // Test cache status
+    console.log("1️⃣ Testing cache status...");
+    const status = window.GraphMemberCache.getStatus();
+    console.log("Cache status:", status);
+
+    // Test cache refresh
+    console.log("\n2️⃣ Testing cache refresh...");
+    const members = window.GraphMemberCache.refresh();
+    console.log("Refreshed members:", members);
+
+    // Test isMember function
+    console.log("\n3️⃣ Testing isMember function...");
+    const currentUser = getCurrentUser();
+    if (currentUser?.displayName) {
+      const isMember = window.GraphMemberCache.isMember(
+        currentUser.displayName
+      );
+      console.log(`Is "${currentUser.displayName}" a member: ${isMember}`);
+    }
+
+    // Test with non-member
+    const nonMember = window.GraphMemberCache.isMember(
+      "Definitely Not A Member"
+    );
+    console.log(`Is "Definitely Not A Member" a member: ${nonMember}`);
+
+    // Test cache vs direct query comparison
+    console.log("\n4️⃣ Testing cache vs direct query...");
+    const directQuery = getGraphMembersFromList(
+      "roam/graph members",
+      "Directory"
+    );
+    const cachedMembers = window.GraphMemberCache.members;
+    console.log("Direct query result:", directQuery);
+    console.log("Cached members:", cachedMembers);
+    console.log(
+      "Cache matches direct query:",
+      JSON.stringify(directQuery) === JSON.stringify(cachedMembers)
+    );
+
+    console.log("\n✅ Member cache test completed!");
+  } catch (error) {
+    console.error("❌ Member cache test failed:", error);
+  }
+
+  console.groupEnd();
+};
+
+/**
+ * Test cache-based username detection
+ */
+const testCacheBasedUsernameDetection = () => {
+  console.group("🎯 Testing Cache-Based Username Detection");
+
+  try {
+    // Ensure cache is initialized
+    window.GraphMemberCache.ensureInitialized();
+
+    const testCases = [
+      { title: "Matt Brockwell", expected: true },
+      { title: "John Smith", expected: false },
+      { title: "Daily Notes", expected: false },
+      { title: "Chat Room", expected: false },
+      { title: "", expected: false },
+      { title: null, expected: false },
+    ];
+
+    testCases.forEach((testCase) => {
+      const result = window.GraphMemberCache.isMember(testCase.title);
+      const status = result === testCase.expected ? "✅ PASS" : "❌ FAIL";
+      console.log(
+        `${status} "${testCase.title}" → ${result} (expected: ${testCase.expected})`
+      );
+    });
+
+    console.log("\n🎉 Cache-based username detection test completed!");
+  } catch (error) {
+    console.error("❌ Cache-based username detection test failed:", error);
+  }
+
+  console.groupEnd();
+};
+
+/**
+ * Test auto-registration with cache integration
+ */
+const testAutoRegistrationWithCache = async () => {
+  console.group("🎯 Testing Auto-Registration with Cache");
+
+  try {
+    const testUsername = "Test User " + Date.now();
+
+    console.log(`1️⃣ Testing registration of: ${testUsername}`);
+
+    // Check initial state
+    const initialIsMember = window.GraphMemberCache.isMember(testUsername);
+    console.log(`Initial member status: ${initialIsMember}`);
+
+    // Register user
+    await autoRegisterUser(testUsername);
+
+    // Check cache was updated
+    const afterRegistrationIsMember =
+      window.GraphMemberCache.isMember(testUsername);
+    console.log(
+      `After registration member status: ${afterRegistrationIsMember}`
+    );
+
+    // Verify in actual data
+    const actualMembers = getGraphMembersFromList(
+      "roam/graph members",
+      "Directory"
+    );
+    const inActualData = actualMembers.includes(testUsername);
+    console.log(`In actual data: ${inActualData}`);
+
+    // Clean up test user
+    console.log(`2️⃣ Cleaning up test user: ${testUsername}`);
+    await removeGraphMember(testUsername);
+
+    const afterRemovalIsMember = window.GraphMemberCache.isMember(testUsername);
+    console.log(`After removal member status: ${afterRemovalIsMember}`);
+
+    console.log("\n✅ Auto-registration with cache test completed!");
+  } catch (error) {
+    console.error("❌ Auto-registration with cache test failed:", error);
+  }
+
+  console.groupEnd();
+};
+
 // ===================================================================
-// 🎛️ COMPLETE UTILITIES REGISTRY - WITH ALL FIXES
+// 🎛️ COMPLETE UTILITIES REGISTRY - WITH MEMBER CACHE SYSTEM
 // ===================================================================
 
 const UTILITIES = {
@@ -2025,11 +2257,14 @@ const UTILITIES = {
   extractImageUrls,
   processAvatarImages,
 
-  // 👥 Graph Member Management
+  // 👥 Graph Member Management with Cache Integration
   getGraphMembers,
   getGraphMembersFromList,
   addGraphMember,
   removeGraphMember,
+
+  // 📝 Member Cache System
+  GraphMemberCache: window.GraphMemberCache,
 
   // 🔧 Core Block Management Utilities
   findBlockByText,
@@ -2067,7 +2302,7 @@ const UTILITIES = {
   // 🔍 FIXED: User Detection
   getCurrentUser,
   getCurrentUserViaOfficialAPI,
-  autoRegisterUser, // ✅ FIXED: Now properly included
+  autoRegisterUser,
   clearUserCache,
 
   // 🧪 Test Functions
@@ -2082,20 +2317,24 @@ const UTILITIES = {
   testProfileAnalysisUtilities,
   testEnhancedImageProcessing,
   testEnhancedMemberManagement,
-  testGraphMembersWorkflow,
   testImageExtraction,
+
+  // 📝 Member Cache Test Functions
+  testMemberCache,
+  testCacheBasedUsernameDetection,
+  testAutoRegistrationWithCache,
 
   // 🔍 Diagnostic Functions
   diagnoseMemberListStructure,
 };
 
 // ===================================================================
-// 🎯 EXTENSION REGISTRATION - COMPLETE WITH ALL FIXES
+// 🎯 EXTENSION REGISTRATION - WITH MEMBER CACHE SYSTEM
 // ===================================================================
 
 export default {
   onload: () => {
-    console.log("🔧 Extension 1.5 loading - COMPLETE FIXED VERSION...");
+    console.log("🔧 Extension 1.5 loading - WITH MEMBER CACHE SYSTEM...");
 
     // Initialize extension registry if it doesn't exist
     if (!window._extensionRegistry) {
@@ -2135,22 +2374,26 @@ export default {
           "utility-library",
           {
             utilities: UTILITIES,
-            version: "1.5.4-complete-fix",
+            version: "1.5.5-member-cache",
           },
           {
-            name: "Enhanced Utility Library - COMPLETE FIXED VERSION",
+            name: "Enhanced Utility Library - WITH MEMBER CACHE SYSTEM",
             description:
-              "Complete fixed utility library with working auto-registration",
-            version: "1.5.4-complete-fix",
+              "Complete utility library with member cache system for exact username detection",
+            version: "1.5.5-member-cache",
             dependencies: [],
           }
         );
       }
     }
 
-    // ✅ FIXED: Trigger auto-registration on startup
+    // ✅ ENHANCED: Initialize member cache and trigger auto-registration on startup
     setTimeout(async () => {
       try {
+        // Initialize member cache first
+        console.log("📝 Initializing member cache...");
+        window.GraphMemberCache.refresh();
+
         const currentUser = getCurrentUser();
         console.log("🔍 Startup user detection:", currentUser);
 
@@ -2214,16 +2457,24 @@ export default {
         callback: testEnhancedMemberManagement,
       },
       {
-        label: "Test: Graph Members Workflow",
-        callback: testGraphMembersWorkflow,
-      },
-      {
         label: "Test: Image Extraction",
         callback: testImageExtraction,
       },
       {
         label: "Test: Diagnose Member List Structure",
         callback: diagnoseMemberListStructure,
+      },
+      {
+        label: "📝 Test: Member Cache System",
+        callback: testMemberCache,
+      },
+      {
+        label: "🎯 Test: Cache-Based Username Detection",
+        callback: testCacheBasedUsernameDetection,
+      },
+      {
+        label: "🎯 Test: Auto-Registration with Cache",
+        callback: testAutoRegistrationWithCache,
       },
     ];
 
@@ -2239,32 +2490,42 @@ export default {
     });
 
     // ✅ Extension successfully loaded
-    console.log("✅ Extension 1.5 COMPLETE FIXED VERSION loaded successfully!");
+    console.log(
+      "✅ Extension 1.5 ENHANCED VERSION with Member Cache loaded successfully!"
+    );
     console.log(`🔧 Registered ${Object.keys(UTILITIES).length} utilities`);
     console.log(
-      "   ✅ FIXED: autoRegisterUser now properly registered and triggers on startup"
+      "   ✅ NEW: GraphMemberCache - Single source of truth for graph members"
+    );
+    console.log(
+      "   ✅ ENHANCED: autoRegisterUser now updates cache immediately"
+    );
+    console.log(
+      "   ✅ ENHANCED: addGraphMember/removeGraphMember update cache"
     );
     console.log(
       "   ✅ FIXED: All functions accessible globally and via platform"
     );
     console.log(
-      "   ✅ FIXED: Auto-registration uses cascadeToBlock for elegant structure creation"
-    );
-    console.log(
       "   🌍 Timezone Management, 🪟 Modal Creation, 🧭 Navigation, 📊 Profile Analysis"
     );
     console.log("   🖼️ Enhanced Image Processing, 👥 Graph Member Management");
-    console.log("💡 Try: Cmd+P → '🔧 Test: Fixed User Detection' to verify!");
+    console.log("   📝 Member Cache System for exact username detection");
+    console.log(
+      "💡 Try: Cmd+P → '📝 Test: Member Cache System' to verify cache!"
+    );
 
     return {
       extensionId: "utility-library",
       utilities: UTILITIES,
-      version: "1.5.4-complete-fix",
+      version: "1.5.5-member-cache",
     };
   },
 
   onunload: () => {
-    console.log("🔧 Extension 1.5 COMPLETE FIXED VERSION unloading...");
+    console.log(
+      "🔧 Extension 1.5 ENHANCED VERSION with Member Cache unloading..."
+    );
 
     // Clean up global functions
     Object.keys(UTILITIES).forEach((name) => {

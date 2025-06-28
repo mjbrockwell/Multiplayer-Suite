@@ -1,14 +1,80 @@
 // ===================================================================
 // Simple Button Utility Extension 2.0 - Page-Change Driven
 // 🎯 COMPLETELY REDESIGNED: Simple "tear down and rebuild" approach
+// 🔧 FIXED: Proper page title detection consistently throughout
 // ===================================================================
 
 (() => {
   "use strict";
 
   const EXTENSION_NAME = "Simple Button Utility";
-  const EXTENSION_VERSION = "2.0.0"; // Complete redesign
+  const EXTENSION_VERSION = "2.0.3"; // Cache-based username detection
   const ANIMATION_DURATION = 200;
+
+  // ==================== CENTRALIZED PAGE TITLE DETECTION ====================
+
+  // 🔧 SINGLE SOURCE OF TRUTH: One function for page title detection used everywhere
+  function getCurrentPageTitle() {
+    try {
+      // STEP 1: Try to get the actual displayed page title from DOM FIRST
+      const titleSelectors = [
+        ".roam-article h1",
+        ".rm-page-title",
+        ".rm-title-display",
+        "[data-page-title]",
+        ".rm-page-title-text",
+        ".roam-article > div:first-child h1",
+        "h1[data-page-title]",
+      ];
+
+      for (const selector of titleSelectors) {
+        const titleElement = document.querySelector(selector);
+        if (titleElement) {
+          const titleText = titleElement.textContent?.trim();
+          if (titleText && titleText !== "") {
+            if (window.SimpleButtonRegistry?.debugMode) {
+              console.log(`📄 Got page title from ${selector}: "${titleText}"`);
+            }
+            return titleText;
+          }
+        }
+      }
+
+      // STEP 2: Try document.title as backup (clean it up)
+      if (document.title && document.title !== "Roam") {
+        const titleText = document.title
+          .replace(" - Roam", "")
+          .replace(" | Roam Research", "")
+          .trim();
+        if (titleText && titleText !== "") {
+          if (window.SimpleButtonRegistry?.debugMode) {
+            console.log(
+              `📄 Got page title from document.title: "${titleText}"`
+            );
+          }
+          return titleText;
+        }
+      }
+
+      // STEP 3: ONLY as last resort, try URL parsing (returns page ID, not title)
+      const url = window.location.href;
+      const pageMatch = url.match(/\/page\/([^/?#]+)/);
+      if (pageMatch) {
+        const pageId = decodeURIComponent(pageMatch[1]);
+        console.warn(`⚠️ Falling back to page ID (not title): "${pageId}"`);
+        console.warn(
+          "💡 Consider improving DOM selectors for better title detection"
+        );
+        return pageId;
+      }
+
+      console.warn("❌ Could not determine page title");
+      return null;
+    } catch (error) {
+      console.error("❌ Failed to get current page title:", error);
+      return null;
+    }
+  }
 
   // ==================== BUTTON STACK POSITIONING (RESTORED) ====================
 
@@ -19,6 +85,55 @@
         { x: 20, y: 8 }, // ← Sandbox coordinates: relative to content area
         { x: 20, y: 50 }, // ← Proper spacing for content positioning
       ],
+    },
+
+    // 🎯 NEW: Test cache-based username detection
+
+    // 🎯 NEW: Test cache-based username detection
+    testCacheBasedUsernameDetection: () => {
+      console.group(
+        "🎯 Testing Cache-Based Username Detection in Button System"
+      );
+
+      // Test current page
+      const currentTitle = getCurrentPageTitle();
+      console.log(`Current page: "${currentTitle}"`);
+
+      if (window.GraphMemberCache) {
+        console.log("✅ GraphMemberCache available");
+        const cacheStatus = window.GraphMemberCache.getStatus();
+        console.log("Cache status:", cacheStatus);
+
+        // Test current page detection
+        const isMemberViaCache = window.GraphMemberCache.isMember(currentTitle);
+        const isUsernamePageResult = window.ButtonConditions.isUsernamePage();
+
+        console.log(
+          `Cache says "${currentTitle}" is member: ${isMemberViaCache}`
+        );
+        console.log(`isUsernamePage() returns: ${isUsernamePageResult}`);
+        console.log(
+          `Results match: ${isMemberViaCache === isUsernamePageResult}`
+        );
+
+        // Test some example cases
+        const testCases = [
+          "Matt Brockwell",
+          "Chat Room",
+          "Daily Notes",
+          "John Smith",
+        ];
+        testCases.forEach((testCase) => {
+          const cacheResult = window.GraphMemberCache.isMember(testCase);
+          console.log(`"${testCase}" → Cache: ${cacheResult}`);
+        });
+      } else {
+        console.log(
+          "❌ GraphMemberCache not available - using fallback detection"
+        );
+      }
+
+      console.groupEnd();
     },
     "top-right": {
       maxButtons: 5,
@@ -94,7 +209,7 @@
       // Watch for title changes (Roam-specific)
       this.titleObserver = new MutationObserver(() => {
         if (document.title !== this.currentTitle) {
-          setTimeout(() => this.checkForPageChange(), 50);
+          setTimeout(() => self.checkForPageChange(), 50);
         }
       });
 
@@ -140,18 +255,43 @@
 
   // ==================== SIMPLE BUTTON CONDITIONS ====================
 
-  // Simple condition functions - much easier to understand!
+  // 🔧 FIXED: All conditions use the same centralized getCurrentPageTitle function
   const ButtonConditions = {
-    // Username page detection
+    // Username page detection - ENHANCED: Uses member cache for exact matching
     isUsernamePage: () => {
       const pageTitle = getCurrentPageTitle();
       if (!pageTitle) return false;
 
-      // Simple patterns for username detection
-      return (
-        /^[A-Z][a-z]+\s+[A-Z][a-z]+$/.test(pageTitle) || // "First Last"
-        /^[a-zA-Z][a-zA-Z0-9_-]{2,}$/.test(pageTitle)
-      ); // "username123"
+      // 🎯 NEW: Use GraphMemberCache for exact member matching (no false positives)
+      if (window.GraphMemberCache?.isMember) {
+        const isCachedMember = window.GraphMemberCache.isMember(pageTitle);
+
+        if (window.SimpleButtonRegistry?.debugMode) {
+          console.log(
+            `🎯 Cache-based username detection for "${pageTitle}": ${isCachedMember}`
+          );
+        }
+
+        return isCachedMember;
+      }
+
+      // Fallback to regex patterns if cache not available
+      const isFirstLastPattern = /^[A-Z][a-z]+\s+[A-Z][a-z]+$/.test(pageTitle);
+      const isUsernamePattern = /^[a-zA-Z][a-zA-Z0-9_-]{2,}$/.test(pageTitle);
+      const result = isFirstLastPattern || isUsernamePattern;
+
+      if (window.SimpleButtonRegistry?.debugMode) {
+        console.log(
+          `⚠️ Fallback regex username detection for "${pageTitle}":`,
+          {
+            isFirstLastPattern,
+            isUsernamePattern,
+            result,
+          }
+        );
+      }
+
+      return result;
     },
 
     // Daily note detection
@@ -191,13 +331,6 @@
     },
   };
 
-  // Helper function
-  function getCurrentPageTitle() {
-    const url = window.location.href;
-    const pageMatch = url.match(/\/page\/([^/?#]+)/);
-    return pageMatch ? decodeURIComponent(pageMatch[1]) : null;
-  }
-
   // ==================== SIMPLE BUTTON REGISTRY ====================
 
   class SimpleButtonRegistry {
@@ -231,7 +364,14 @@
     }
 
     setupContainer() {
-      // Find main content area
+      // 🔧 FIXED: Don't cache container - find it dynamically each time
+      // This prevents stale container issues during SPA navigation
+      this.container = null; // Will be found dynamically
+      console.log("✅ Container setup configured for dynamic detection");
+    }
+
+    getCurrentContainer() {
+      // 🔧 DYNAMIC: Find container fresh each time to handle SPA navigation
       const candidates = [
         ".roam-article",
         ".roam-main .roam-article",
@@ -240,30 +380,29 @@
 
       for (const selector of candidates) {
         const element = document.querySelector(selector);
-        if (element) {
-          this.container = element;
-
+        if (element && document.contains(element)) {
           // Ensure relative positioning for absolute button placement
           if (getComputedStyle(element).position === "static") {
             element.style.position = "relative";
           }
 
-          console.log(`✅ Container found: ${selector}`);
-          return;
+          return element;
         }
       }
 
-      throw new Error("No suitable container found");
+      // Fallback to body if no suitable container found
+      console.warn("⚠️ No suitable container found, using document.body");
+      return document.body;
     }
 
     // ==================== CORE METHOD: REBUILD ALL BUTTONS ====================
 
     rebuildAllButtons() {
       console.log("🔄 Rebuilding all buttons for current page...");
-      if (window.SimpleButtonRegistry?.debugMode) {
+      if (this.debugMode) {
         console.log("📍 Current location:", {
           url: window.location.href,
-          title: getCurrentPageTitle(),
+          title: getCurrentPageTitle(), // Uses centralized function
         });
       }
 
@@ -271,7 +410,7 @@
       this.clearAllButtons();
       this.clearAllStacks();
 
-      if (window.SimpleButtonRegistry?.debugMode) {
+      if (this.debugMode) {
         console.log(
           `📋 Evaluating ${this.registeredButtons.size} registered buttons`
         );
@@ -282,17 +421,17 @@
       this.registeredButtons.forEach((config) => {
         if (this.shouldButtonBeVisible(config)) {
           visibleButtons.push(config);
-          if (window.SimpleButtonRegistry?.debugMode) {
+          if (this.debugMode) {
             console.log(`✅ Button "${config.id}" will be shown`);
           }
         } else {
-          if (window.SimpleButtonRegistry?.debugMode) {
+          if (this.debugMode) {
             console.log(`❌ Button "${config.id}" will be hidden`);
           }
         }
       });
 
-      if (window.SimpleButtonRegistry?.debugMode) {
+      if (this.debugMode) {
         console.log(
           `📊 Visibility results: ${visibleButtons.length}/${this.registeredButtons.size} buttons will be shown`
         );
@@ -317,7 +456,7 @@
         `✅ Button rebuild complete (${this.activeButtons.size} visible)`
       );
 
-      if (window.SimpleButtonRegistry?.debugMode) {
+      if (this.debugMode) {
         console.log("📊 Final button status:", {
           registered: Array.from(this.registeredButtons.keys()),
           visible: Array.from(this.activeButtons.keys()),
@@ -371,7 +510,7 @@
       const { showOn, hideOn, condition } = config;
 
       // Enhanced debugging for this specific issue
-      if (window.SimpleButtonRegistry?.debugMode) {
+      if (this.debugMode) {
         console.group(`🔍 Evaluating visibility for button "${config.id}"`);
         console.log("Button config:", {
           showOn,
@@ -380,7 +519,7 @@
         });
         console.log("Current page:", {
           url: window.location.href,
-          title: getCurrentPageTitle(),
+          title: getCurrentPageTitle(), // Uses centralized function
         });
       }
 
@@ -388,14 +527,14 @@
       if (condition && typeof condition === "function") {
         try {
           const result = condition();
-          if (window.SimpleButtonRegistry?.debugMode) {
+          if (this.debugMode) {
             console.log(`Custom condition result: ${result}`);
             console.groupEnd();
           }
           return result;
         } catch (error) {
           console.error(`❌ Custom condition error for "${config.id}":`, error);
-          if (window.SimpleButtonRegistry?.debugMode) {
+          if (this.debugMode) {
             console.groupEnd();
           }
           return false;
@@ -408,21 +547,21 @@
           const hasCondition = ButtonConditions[conditionName]
             ? ButtonConditions[conditionName]()
             : false;
-          if (window.SimpleButtonRegistry?.debugMode) {
+          if (this.debugMode) {
             console.log(`Condition "${conditionName}": ${hasCondition}`);
           }
           return hasCondition;
         });
 
         const shouldShow = conditionResults.some((result) => result);
-        if (window.SimpleButtonRegistry?.debugMode) {
+        if (this.debugMode) {
           console.log(
             `showOn evaluation: ${shouldShow} (${conditionResults.join(", ")})`
           );
         }
 
         if (!shouldShow) {
-          if (window.SimpleButtonRegistry?.debugMode) {
+          if (this.debugMode) {
             console.log("❌ Button hidden by showOn rules");
             console.groupEnd();
           }
@@ -435,21 +574,21 @@
           const shouldHide = ButtonConditions[conditionName]
             ? ButtonConditions[conditionName]()
             : false;
-          if (window.SimpleButtonRegistry?.debugMode) {
+          if (this.debugMode) {
             console.log(`Hide condition "${conditionName}": ${shouldHide}`);
           }
           return shouldHide;
         });
 
         const shouldHide = hideResults.some((result) => result);
-        if (window.SimpleButtonRegistry?.debugMode) {
+        if (this.debugMode) {
           console.log(
             `hideOn evaluation: ${shouldHide} (${hideResults.join(", ")})`
           );
         }
 
         if (shouldHide) {
-          if (window.SimpleButtonRegistry?.debugMode) {
+          if (this.debugMode) {
             console.log("❌ Button hidden by hideOn rules");
             console.groupEnd();
           }
@@ -457,7 +596,7 @@
         }
       }
 
-      if (window.SimpleButtonRegistry?.debugMode) {
+      if (this.debugMode) {
         console.log("✅ Button should be visible");
         console.groupEnd();
       }
@@ -520,7 +659,7 @@
             buttonPosition: stackIndex + 1,
             currentPage: {
               url: window.location.href,
-              title: getCurrentPageTitle(),
+              title: getCurrentPageTitle(), // Uses centralized function
             },
           });
         } catch (error) {
@@ -540,7 +679,8 @@
       });
 
       // Add to DOM and track
-      this.container.appendChild(button);
+      const container = this.getCurrentContainer(); // 🔧 DYNAMIC: Get fresh container
+      container.appendChild(button);
       this.activeButtons.set(config.id, button);
 
       console.log(
@@ -588,7 +728,8 @@
       });
 
       // If already initialized, trigger rebuild
-      if (this.container) {
+      if (this.pageDetector.isMonitoring) {
+        // 🔧 CHANGED: Check if initialized differently
         this.rebuildAllButtons();
       }
 
@@ -641,7 +782,7 @@
         },
         currentPage: {
           url: window.location.href,
-          title: getCurrentPageTitle(),
+          title: getCurrentPageTitle(), // Uses centralized function
         },
         buttonIds: {
           registered: Array.from(this.registeredButtons.keys()),
@@ -874,9 +1015,108 @@
         console.log("✅ Debug mode disabled");
       }
     },
+
+    // 🔧 NEW: Test container connectivity
+    testContainerConnectivity: () => {
+      console.group("🔍 Testing Container Connectivity");
+
+      if (window.SimpleButtonRegistry) {
+        const registry = window.SimpleButtonRegistry;
+        const container = registry.getCurrentContainer();
+
+        console.log("Current container:", container);
+        console.log(
+          "Container connected to document:",
+          document.contains(container)
+        );
+        console.log("Container className:", container?.className);
+
+        // Test all possible containers
+        const candidates = [
+          ".roam-article",
+          ".roam-main .roam-article",
+          ".roam-main",
+        ];
+        candidates.forEach((selector) => {
+          const element = document.querySelector(selector);
+          console.log(`${selector}:`, {
+            exists: !!element,
+            connected: element ? document.contains(element) : false,
+            isCurrentContainer: element === container,
+          });
+        });
+
+        // Check button connectivity
+        registry.activeButtons.forEach((button, id) => {
+          console.log(`Button "${id}":`, {
+            connected: document.contains(button),
+            parent: button.parentElement?.className,
+            visible: button.getBoundingClientRect().width > 0,
+          });
+        });
+      }
+
+      console.groupEnd();
+    },
+    testPageTitleDetection: () => {
+      console.group("🔧 Testing Fixed Page Title Detection");
+
+      console.log("Current page title:", getCurrentPageTitle());
+
+      // Test username detection with current title
+      const pageTitle = getCurrentPageTitle();
+      if (pageTitle) {
+        const isFirstLastPattern = /^[A-Z][a-z]+\s+[A-Z][a-z]+$/.test(
+          pageTitle
+        );
+        const isUsernamePattern = /^[a-zA-Z][a-zA-Z0-9_-]{2,}$/.test(pageTitle);
+
+        console.log(`Testing "${pageTitle}":`);
+        console.log("  Matches 'First Last' pattern:", isFirstLastPattern);
+        console.log("  Matches 'username123' pattern:", isUsernamePattern);
+        console.log(
+          "  Should be detected as username page:",
+          isFirstLastPattern || isUsernamePattern
+        );
+
+        // Test the actual condition
+        console.log(
+          "  isUsernamePage() result:",
+          ButtonConditions.isUsernamePage()
+        );
+      }
+
+      // Test what different methods return
+      console.log("\nComparison of page title detection methods:");
+      console.log(
+        "  DOM-based:",
+        document.querySelector(".roam-article h1")?.textContent?.trim()
+      );
+      console.log(
+        "  URL-based:",
+        window.location.href.match(/\/page\/([^/?#]+)/)?.[1]
+      );
+      console.log("  document.title:", document.title);
+      console.log("  getCurrentPageTitle():", getCurrentPageTitle());
+
+      console.groupEnd();
+    },
   };
 
   console.log(
-    `✅ ${EXTENSION_NAME} v${EXTENSION_VERSION} loaded - Simple & Clean! 🎯`
+    `✅ ${EXTENSION_NAME} v${EXTENSION_VERSION} loaded - Cache-Based Username Detection! 🎯`
   );
+
+  // Auto-test the page title detection and cache integration
+  setTimeout(() => {
+    console.log(
+      "🔧 Auto-testing page title detection and cache integration..."
+    );
+    window.SimpleButtonUtilityTests.testPageTitleDetection();
+
+    // Test cache integration if available
+    if (window.GraphMemberCache) {
+      window.SimpleButtonUtilityTests.testCacheBasedUsernameDetection();
+    }
+  }, 1000);
 })();

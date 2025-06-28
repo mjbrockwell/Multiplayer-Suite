@@ -1,903 +1,983 @@
 // ===================================================================
-// Extension ZERO: Debug Interface - Button System Diagnostics
-// 🐛 DEBUG: Clean interface for troubleshooting extension issues
-// 📋 COPY-PASTE: Export functionality for easy sharing
-// 🔄 REAL-TIME: Live monitoring of system state
+// Simple Button Utility Extension 2.0 - Page-Change Driven
+// 🎯 COMPLETELY REDESIGNED: Simple "tear down and rebuild" approach
+// 🔧 FIXED: Proper page title detection (DOM-based, not URL-based)
 // ===================================================================
 
 (() => {
   "use strict";
 
-  const EXTENSION_NAME = "Extension Zero Debug";
-  const EXTENSION_VERSION = "1.0.0";
+  const EXTENSION_NAME = "Simple Button Utility";
+  const EXTENSION_VERSION = "2.0.1"; // Fixed page title detection
+  const ANIMATION_DURATION = 200;
 
-  // ==================== DEBUG DATA COLLECTION ====================
+  // ==================== BUTTON STACK POSITIONING (RESTORED) ====================
 
-  class ExtensionDebugger {
+  const BUTTON_STACKS = {
+    "top-left": {
+      maxButtons: 2,
+      positions: [
+        { x: 20, y: 8 }, // ← Sandbox coordinates: relative to content area
+        { x: 20, y: 50 }, // ← Proper spacing for content positioning
+      ],
+    },
+    "top-right": {
+      maxButtons: 5,
+      positions: [
+        { x: -100, y: 8 }, // ← Sandbox coordinates: -100px from right edge
+        { x: -100, y: 50 },
+        { x: -100, y: 92 },
+        { x: -100, y: 134 },
+        { x: -100, y: 176 },
+      ],
+    },
+  };
+
+  // ==================== SIMPLE PAGE CHANGE DETECTOR ====================
+
+  class SimplePageChangeDetector {
     constructor() {
-      this.debugData = {};
-      this.updateCallbacks = new Set();
+      this.currentUrl = window.location.href;
+      this.currentTitle = document.title;
+      this.listeners = new Set();
+      this.isMonitoring = false;
     }
 
-    async collectDebugData() {
-      const data = {
-        timestamp: new Date().toISOString(),
-        currentPage: this.getCurrentPageInfo(),
-        dependencies: this.checkDependencies(),
-        buttonSystems: this.checkButtonSystems(),
-        extension6Status: this.checkExtension6Status(),
-        contextDetection: this.checkContextDetection(),
-        recommendations: [],
+    startMonitoring() {
+      if (this.isMonitoring) return;
+
+      // Just monitor the basics - URL and title changes
+      this.setupURLListeners();
+      this.setupTitleListener();
+      this.setupPeriodicCheck();
+
+      this.isMonitoring = true;
+      console.log("🚀 Simple page monitoring started");
+    }
+
+    stopMonitoring() {
+      if (!this.isMonitoring) return;
+
+      // Clean up listeners
+      window.removeEventListener("popstate", this.boundURLChange);
+      if (this.originalPushState) history.pushState = this.originalPushState;
+      if (this.originalReplaceState)
+        history.replaceState = this.originalReplaceState;
+      if (this.titleObserver) this.titleObserver.disconnect();
+      if (this.checkInterval) clearInterval(this.checkInterval);
+
+      this.isMonitoring = false;
+      console.log("🛑 Simple page monitoring stopped");
+    }
+
+    setupURLListeners() {
+      // Browser navigation
+      this.boundURLChange = () => this.checkForPageChange();
+      window.addEventListener("popstate", this.boundURLChange);
+
+      // SPA navigation
+      this.originalPushState = history.pushState;
+      this.originalReplaceState = history.replaceState;
+
+      const self = this;
+      history.pushState = function (...args) {
+        self.originalPushState.apply(history, args);
+        setTimeout(() => self.checkForPageChange(), 50);
       };
 
-      // Generate recommendations based on findings
-      data.recommendations = this.generateRecommendations(data);
-
-      this.debugData = data;
-      this.notifyUpdateCallbacks();
-
-      return data;
-    }
-
-    getCurrentPageInfo() {
-      const getCurrentPageTitle = () => {
-        try {
-          const url = window.location.href;
-          const pageMatch = url.match(/\/page\/([^/?#]+)/);
-          if (pageMatch) {
-            return decodeURIComponent(pageMatch[1]);
-          }
-          const titleElement = document.querySelector(
-            ".roam-article h1, .rm-page-title"
-          );
-          return titleElement?.textContent?.trim() || null;
-        } catch (error) {
-          return null;
-        }
-      };
-
-      return {
-        url: window.location.href,
-        title: getCurrentPageTitle(),
-        timestamp: new Date().toLocaleString(),
+      history.replaceState = function (...args) {
+        self.originalReplaceState.apply(history, args);
+        setTimeout(() => self.checkForPageChange(), 50);
       };
     }
 
-    checkDependencies() {
-      const deps = {
-        extension15: {
-          available: !!window.RoamExtensionSuite,
-          platform: null,
-          utilities: {},
-        },
-        extension16: {
-          available: false,
-          components: {},
-          registry: null,
-        },
-      };
-
-      // Check Extension 1.5
-      if (window.RoamExtensionSuite) {
-        deps.extension15.platform = "✅ Available";
-        const platform = window.RoamExtensionSuite;
-
-        const requiredUtilities = [
-          "timezoneManager",
-          "modalUtilities",
-          "profileAnalysisUtilities",
-          "getCurrentUser",
-          "getGraphMembersFromList",
-        ];
-
-        requiredUtilities.forEach((util) => {
-          deps.extension15.utilities[util] = !!platform.getUtility(util);
-        });
-      } else {
-        deps.extension15.platform = "❌ Not found";
-      }
-
-      // Check Extension 1.6
-      deps.extension16.components = {
-        ExtensionButtonManager: !!window.ExtensionButtonManager,
-        RoamButtonRegistry: !!window.RoamButtonRegistry,
-        ButtonRegistryAPI: !!window.ButtonRegistryAPI,
-      };
-
-      deps.extension16.available = Object.values(
-        deps.extension16.components
-      ).every(Boolean);
-
-      if (window.RoamButtonRegistry) {
-        try {
-          deps.extension16.registry = window.RoamButtonRegistry.getStatus();
-        } catch (error) {
-          deps.extension16.registry = `Error: ${error.message}`;
-        }
-      }
-
-      return deps;
-    }
-
-    checkButtonSystems() {
-      const systems = {
-        old_system: {
-          available: !!window.RoamButtonRegistry,
-          buttons: {},
-          status: null,
-        },
-        new_system: {
-          available: !!window.SimpleButtonRegistry,
-          buttons: {},
-          status: null,
-        },
-      };
-
-      // Check old system (Extension 1.6)
-      if (window.RoamButtonRegistry) {
-        try {
-          systems.old_system.status = window.RoamButtonRegistry.getStatus();
-
-          // Get button details
-          if (window.RoamButtonRegistry.buttons) {
-            const buttonDetails = {};
-            window.RoamButtonRegistry.buttons.forEach((config, id) => {
-              buttonDetails[id] = {
-                text: config.text,
-                visible: config.visible,
-                stack: config.stack,
-                contextRules: config.contextRules,
-              };
-            });
-            systems.old_system.buttons = buttonDetails;
-          }
-        } catch (error) {
-          systems.old_system.status = `Error: ${error.message}`;
-        }
-      }
-
-      // Check new system (Extension 2.0)
-      if (window.SimpleButtonRegistry) {
-        try {
-          systems.new_system.status = window.SimpleButtonRegistry.getStatus();
-
-          // Get button details
-          const buttonDetails = {};
-          window.SimpleButtonRegistry.registeredButtons.forEach(
-            (config, id) => {
-              buttonDetails[id] = {
-                text: config.text,
-                showOn: config.showOn,
-                hideOn: config.hideOn,
-                condition: !!config.condition,
-              };
-            }
-          );
-          systems.new_system.buttons = buttonDetails;
-        } catch (error) {
-          systems.new_system.status = `Error: ${error.message}`;
-        }
-      }
-
-      return systems;
-    }
-
-    checkExtension6Status() {
-      const ext6 = {
-        userDirectoryButton: null,
-        buttonManager: null,
-        services: null,
-        domElements: [],
-      };
-
-      // Check for Extension 6 services
-      if (window.RoamExtensionSuite) {
-        try {
-          const platform = window.RoamExtensionSuite;
-          const services = platform.getService?.("clean-user-directory");
-          ext6.services = services ? "✅ Registered" : "❌ Not found";
-        } catch (error) {
-          ext6.services = `Error: ${error.message}`;
-        }
-      }
-
-      // Check for User Directory buttons in DOM
-      const fallbackButtons = document.querySelectorAll(
-        ".user-directory-fallback-button"
-      );
-      const allButtons = Array.from(document.querySelectorAll("button")).filter(
-        (btn) =>
-          btn.textContent.includes("User Directory") ||
-          btn.textContent.includes("👥")
-      );
-
-      ext6.domElements = allButtons.map((btn) => ({
-        text: btn.textContent,
-        classes: btn.className,
-        visible: btn.style.display !== "none",
-        position: {
-          position: btn.style.position,
-          top: btn.style.top,
-          left: btn.style.left,
-          right: btn.style.right,
-        },
-      }));
-
-      return ext6;
-    }
-
-    checkContextDetection() {
-      const context = {
-        currentContexts: [],
-        availableContexts: [],
-        usernamePageDetection: null,
-        chatRoomDetection: null,
-      };
-
-      // Check Extension 1.6 context detection
-      if (window.RoamButtonRegistry?.pageMonitor) {
-        try {
-          context.currentContexts = Array.from(
-            window.RoamButtonRegistry.pageMonitor.getCurrentContext()
-          );
-        } catch (error) {
-          context.currentContexts = [`Error: ${error.message}`];
-        }
-      }
-
-      if (window.RoamButtonRegistry?.contextEngine) {
-        try {
-          context.availableContexts =
-            window.RoamButtonRegistry.contextEngine.getAvailableContexts();
-        } catch (error) {
-          context.availableContexts = [`Error: ${error.message}`];
-        }
-      }
-
-      // Test specific page detection
-      const pageTitle = this.getCurrentPageInfo().title;
-      if (pageTitle) {
-        // Test username page detection
-        context.usernamePageDetection = {
-          pageTitle,
-          isUsernamePageContext:
-            context.currentContexts.includes("username-pages"),
-          isChatRoomContext:
-            context.currentContexts.includes("chat-room-pages"),
-        };
-      }
-
-      return context;
-    }
-
-    generateRecommendations(data) {
-      const recommendations = [];
-
-      // Extension dependencies
-      if (!data.dependencies.extension15.available) {
-        recommendations.push({
-          type: "error",
-          title: "Extension 1.5 Missing",
-          message:
-            "Load Extension 1.5 first - it provides core utilities for Extension 6",
-          action: "Load Extension 1.5 before Extension 6",
-        });
-      }
-
-      if (!data.dependencies.extension16.available) {
-        recommendations.push({
-          type: "error",
-          title: "Extension 1.6 Missing",
-          message: "Extension 6 needs Extension 1.6 for button management",
-          action: "Load Extension 1.6 Button Utility",
-        });
-      }
-
-      // Button system issues
-      if (
-        data.extension6Status.domElements.length === 0 &&
-        data.dependencies.extension16.available
-      ) {
-        recommendations.push({
-          type: "warning",
-          title: "No User Directory Button Found",
-          message: "Extension 6 should create a button but none found",
-          action: "Check Extension 6 initialization in console",
-        });
-      }
-
-      if (data.extension6Status.domElements.length > 1) {
-        recommendations.push({
-          type: "warning",
-          title: "Multiple User Directory Buttons",
-          message:
-            "Found multiple User Directory buttons - possible duplicate loading",
-          action: "Reload page and load extensions in correct order",
-        });
-      }
-
-      // Context detection issues
-      const shouldHaveButton =
-        data.contextDetection.currentContexts.includes("username-pages") ||
-        data.contextDetection.currentContexts.includes("chat-room-pages");
-      const hasButton = data.extension6Status.domElements.length > 0;
-
-      if (shouldHaveButton && !hasButton) {
-        recommendations.push({
-          type: "error",
-          title: "Missing Button on Conditional Page",
-          message:
-            "Current page should show User Directory button but none found",
-          action: "Check Extension 6 button registration",
-        });
-      }
-
-      if (!shouldHaveButton && hasButton) {
-        recommendations.push({
-          type: "warning",
-          title: "Button Visible on Wrong Page",
-          message: "User Directory button showing on non-conditional page",
-          action: "Check button conditional logic",
-        });
-      }
-
-      return recommendations;
-    }
-
-    onUpdate(callback) {
-      this.updateCallbacks.add(callback);
-      return () => this.updateCallbacks.delete(callback);
-    }
-
-    notifyUpdateCallbacks() {
-      this.updateCallbacks.forEach((callback) => {
-        try {
-          callback(this.debugData);
-        } catch (error) {
-          console.error("Debug update callback error:", error);
+    setupTitleListener() {
+      // Watch for title changes (Roam-specific)
+      this.titleObserver = new MutationObserver(() => {
+        if (document.title !== this.currentTitle) {
+          setTimeout(() => this.checkForPageChange(), 50);
         }
       });
+
+      this.titleObserver.observe(document.head, {
+        childList: true,
+        subtree: true,
+      });
+    }
+
+    setupPeriodicCheck() {
+      // Light backup check every 3 seconds
+      this.checkInterval = setInterval(() => {
+        this.checkForPageChange();
+      }, 3000);
+    }
+
+    checkForPageChange() {
+      const newUrl = window.location.href;
+      const newTitle = document.title;
+
+      if (newUrl !== this.currentUrl || newTitle !== this.currentTitle) {
+        console.log(`📄 Page changed: ${this.currentUrl} → ${newUrl}`);
+
+        this.currentUrl = newUrl;
+        this.currentTitle = newTitle;
+
+        // Notify all listeners - THIS IS THE CORE EVENT
+        this.listeners.forEach((listener) => {
+          try {
+            listener({ url: newUrl, title: newTitle });
+          } catch (error) {
+            console.error("❌ Page change listener error:", error);
+          }
+        });
+      }
+    }
+
+    onPageChange(listener) {
+      this.listeners.add(listener);
+      return () => this.listeners.delete(listener);
     }
   }
 
-  // ==================== DEBUG UI INTERFACE ====================
+  // ==================== FIXED PAGE TITLE DETECTION ====================
 
-  class DebugUI {
-    constructor(extensionDebugger) {
-      this.extensionDebugger = extensionDebugger;
-      this.modal = null;
-      this.updateInterval = null;
-    }
+  // 🔧 FIXED: Get the actual page TITLE (not page ID) from DOM
+  function getCurrentPageTitle() {
+    try {
+      // STEP 1: Try to get the actual displayed page title from DOM FIRST
+      const titleSelectors = [
+        ".roam-article h1",
+        ".rm-page-title",
+        ".rm-title-display",
+        "[data-page-title]",
+        ".rm-page-title-text",
+        ".roam-article > div:first-child h1",
+        "h1[data-page-title]",
+      ];
 
-    async show() {
-      if (this.modal) {
-        this.modal.remove();
+      for (const selector of titleSelectors) {
+        const titleElement = document.querySelector(selector);
+        if (titleElement) {
+          const titleText = titleElement.textContent?.trim();
+          if (titleText && titleText !== "") {
+            console.log(`📄 Got page title from ${selector}: "${titleText}"`);
+            return titleText;
+          }
+        }
       }
 
-      this.modal = this.createModal();
-      document.body.appendChild(this.modal);
-
-      // Start auto-refresh
-      this.startAutoRefresh();
-
-      // Initial data load
-      await this.refresh();
-    }
-
-    createModal() {
-      const modal = document.createElement("div");
-      modal.id = "extension-zero-debug-modal";
-      modal.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        background: rgba(0, 0, 0, 0.8);
-        z-index: 20000;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      `;
-
-      const content = document.createElement("div");
-      content.style.cssText = `
-        background: white;
-        border-radius: 12px;
-        width: 90%;
-        max-width: 1200px;
-        max-height: 90%;
-        display: flex;
-        flex-direction: column;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-      `;
-
-      // Header
-      const header = document.createElement("div");
-      header.style.cssText = `
-        padding: 20px 24px;
-        border-bottom: 1px solid #e5e7eb;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background: #f9fafb;
-        border-radius: 12px 12px 0 0;
-      `;
-
-      header.innerHTML = `
-        <div>
-          <h2 style="margin: 0; font-size: 20px; font-weight: 600; color: #1f2937;">
-            🐛 Extension Zero - Debug Interface
-          </h2>
-          <p style="margin: 4px 0 0 0; font-size: 14px; color: #6b7280;">
-            Real-time button system diagnostics
-          </p>
-        </div>
-        <div style="display: flex; gap: 12px; align-items: center;">
-          <button id="debug-refresh-btn" style="
-            padding: 8px 16px;
-            background: #3b82f6;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-          ">🔄 Refresh</button>
-          <button id="debug-copy-btn" style="
-            padding: 8px 16px;
-            background: #10b981;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-          ">📋 Copy Report</button>
-          <button id="debug-close-btn" style="
-            padding: 8px 16px;
-            background: #ef4444;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-          ">✕ Close</button>
-        </div>
-      `;
-
-      // Content area
-      const contentArea = document.createElement("div");
-      contentArea.id = "debug-content-area";
-      contentArea.style.cssText = `
-        flex: 1;
-        overflow: auto;
-        padding: 24px;
-      `;
-
-      content.appendChild(header);
-      content.appendChild(contentArea);
-      modal.appendChild(content);
-
-      // Event listeners
-      header.querySelector("#debug-refresh-btn").onclick = () => this.refresh();
-      header.querySelector("#debug-copy-btn").onclick = () => this.copyReport();
-      header.querySelector("#debug-close-btn").onclick = () => this.hide();
-
-      // Close on backdrop click
-      modal.onclick = (e) => {
-        if (e.target === modal) this.hide();
-      };
-
-      return modal;
-    }
-
-    async refresh() {
-      const data = await this.extensionDebugger.collectDebugData();
-      this.renderDebugData(data);
-    }
-
-    renderDebugData(data) {
-      const contentArea = this.modal.querySelector("#debug-content-area");
-
-      contentArea.innerHTML = `
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
-          ${this.renderCurrentPageSection(data.currentPage)}
-          ${this.renderRecommendationsSection(data.recommendations)}
-        </div>
-        
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
-          ${this.renderDependenciesSection(data.dependencies)}
-          ${this.renderContextSection(data.contextDetection)}
-        </div>
-
-        <div style="margin-bottom: 24px;">
-          ${this.renderButtonSystemsSection(data.buttonSystems)}
-        </div>
-
-        <div>
-          ${this.renderExtension6Section(data.extension6Status)}
-        </div>
-      `;
-    }
-
-    renderCurrentPageSection(pageInfo) {
-      return `
-        <div style="background: #f8fafc; padding: 16px; border-radius: 8px; border-left: 4px solid #3b82f6;">
-          <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #1f2937;">
-            📄 Current Page
-          </h3>
-          <div style="font-size: 14px; line-height: 1.5;">
-            <div><strong>Title:</strong> ${pageInfo.title || "No title"}</div>
-            <div style="margin-top: 8px; word-break: break-all;"><strong>URL:</strong> ${
-              pageInfo.url
-            }</div>
-            <div style="margin-top: 8px;"><strong>Updated:</strong> ${
-              pageInfo.timestamp
-            }</div>
-          </div>
-        </div>
-      `;
-    }
-
-    renderRecommendationsSection(recommendations) {
-      if (recommendations.length === 0) {
-        return `
-          <div style="background: #f0f9ff; padding: 16px; border-radius: 8px; border-left: 4px solid #10b981;">
-            <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #1f2937;">
-              ✅ Recommendations
-            </h3>
-            <div style="color: #059669; font-size: 14px;">All systems appear to be working correctly!</div>
-          </div>
-        `;
+      // STEP 2: Try document.title as backup (clean it up)
+      if (document.title && document.title !== "Roam") {
+        const titleText = document.title
+          .replace(" - Roam", "")
+          .replace(" | Roam Research", "")
+          .trim();
+        if (titleText && titleText !== "") {
+          console.log(`📄 Got page title from document.title: "${titleText}"`);
+          return titleText;
+        }
       }
 
-      const items = recommendations
-        .map((rec) => {
-          const color =
-            rec.type === "error"
-              ? "#ef4444"
-              : rec.type === "warning"
-              ? "#f59e0b"
-              : "#3b82f6";
-          const icon =
-            rec.type === "error" ? "🚨" : rec.type === "warning" ? "⚠️" : "💡";
+      // STEP 3: ONLY as last resort, try URL parsing (returns page ID, not title)
+      const url = window.location.href;
+      const pageMatch = url.match(/\/page\/([^/?#]+)/);
+      if (pageMatch) {
+        const pageId = decodeURIComponent(pageMatch[1]);
+        console.warn(`⚠️ Falling back to page ID (not title): "${pageId}"`);
+        console.warn(
+          "💡 Consider improving DOM selectors for better title detection"
+        );
+        return pageId;
+      }
 
-          return `
-          <div style="margin-bottom: 12px; padding: 12px; background: white; border-radius: 6px; border-left: 3px solid ${color};">
-            <div style="font-weight: 600; color: ${color}; margin-bottom: 4px;">
-              ${icon} ${rec.title}
-            </div>
-            <div style="font-size: 13px; color: #6b7280; margin-bottom: 6px;">${rec.message}</div>
-            <div style="font-size: 12px; color: #374151; font-style: italic;">Action: ${rec.action}</div>
-          </div>
-        `;
-        })
-        .join("");
-
-      return `
-        <div style="background: #fef2f2; padding: 16px; border-radius: 8px; border-left: 4px solid #ef4444;">
-          <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #1f2937;">
-            🎯 Recommendations
-          </h3>
-          ${items}
-        </div>
-      `;
+      console.warn("❌ Could not determine page title");
+      return null;
+    } catch (error) {
+      console.error("❌ Failed to get current page title:", error);
+      return null;
     }
+  }
 
-    renderDependenciesSection(deps) {
-      const ext15Status = deps.extension15.available ? "✅" : "❌";
-      const ext16Status = deps.extension16.available ? "✅" : "❌";
+  // ==================== SIMPLE BUTTON CONDITIONS ====================
 
-      const ext15Utils = Object.entries(deps.extension15.utilities)
-        .map(
-          ([name, available]) => `<div>${available ? "✅" : "❌"} ${name}</div>`
-        )
-        .join("");
+  // Simple condition functions - much easier to understand!
+  const ButtonConditions = {
+    // Username page detection
+    isUsernamePage: () => {
+      const pageTitle = getCurrentPageTitle();
+      if (!pageTitle) return false;
 
-      const ext16Components = Object.entries(deps.extension16.components)
-        .map(
-          ([name, available]) => `<div>${available ? "✅" : "❌"} ${name}</div>`
-        )
-        .join("");
+      // Simple patterns for username detection
+      const isFirstLastPattern = /^[A-Z][a-z]+\s+[A-Z][a-z]+$/.test(pageTitle); // "First Last"
+      const isUsernamePattern = /^[a-zA-Z][a-zA-Z0-9_-]{2,}$/.test(pageTitle); // "username123"
 
-      return `
-        <div style="background: #f9fafb; padding: 16px; border-radius: 8px; border-left: 4px solid #6b7280;">
-          <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #1f2937;">
-            🔧 Dependencies
-          </h3>
-          <div style="font-size: 14px;">
-            <div style="margin-bottom: 12px;">
-              <strong>${ext15Status} Extension 1.5</strong>
-              <div style="margin-left: 16px; margin-top: 4px; font-size: 13px;">
-                ${ext15Utils}
-              </div>
-            </div>
-            <div>
-              <strong>${ext16Status} Extension 1.6</strong>
-              <div style="margin-left: 16px; margin-top: 4px; font-size: 13px;">
-                ${ext16Components}
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-    }
+      const result = isFirstLastPattern || isUsernamePattern;
 
-    renderContextSection(context) {
-      const currentContexts = context.currentContexts
-        .map(
-          (c) => `<span style="
-        background: #dbeafe; 
-        color: #1e40af; 
-        padding: 2px 6px; 
-        border-radius: 4px; 
-        font-size: 12px;
-        margin-right: 4px;
-      ">${c}</span>`
-        )
-        .join("");
+      if (window.SimpleButtonRegistry?.debugMode) {
+        console.log(`🔍 Username page detection for "${pageTitle}":`, {
+          isFirstLastPattern,
+          isUsernamePattern,
+          result,
+        });
+      }
 
-      return `
-        <div style="background: #f0f9ff; padding: 16px; border-radius: 8px; border-left: 4px solid #8b5cf6;">
-          <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #1f2937;">
-            🎯 Context Detection
-          </h3>
-          <div style="font-size: 14px;">
-            <div style="margin-bottom: 8px;"><strong>Current Contexts:</strong></div>
-            <div style="margin-bottom: 12px;">${
-              currentContexts || "<em>None detected</em>"
-            }</div>
-            
-            ${
-              context.usernamePageDetection
-                ? `
-              <div style="margin-top: 12px; padding: 8px; background: white; border-radius: 4px;">
-                <div><strong>Page Analysis:</strong></div>
-                <div style="font-size: 13px; margin-top: 4px;">
-                  Username page: ${
-                    context.usernamePageDetection.isUsernamePageContext
-                      ? "✅"
-                      : "❌"
-                  }<br>
-                  Chat room page: ${
-                    context.usernamePageDetection.isChatRoomContext
-                      ? "✅"
-                      : "❌"
-                  }
-                </div>
-              </div>
-            `
-                : ""
-            }
-          </div>
-        </div>
-      `;
-    }
+      return result;
+    },
 
-    renderButtonSystemsSection(systems) {
-      const oldSystemButtons = Object.entries(systems.old_system.buttons)
-        .map(
-          ([id, config]) => `
-        <div style="margin: 4px 0; padding: 8px; background: #f9fafb; border-radius: 4px; font-size: 13px;">
-          <strong>${id}</strong>: "${config.text}" 
-          <span style="color: ${config.visible ? "#059669" : "#dc2626"};">
-            (${config.visible ? "visible" : "hidden"})
-          </span>
-          <br>
-          <span style="color: #6b7280;">
-            Stack: ${config.stack}, Rules: ${JSON.stringify(
-            config.contextRules
-          )}
-          </span>
-        </div>
-      `
-        )
-        .join("");
+    // Daily note detection
+    isDailyNote: () => {
+      const url = window.location.href;
+      return (
+        /\/page\/\d{2}-\d{2}-\d{4}/.test(url) || // MM-DD-YYYY
+        /\/page\/\d{4}-\d{2}-\d{2}/.test(url) || // YYYY-MM-DD
+        /\/page\/[A-Z][a-z]+.*\d{4}/.test(url)
+      ); // Month DD, YYYY
+    },
 
-      const newSystemButtons = Object.entries(systems.new_system.buttons)
-        .map(
-          ([id, config]) => `
-        <div style="margin: 4px 0; padding: 8px; background: #f9fafb; border-radius: 4px; font-size: 13px;">
-          <strong>${id}</strong>: "${config.text}"<br>
-          <span style="color: #6b7280;">
-            ShowOn: ${JSON.stringify(config.showOn)}, HideOn: ${JSON.stringify(
-            config.hideOn
-          )}
-          </span>
-        </div>
-      `
-        )
-        .join("");
+    // Main content pages
+    isMainPage: () => {
+      return (
+        !!document.querySelector(".roam-article") &&
+        window.location.href.includes("/page/")
+      );
+    },
 
-      return `
-        <div style="background: #fffbeb; padding: 16px; border-radius: 8px; border-left: 4px solid #f59e0b;">
-          <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #1f2937;">
-            🏗️ Button Systems
-          </h3>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-            <div>
-              <h4 style="margin: 0 0 8px 0; font-size: 14px;">Extension 1.6 System ${
-                systems.old_system.available ? "✅" : "❌"
-              }</h4>
-              ${oldSystemButtons || "<em>No buttons registered</em>"}
-            </div>
-            <div>
-              <h4 style="margin: 0 0 8px 0; font-size: 14px;">Extension 2.0 System ${
-                systems.new_system.available ? "✅" : "❌"
-              }</h4>
-              ${newSystemButtons || "<em>No buttons registered</em>"}
-            </div>
-          </div>
-        </div>
-      `;
-    }
+    // Settings pages
+    isSettingsPage: () => {
+      return (
+        window.location.href.includes("/settings") ||
+        window.location.href.includes("roam/settings")
+      );
+    },
 
-    renderExtension6Section(ext6) {
-      const domElements = ext6.domElements
-        .map(
-          (el, index) => `
-        <div style="margin: 4px 0; padding: 8px; background: #f9fafb; border-radius: 4px; font-size: 13px;">
-          <strong>Button ${index + 1}:</strong> "${el.text}"<br>
-          <span style="color: #6b7280;">
-            Classes: ${el.classes || "none"}, Visible: ${
-            el.visible ? "yes" : "no"
-          }<br>
-            Position: ${el.position.position || "static"} (${
-            el.position.top || "auto"
-          }, ${el.position.left || "auto"}, ${el.position.right || "auto"})
-          </span>
-        </div>
-      `
-        )
-        .join("");
-
-      return `
-        <div style="background: #f0fdf4; padding: 16px; border-radius: 8px; border-left: 4px solid #22c55e;">
-          <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #1f2937;">
-            👥 Extension 6 Status
-          </h3>
-          <div style="font-size: 14px;">
-            <div style="margin-bottom: 12px;"><strong>Services:</strong> ${
-              ext6.services || "Not checked"
-            }</div>
-            <div><strong>DOM Elements (${
-              ext6.domElements.length
-            }):</strong></div>
-            <div style="margin-top: 8px;">
-              ${
-                domElements || "<em>No User Directory buttons found in DOM</em>"
-              }
-            </div>
-          </div>
-        </div>
-      `;
-    }
-
-    async copyReport() {
-      const data = this.extensionDebugger.debugData;
-      const report = this.generateTextReport(data);
-
+    // Custom condition support
+    custom: (conditionFn) => {
       try {
-        await navigator.clipboard.writeText(report);
-
-        // Show success feedback
-        const btn = this.modal.querySelector("#debug-copy-btn");
-        const originalText = btn.textContent;
-        btn.textContent = "✅ Copied!";
-        btn.style.background = "#10b981";
-
-        setTimeout(() => {
-          btn.textContent = originalText;
-          btn.style.background = "#10b981";
-        }, 2000);
+        return conditionFn();
       } catch (error) {
-        console.error("Failed to copy to clipboard:", error);
-        alert("Failed to copy to clipboard. Check console for raw data.");
-        console.log("DEBUG REPORT:", report);
+        console.error("❌ Custom condition error:", error);
+        return false;
+      }
+    },
+  };
+
+  // ==================== SIMPLE BUTTON REGISTRY ====================
+
+  class SimpleButtonRegistry {
+    constructor() {
+      this.registeredButtons = new Map(); // button config storage
+      this.activeButtons = new Map(); // currently visible DOM elements
+      this.stacks = {
+        // RESTORED: Stack management
+        "top-left": [],
+        "top-right": [],
+      };
+      this.container = null;
+      this.debugMode = false; // 🐛 Debug mode toggle
+      this.pageDetector = new SimplePageChangeDetector();
+
+      // Core event: when page changes, rebuild all buttons
+      this.pageDetector.onPageChange(() => {
+        this.rebuildAllButtons();
+      });
+    }
+
+    async initialize() {
+      this.setupContainer();
+      this.pageDetector.startMonitoring();
+
+      // Initial button placement
+      this.rebuildAllButtons();
+
+      console.log("✅ Simple Button Registry initialized");
+      return true;
+    }
+
+    setupContainer() {
+      // Find main content area
+      const candidates = [
+        ".roam-article",
+        ".roam-main .roam-article",
+        ".roam-main",
+      ];
+
+      for (const selector of candidates) {
+        const element = document.querySelector(selector);
+        if (element) {
+          this.container = element;
+
+          // Ensure relative positioning for absolute button placement
+          if (getComputedStyle(element).position === "static") {
+            element.style.position = "relative";
+          }
+
+          console.log(`✅ Container found: ${selector}`);
+          return;
+        }
+      }
+
+      throw new Error("No suitable container found");
+    }
+
+    // ==================== CORE METHOD: REBUILD ALL BUTTONS ====================
+
+    rebuildAllButtons() {
+      console.log("🔄 Rebuilding all buttons for current page...");
+      if (window.SimpleButtonRegistry?.debugMode) {
+        console.log("📍 Current location:", {
+          url: window.location.href,
+          title: getCurrentPageTitle(),
+        });
+      }
+
+      // STEP 1: Clear ALL existing buttons and stacks (default state)
+      this.clearAllButtons();
+      this.clearAllStacks();
+
+      if (window.SimpleButtonRegistry?.debugMode) {
+        console.log(
+          `📋 Evaluating ${this.registeredButtons.size} registered buttons`
+        );
+      }
+
+      // STEP 2: Collect buttons that should be visible
+      const visibleButtons = [];
+      this.registeredButtons.forEach((config) => {
+        if (this.shouldButtonBeVisible(config)) {
+          visibleButtons.push(config);
+          if (window.SimpleButtonRegistry?.debugMode) {
+            console.log(`✅ Button "${config.id}" will be shown`);
+          }
+        } else {
+          if (window.SimpleButtonRegistry?.debugMode) {
+            console.log(`❌ Button "${config.id}" will be hidden`);
+          }
+        }
+      });
+
+      if (window.SimpleButtonRegistry?.debugMode) {
+        console.log(
+          `📊 Visibility results: ${visibleButtons.length}/${this.registeredButtons.size} buttons will be shown`
+        );
+      }
+
+      // STEP 3: Sort by priority (priority buttons get slots first)
+      visibleButtons.sort((a, b) => {
+        if (a.priority && !b.priority) return -1;
+        if (!a.priority && b.priority) return 1;
+        return 0; // Maintain original order for same priority
+      });
+
+      // STEP 4: Assign to available stack slots
+      visibleButtons.forEach((config) => {
+        this.assignButtonToStack(config);
+      });
+
+      // STEP 5: Create and place all assigned buttons
+      this.placeAllStackedButtons();
+
+      console.log(
+        `✅ Button rebuild complete (${this.activeButtons.size} visible)`
+      );
+
+      if (window.SimpleButtonRegistry?.debugMode) {
+        console.log("📊 Final button status:", {
+          registered: Array.from(this.registeredButtons.keys()),
+          visible: Array.from(this.activeButtons.keys()),
+          stacks: {
+            "top-left": this.stacks["top-left"].map((b) => b.id),
+            "top-right": this.stacks["top-right"].map((b) => b.id),
+          },
+        });
       }
     }
 
-    generateTextReport(data) {
-      return `
-EXTENSION ZERO DEBUG REPORT
-Generated: ${data.timestamp}
+    clearAllButtons() {
+      this.activeButtons.forEach((element) => {
+        element.remove();
+      });
+      this.activeButtons.clear();
+    }
 
-CURRENT PAGE:
-- Title: ${data.currentPage.title || "No title"}
-- URL: ${data.currentPage.url}
+    clearAllStacks() {
+      this.stacks["top-left"] = [];
+      this.stacks["top-right"] = [];
+    }
 
-DEPENDENCIES:
-- Extension 1.5: ${
-        data.dependencies.extension15.available ? "Available" : "Missing"
+    assignButtonToStack(config) {
+      const targetStack = config.stack || "top-right";
+      const stackConfig = BUTTON_STACKS[targetStack];
+
+      // Check if stack has available slots
+      if (this.stacks[targetStack].length < stackConfig.maxButtons) {
+        this.stacks[targetStack].push(config);
+        console.log(
+          `📍 Button "${config.id}" assigned to ${targetStack} slot ${this.stacks[targetStack].length}`
+        );
+      } else {
+        console.warn(
+          `⚠️ Button "${config.id}" skipped - no slots available in ${targetStack}`
+        );
       }
-- Extension 1.6: ${
-        data.dependencies.extension16.available ? "Available" : "Missing"
+    }
+
+    placeAllStackedButtons() {
+      // Place buttons from both stacks
+      Object.keys(this.stacks).forEach((stackName) => {
+        this.stacks[stackName].forEach((config, index) => {
+          this.createAndPlaceButton(config, stackName, index);
+        });
+      });
+    }
+
+    shouldButtonBeVisible(config) {
+      const { showOn, hideOn, condition } = config;
+
+      // Enhanced debugging for this specific issue
+      if (window.SimpleButtonRegistry?.debugMode) {
+        console.group(`🔍 Evaluating visibility for button "${config.id}"`);
+        console.log("Button config:", {
+          showOn,
+          hideOn,
+          condition: !!condition,
+        });
+        console.log("Current page:", {
+          url: window.location.href,
+          title: getCurrentPageTitle(),
+        });
       }
 
-BUTTON SYSTEMS:
-- Extension 1.6 System: ${
-        data.buttonSystems.old_system.available ? "Available" : "Not found"
+      // Custom condition function (most flexible)
+      if (condition && typeof condition === "function") {
+        try {
+          const result = condition();
+          if (window.SimpleButtonRegistry?.debugMode) {
+            console.log(`Custom condition result: ${result}`);
+            console.groupEnd();
+          }
+          return result;
+        } catch (error) {
+          console.error(`❌ Custom condition error for "${config.id}":`, error);
+          if (window.SimpleButtonRegistry?.debugMode) {
+            console.groupEnd();
+          }
+          return false;
+        }
       }
-  Buttons: ${
-    Object.keys(data.buttonSystems.old_system.buttons).join(", ") || "None"
+
+      // Simple showOn/hideOn rules
+      if (showOn) {
+        const conditionResults = showOn.map((conditionName) => {
+          const hasCondition = ButtonConditions[conditionName]
+            ? ButtonConditions[conditionName]()
+            : false;
+          if (window.SimpleButtonRegistry?.debugMode) {
+            console.log(`Condition "${conditionName}": ${hasCondition}`);
+          }
+          return hasCondition;
+        });
+
+        const shouldShow = conditionResults.some((result) => result);
+        if (window.SimpleButtonRegistry?.debugMode) {
+          console.log(
+            `showOn evaluation: ${shouldShow} (${conditionResults.join(", ")})`
+          );
+        }
+
+        if (!shouldShow) {
+          if (window.SimpleButtonRegistry?.debugMode) {
+            console.log("❌ Button hidden by showOn rules");
+            console.groupEnd();
+          }
+          return false;
+        }
+      }
+
+      if (hideOn) {
+        const hideResults = hideOn.map((conditionName) => {
+          const shouldHide = ButtonConditions[conditionName]
+            ? ButtonConditions[conditionName]()
+            : false;
+          if (window.SimpleButtonRegistry?.debugMode) {
+            console.log(`Hide condition "${conditionName}": ${shouldHide}`);
+          }
+          return shouldHide;
+        });
+
+        const shouldHide = hideResults.some((result) => result);
+        if (window.SimpleButtonRegistry?.debugMode) {
+          console.log(
+            `hideOn evaluation: ${shouldHide} (${hideResults.join(", ")})`
+          );
+        }
+
+        if (shouldHide) {
+          if (window.SimpleButtonRegistry?.debugMode) {
+            console.log("❌ Button hidden by hideOn rules");
+            console.groupEnd();
+          }
+          return false;
+        }
+      }
+
+      if (window.SimpleButtonRegistry?.debugMode) {
+        console.log("✅ Button should be visible");
+        console.groupEnd();
+      }
+
+      return true; // Default: show button
+    }
+
+    createAndPlaceButton(config, stackName, stackIndex) {
+      const button = document.createElement("button");
+      button.textContent = config.text;
+
+      // Get position from stack configuration
+      const stackConfig = BUTTON_STACKS[stackName];
+      const position = stackConfig.positions[stackIndex];
+
+      // Base styling
+      Object.assign(button.style, {
+        position: "absolute",
+        padding: "8px 12px",
+        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+        color: "white",
+        border: "none",
+        borderRadius: "6px",
+        fontSize: "13px",
+        fontWeight: "500",
+        cursor: "pointer",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+        zIndex: "10000",
+        userSelect: "none",
+        transition: "all 200ms ease",
+        whiteSpace: "nowrap",
+      });
+
+      // Apply custom styles
+      if (config.style) {
+        Object.assign(button.style, config.style);
+      }
+
+      // RESTORED: Smart positioning logic
+      if (position.x < 0) {
+        // Right-aligned positioning
+        button.style.right = `${Math.abs(position.x)}px`;
+        button.style.left = "auto";
+      } else {
+        // Left-aligned positioning
+        button.style.left = `${position.x}px`;
+        button.style.right = "auto";
+      }
+      button.style.top = `${position.y}px`;
+
+      // Click handler
+      button.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        try {
+          config.onClick({
+            buttonId: config.id,
+            buttonStack: stackName,
+            buttonPosition: stackIndex + 1,
+            currentPage: {
+              url: window.location.href,
+              title: getCurrentPageTitle(),
+            },
+          });
+        } catch (error) {
+          console.error(`❌ Button "${config.id}" click error:`, error);
+        }
+      });
+
+      // Hover effects
+      button.addEventListener("mouseenter", () => {
+        button.style.transform = "translateY(-1px)";
+        button.style.boxShadow = "0 4px 12px rgba(0,0,0,0.2)";
+      });
+
+      button.addEventListener("mouseleave", () => {
+        button.style.transform = "translateY(0)";
+        button.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
+      });
+
+      // Add to DOM and track
+      this.container.appendChild(button);
+      this.activeButtons.set(config.id, button);
+
+      console.log(
+        `✅ Button "${config.id}" placed at ${stackName} #${stackIndex + 1} (${
+          position.x
+        }, ${position.y})`
+      );
+    }
+
+    // ==================== SIMPLE PUBLIC API ====================
+
+    registerButton(config) {
+      const { id, text, onClick } = config;
+
+      // Validation
+      if (!id || !text || !onClick) {
+        throw new Error("Button must have id, text, and onClick");
+      }
+
+      if (this.registeredButtons.has(id)) {
+        throw new Error(`Button "${id}" already registered`);
+      }
+
+      // Validate stack
+      const stack = config.stack || "top-right";
+      if (!BUTTON_STACKS[stack]) {
+        throw new Error(
+          `Invalid stack: ${stack}. Must be: ${Object.keys(BUTTON_STACKS).join(
+            ", "
+          )}`
+        );
+      }
+
+      // Store configuration with stack positioning
+      this.registeredButtons.set(id, {
+        id,
+        text,
+        onClick,
+        stack,
+        priority: config.priority || false,
+        showOn: config.showOn || null,
+        hideOn: config.hideOn || null,
+        condition: config.condition || null,
+        style: config.style || {},
+      });
+
+      // If already initialized, trigger rebuild
+      if (this.container) {
+        this.rebuildAllButtons();
+      }
+
+      console.log(
+        `✅ Button "${id}" registered for ${stack} stack${
+          config.priority ? " (priority)" : ""
+        }`
+      );
+      return { success: true, id, stack };
+    }
+
+    removeButton(id) {
+      // Remove from registry
+      const removed = this.registeredButtons.delete(id);
+
+      // Remove from DOM if active
+      if (this.activeButtons.has(id)) {
+        this.activeButtons.get(id).remove();
+        this.activeButtons.delete(id);
+      }
+
+      if (removed) {
+        console.log(`🗑️ Button "${id}" removed`);
+      }
+
+      return removed;
+    }
+
+    getStatus() {
+      return {
+        registeredButtons: this.registeredButtons.size,
+        activeButtons: this.activeButtons.size,
+        stacks: {
+          "top-left": {
+            buttons: this.stacks["top-left"].length,
+            max: BUTTON_STACKS["top-left"].maxButtons,
+            available:
+              BUTTON_STACKS["top-left"].maxButtons -
+              this.stacks["top-left"].length,
+            buttonIds: this.stacks["top-left"].map((b) => b.id),
+          },
+          "top-right": {
+            buttons: this.stacks["top-right"].length,
+            max: BUTTON_STACKS["top-right"].maxButtons,
+            available:
+              BUTTON_STACKS["top-right"].maxButtons -
+              this.stacks["top-right"].length,
+            buttonIds: this.stacks["top-right"].map((b) => b.id),
+          },
+        },
+        currentPage: {
+          url: window.location.href,
+          title: getCurrentPageTitle(),
+        },
+        buttonIds: {
+          registered: Array.from(this.registeredButtons.keys()),
+          active: Array.from(this.activeButtons.keys()),
+        },
+      };
+    }
+
+    cleanup() {
+      this.clearAllButtons();
+      this.clearAllStacks();
+      this.registeredButtons.clear();
+      this.pageDetector.stopMonitoring();
+      console.log("🧹 Simple Button Registry cleaned up");
+    }
   }
-- Extension 2.0 System: ${
-        data.buttonSystems.new_system.available ? "Available" : "Not found"
-      }
-  Buttons: ${
-    Object.keys(data.buttonSystems.new_system.buttons).join(", ") || "None"
-  }
 
-CONTEXT DETECTION:
-- Current Contexts: ${
-        data.contextDetection.currentContexts.join(", ") || "None"
-      }
-- Available Contexts: ${
-        data.contextDetection.availableContexts.join(", ") || "None"
-      }
+  // ==================== EXTENSION MANAGER ====================
 
-EXTENSION 6:
-- Services: ${data.extension6Status.services || "Unknown"}
-- DOM Elements: ${
-        data.extension6Status.domElements.length
-      } User Directory button(s) found
-
-RECOMMENDATIONS:
-${
-  data.recommendations
-    .map((rec) => `- ${rec.type.toUpperCase()}: ${rec.title} - ${rec.message}`)
-    .join("\n") || "No issues detected"
-}
-
-RAW DATA:
-${JSON.stringify(data, null, 2)}
-      `.trim();
+  class SimpleExtensionButtonManager {
+    constructor(extensionName) {
+      this.extensionName = extensionName;
+      this.registry = null;
+      this.myButtons = new Set();
     }
 
-    startAutoRefresh() {
-      // Refresh every 5 seconds
-      this.updateInterval = setInterval(() => {
-        this.refresh();
-      }, 5000);
+    async initialize() {
+      if (!window.SimpleButtonRegistry) {
+        window.SimpleButtonRegistry = new SimpleButtonRegistry();
+        await window.SimpleButtonRegistry.initialize();
+      }
+
+      this.registry = window.SimpleButtonRegistry;
+      return true;
     }
 
-    hide() {
-      if (this.updateInterval) {
-        clearInterval(this.updateInterval);
-        this.updateInterval = null;
+    async registerButton(config) {
+      if (!this.registry) await this.initialize();
+
+      const buttonId = `${this.extensionName}-${config.id}`;
+      const result = this.registry.registerButton({
+        ...config,
+        id: buttonId,
+      });
+
+      if (result.success) {
+        this.myButtons.add(buttonId);
       }
 
-      if (this.modal) {
-        this.modal.remove();
-        this.modal = null;
+      return result;
+    }
+
+    removeButton(id) {
+      const buttonId = `${this.extensionName}-${id}`;
+      const success = this.registry?.removeButton(buttonId);
+
+      if (success) {
+        this.myButtons.delete(buttonId);
       }
+
+      return success;
+    }
+
+    cleanup() {
+      this.myButtons.forEach((buttonId) => {
+        this.registry?.removeButton(buttonId);
+      });
+      this.myButtons.clear();
     }
   }
 
   // ==================== GLOBAL API ====================
 
-  const extensionDebugger = new ExtensionDebugger();
-  const debugUI = new DebugUI(extensionDebugger);
+  // Simple global access
+  window.SimpleButtonRegistry = null; // Will be created on first use
+  window.SimpleExtensionButtonManager = SimpleExtensionButtonManager;
+  window.ButtonConditions = ButtonConditions;
 
-  // Global access
-  window.ExtensionZeroDebug = {
-    show: () => debugUI.show(),
-    hide: () => debugUI.hide(),
-    collectData: () => extensionDebugger.collectDebugData(),
-    extensionDebugger: extensionDebugger,
-    ui: debugUI,
+  // Simple testing
+  window.SimpleButtonUtilityTests = {
+    testBasicButton: async () => {
+      const manager = new SimpleExtensionButtonManager("TestExtension");
+      await manager.initialize();
+
+      // Test multiple buttons with different stacks and priorities
+      await manager.registerButton({
+        id: "test-button-1",
+        text: "🧪 Test 1",
+        onClick: () => console.log("Test button 1 clicked!"),
+        showOn: ["isMainPage"],
+        stack: "top-right",
+        priority: false,
+      });
+
+      await manager.registerButton({
+        id: "test-button-2",
+        text: "⭐ Priority",
+        onClick: () => console.log("Priority button clicked!"),
+        showOn: ["isMainPage"],
+        stack: "top-right",
+        priority: true, // This will get slot #1
+      });
+
+      await manager.registerButton({
+        id: "test-button-3",
+        text: "📍 Left",
+        onClick: () => console.log("Left stack button clicked!"),
+        showOn: ["isMainPage"],
+        stack: "top-left",
+      });
+
+      console.log("Test buttons registered");
+      console.log("Registry status:", window.SimpleButtonRegistry.getStatus());
+
+      // Clean up after 10 seconds
+      setTimeout(() => {
+        manager.cleanup();
+        console.log("Test cleaned up");
+      }, 10000);
+    },
+
+    // 🚨 SPECIAL: Debug Extension 6 User Directory button issue
+    debugUserDirectoryButton: () => {
+      console.group("🔍 Debugging User Directory Button Issue");
+
+      const registry = window.SimpleButtonRegistry;
+      if (!registry) {
+        console.error("❌ Simple Button Registry not found");
+        console.groupEnd();
+        return;
+      }
+
+      // Check if there's a User Directory button registered
+      let userDirButton = null;
+      registry.registeredButtons.forEach((config, id) => {
+        if (
+          id.includes("User") ||
+          id.includes("Directory") ||
+          config.text.includes("User") ||
+          config.text.includes("Directory")
+        ) {
+          userDirButton = { id, config };
+        }
+      });
+
+      if (!userDirButton) {
+        console.log("❌ No User Directory button found in registry");
+        console.log(
+          "📋 Registered buttons:",
+          Array.from(registry.registeredButtons.keys())
+        );
+        console.groupEnd();
+        return;
+      }
+
+      console.log("🎯 Found User Directory button:", userDirButton.id);
+      console.log("📝 Button config:", userDirButton.config);
+
+      // Test all conditions manually
+      console.log("\n🧪 Testing button conditions manually:");
+
+      // Test current page conditions
+      console.log("📄 Current page info:");
+      console.log("  URL:", window.location.href);
+      console.log("  Title:", getCurrentPageTitle());
+
+      // Test all ButtonConditions
+      console.log("\n🔍 Testing all button conditions:");
+      Object.keys(ButtonConditions).forEach((conditionName) => {
+        try {
+          const result = ButtonConditions[conditionName]();
+          console.log(`  ${conditionName}: ${result}`);
+        } catch (error) {
+          console.log(`  ${conditionName}: ERROR - ${error.message}`);
+        }
+      });
+
+      // Test the specific button's visibility logic
+      console.log("\n⚖️ Testing button visibility logic:");
+      const shouldBeVisible = registry.shouldButtonBeVisible(
+        userDirButton.config
+      );
+      console.log(`Should be visible: ${shouldBeVisible}`);
+
+      // Check if it's actually visible
+      const isActuallyVisible = registry.activeButtons.has(userDirButton.id);
+      console.log(`Actually visible: ${isActuallyVisible}`);
+
+      if (shouldBeVisible !== isActuallyVisible) {
+        console.error(
+          "🚨 MISMATCH: Expected visibility doesn't match actual visibility!"
+        );
+      }
+
+      console.groupEnd();
+    },
+
+    showStatus: () => {
+      if (window.SimpleButtonRegistry) {
+        console.log(
+          "📊 Registry Status:",
+          window.SimpleButtonRegistry.getStatus()
+        );
+      } else {
+        console.log("❌ Registry not initialized");
+      }
+    },
+
+    forceRebuild: () => {
+      if (window.SimpleButtonRegistry) {
+        console.log("🔄 Forcing button rebuild...");
+        window.SimpleButtonRegistry.rebuildAllButtons();
+      }
+    },
+
+    enableDebugMode: () => {
+      if (window.SimpleButtonRegistry) {
+        window.SimpleButtonRegistry.debugMode = true;
+        console.log(
+          "🐛 Debug mode enabled - you'll see detailed logs during button rebuilds"
+        );
+      } else {
+        console.log("❌ Registry not found");
+      }
+    },
+
+    disableDebugMode: () => {
+      if (window.SimpleButtonRegistry) {
+        window.SimpleButtonRegistry.debugMode = false;
+        console.log("✅ Debug mode disabled");
+      }
+    },
+
+    // 🔧 NEW: Test the fixed page title detection
+    testPageTitleDetection: () => {
+      console.group("🔧 Testing Fixed Page Title Detection");
+
+      console.log("Current page title:", getCurrentPageTitle());
+
+      // Test username detection with current title
+      const pageTitle = getCurrentPageTitle();
+      if (pageTitle) {
+        const isFirstLastPattern = /^[A-Z][a-z]+\s+[A-Z][a-z]+$/.test(
+          pageTitle
+        );
+        const isUsernamePattern = /^[a-zA-Z][a-zA-Z0-9_-]{2,}$/.test(pageTitle);
+
+        console.log(`Testing "${pageTitle}":`);
+        console.log("  Matches 'First Last' pattern:", isFirstLastPattern);
+        console.log("  Matches 'username123' pattern:", isUsernamePattern);
+        console.log(
+          "  Should be detected as username page:",
+          isFirstLastPattern || isUsernamePattern
+        );
+
+        // Test the actual condition
+        console.log(
+          "  isUsernamePage() result:",
+          ButtonConditions.isUsernamePage()
+        );
+      }
+
+      console.groupEnd();
+    },
   };
 
-  // Auto-register command
-  if (window.roamAlphaAPI?.ui?.commandPalette) {
-    window.roamAlphaAPI.ui.commandPalette.addCommand({
-      label: "Extension Zero: Show Debug Interface",
-      callback: () => debugUI.show(),
-    });
-  }
-
-  console.log(`✅ ${EXTENSION_NAME} v${EXTENSION_VERSION} loaded`);
   console.log(
-    "💡 Run: window.ExtensionZeroDebug.show() or use Command Palette"
+    `✅ ${EXTENSION_NAME} v${EXTENSION_VERSION} loaded - Fixed Page Title Detection! 🎯`
   );
+
+  // Auto-test the page title detection
+  setTimeout(() => {
+    console.log("🔧 Auto-testing page title detection...");
+    window.SimpleButtonUtilityTests.testPageTitleDetection();
+  }, 1000);
 })();
