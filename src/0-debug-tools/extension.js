@@ -1,983 +1,1067 @@
 // ===================================================================
-// Simple Button Utility Extension 2.0 - Page-Change Driven
-// 🎯 COMPLETELY REDESIGNED: Simple "tear down and rebuild" approach
-// 🔧 FIXED: Proper page title detection (DOM-based, not URL-based)
+// Extension ZERO: Debug Interface - Button System Diagnostics (UPDATED)
+// 🐛 DEBUG: Clean interface for troubleshooting extension issues
+// 📋 COPY-PASTE: Export functionality for easy sharing
+// 🔄 REAL-TIME: Live monitoring of system state
+// 🔧 UPDATED: Compatible with new Simple Button Manager architecture
 // ===================================================================
 
 (() => {
   "use strict";
 
-  const EXTENSION_NAME = "Simple Button Utility";
-  const EXTENSION_VERSION = "2.0.1"; // Fixed page title detection
-  const ANIMATION_DURATION = 200;
+  const EXTENSION_NAME = "Extension Zero Debug";
+  const EXTENSION_VERSION = "1.1.0";
 
-  // ==================== BUTTON STACK POSITIONING (RESTORED) ====================
+  // ==================== DEBUG DATA COLLECTION ====================
 
-  const BUTTON_STACKS = {
-    "top-left": {
-      maxButtons: 2,
-      positions: [
-        { x: 20, y: 8 }, // ← Sandbox coordinates: relative to content area
-        { x: 20, y: 50 }, // ← Proper spacing for content positioning
-      ],
-    },
-    "top-right": {
-      maxButtons: 5,
-      positions: [
-        { x: -100, y: 8 }, // ← Sandbox coordinates: -100px from right edge
-        { x: -100, y: 50 },
-        { x: -100, y: 92 },
-        { x: -100, y: 134 },
-        { x: -100, y: 176 },
-      ],
-    },
-  };
-
-  // ==================== SIMPLE PAGE CHANGE DETECTOR ====================
-
-  class SimplePageChangeDetector {
+  class ExtensionDebugger {
     constructor() {
-      this.currentUrl = window.location.href;
-      this.currentTitle = document.title;
-      this.listeners = new Set();
-      this.isMonitoring = false;
+      this.debugData = {};
+      this.updateCallbacks = new Set();
     }
 
-    startMonitoring() {
-      if (this.isMonitoring) return;
-
-      // Just monitor the basics - URL and title changes
-      this.setupURLListeners();
-      this.setupTitleListener();
-      this.setupPeriodicCheck();
-
-      this.isMonitoring = true;
-      console.log("🚀 Simple page monitoring started");
-    }
-
-    stopMonitoring() {
-      if (!this.isMonitoring) return;
-
-      // Clean up listeners
-      window.removeEventListener("popstate", this.boundURLChange);
-      if (this.originalPushState) history.pushState = this.originalPushState;
-      if (this.originalReplaceState)
-        history.replaceState = this.originalReplaceState;
-      if (this.titleObserver) this.titleObserver.disconnect();
-      if (this.checkInterval) clearInterval(this.checkInterval);
-
-      this.isMonitoring = false;
-      console.log("🛑 Simple page monitoring stopped");
-    }
-
-    setupURLListeners() {
-      // Browser navigation
-      this.boundURLChange = () => this.checkForPageChange();
-      window.addEventListener("popstate", this.boundURLChange);
-
-      // SPA navigation
-      this.originalPushState = history.pushState;
-      this.originalReplaceState = history.replaceState;
-
-      const self = this;
-      history.pushState = function (...args) {
-        self.originalPushState.apply(history, args);
-        setTimeout(() => self.checkForPageChange(), 50);
+    async collectDebugData() {
+      const data = {
+        timestamp: new Date().toISOString(),
+        currentPage: this.getCurrentPageInfo(),
+        dependencies: this.checkDependencies(),
+        buttonSystems: this.checkButtonSystems(),
+        extension6Status: this.checkExtension6Status(),
+        contextDetection: this.checkContextDetection(),
+        recommendations: [],
       };
 
-      history.replaceState = function (...args) {
-        self.originalReplaceState.apply(history, args);
-        setTimeout(() => self.checkForPageChange(), 50);
-      };
+      // Generate recommendations based on findings
+      data.recommendations = this.generateRecommendations(data);
+
+      this.debugData = data;
+      this.notifyUpdateCallbacks();
+
+      return data;
     }
 
-    setupTitleListener() {
-      // Watch for title changes (Roam-specific)
-      this.titleObserver = new MutationObserver(() => {
-        if (document.title !== this.currentTitle) {
-          setTimeout(() => this.checkForPageChange(), 50);
-        }
-      });
-
-      this.titleObserver.observe(document.head, {
-        childList: true,
-        subtree: true,
-      });
-    }
-
-    setupPeriodicCheck() {
-      // Light backup check every 3 seconds
-      this.checkInterval = setInterval(() => {
-        this.checkForPageChange();
-      }, 3000);
-    }
-
-    checkForPageChange() {
-      const newUrl = window.location.href;
-      const newTitle = document.title;
-
-      if (newUrl !== this.currentUrl || newTitle !== this.currentTitle) {
-        console.log(`📄 Page changed: ${this.currentUrl} → ${newUrl}`);
-
-        this.currentUrl = newUrl;
-        this.currentTitle = newTitle;
-
-        // Notify all listeners - THIS IS THE CORE EVENT
-        this.listeners.forEach((listener) => {
-          try {
-            listener({ url: newUrl, title: newTitle });
-          } catch (error) {
-            console.error("❌ Page change listener error:", error);
-          }
-        });
-      }
-    }
-
-    onPageChange(listener) {
-      this.listeners.add(listener);
-      return () => this.listeners.delete(listener);
-    }
-  }
-
-  // ==================== FIXED PAGE TITLE DETECTION ====================
-
-  // 🔧 FIXED: Get the actual page TITLE (not page ID) from DOM
-  function getCurrentPageTitle() {
-    try {
-      // STEP 1: Try to get the actual displayed page title from DOM FIRST
-      const titleSelectors = [
-        ".roam-article h1",
-        ".rm-page-title",
-        ".rm-title-display",
-        "[data-page-title]",
-        ".rm-page-title-text",
-        ".roam-article > div:first-child h1",
-        "h1[data-page-title]",
-      ];
-
-      for (const selector of titleSelectors) {
-        const titleElement = document.querySelector(selector);
-        if (titleElement) {
-          const titleText = titleElement.textContent?.trim();
-          if (titleText && titleText !== "") {
-            console.log(`📄 Got page title from ${selector}: "${titleText}"`);
-            return titleText;
-          }
-        }
-      }
-
-      // STEP 2: Try document.title as backup (clean it up)
-      if (document.title && document.title !== "Roam") {
-        const titleText = document.title
-          .replace(" - Roam", "")
-          .replace(" | Roam Research", "")
-          .trim();
-        if (titleText && titleText !== "") {
-          console.log(`📄 Got page title from document.title: "${titleText}"`);
-          return titleText;
-        }
-      }
-
-      // STEP 3: ONLY as last resort, try URL parsing (returns page ID, not title)
-      const url = window.location.href;
-      const pageMatch = url.match(/\/page\/([^/?#]+)/);
-      if (pageMatch) {
-        const pageId = decodeURIComponent(pageMatch[1]);
-        console.warn(`⚠️ Falling back to page ID (not title): "${pageId}"`);
-        console.warn(
-          "💡 Consider improving DOM selectors for better title detection"
-        );
-        return pageId;
-      }
-
-      console.warn("❌ Could not determine page title");
-      return null;
-    } catch (error) {
-      console.error("❌ Failed to get current page title:", error);
-      return null;
-    }
-  }
-
-  // ==================== SIMPLE BUTTON CONDITIONS ====================
-
-  // Simple condition functions - much easier to understand!
-  const ButtonConditions = {
-    // Username page detection
-    isUsernamePage: () => {
-      const pageTitle = getCurrentPageTitle();
-      if (!pageTitle) return false;
-
-      // Simple patterns for username detection
-      const isFirstLastPattern = /^[A-Z][a-z]+\s+[A-Z][a-z]+$/.test(pageTitle); // "First Last"
-      const isUsernamePattern = /^[a-zA-Z][a-zA-Z0-9_-]{2,}$/.test(pageTitle); // "username123"
-
-      const result = isFirstLastPattern || isUsernamePattern;
-
-      if (window.SimpleButtonRegistry?.debugMode) {
-        console.log(`🔍 Username page detection for "${pageTitle}":`, {
-          isFirstLastPattern,
-          isUsernamePattern,
-          result,
-        });
-      }
-
-      return result;
-    },
-
-    // Daily note detection
-    isDailyNote: () => {
-      const url = window.location.href;
-      return (
-        /\/page\/\d{2}-\d{2}-\d{4}/.test(url) || // MM-DD-YYYY
-        /\/page\/\d{4}-\d{2}-\d{2}/.test(url) || // YYYY-MM-DD
-        /\/page\/[A-Z][a-z]+.*\d{4}/.test(url)
-      ); // Month DD, YYYY
-    },
-
-    // Main content pages
-    isMainPage: () => {
-      return (
-        !!document.querySelector(".roam-article") &&
-        window.location.href.includes("/page/")
-      );
-    },
-
-    // Settings pages
-    isSettingsPage: () => {
-      return (
-        window.location.href.includes("/settings") ||
-        window.location.href.includes("roam/settings")
-      );
-    },
-
-    // Custom condition support
-    custom: (conditionFn) => {
-      try {
-        return conditionFn();
-      } catch (error) {
-        console.error("❌ Custom condition error:", error);
-        return false;
-      }
-    },
-  };
-
-  // ==================== SIMPLE BUTTON REGISTRY ====================
-
-  class SimpleButtonRegistry {
-    constructor() {
-      this.registeredButtons = new Map(); // button config storage
-      this.activeButtons = new Map(); // currently visible DOM elements
-      this.stacks = {
-        // RESTORED: Stack management
-        "top-left": [],
-        "top-right": [],
-      };
-      this.container = null;
-      this.debugMode = false; // 🐛 Debug mode toggle
-      this.pageDetector = new SimplePageChangeDetector();
-
-      // Core event: when page changes, rebuild all buttons
-      this.pageDetector.onPageChange(() => {
-        this.rebuildAllButtons();
-      });
-    }
-
-    async initialize() {
-      this.setupContainer();
-      this.pageDetector.startMonitoring();
-
-      // Initial button placement
-      this.rebuildAllButtons();
-
-      console.log("✅ Simple Button Registry initialized");
-      return true;
-    }
-
-    setupContainer() {
-      // Find main content area
-      const candidates = [
-        ".roam-article",
-        ".roam-main .roam-article",
-        ".roam-main",
-      ];
-
-      for (const selector of candidates) {
-        const element = document.querySelector(selector);
-        if (element) {
-          this.container = element;
-
-          // Ensure relative positioning for absolute button placement
-          if (getComputedStyle(element).position === "static") {
-            element.style.position = "relative";
-          }
-
-          console.log(`✅ Container found: ${selector}`);
-          return;
-        }
-      }
-
-      throw new Error("No suitable container found");
-    }
-
-    // ==================== CORE METHOD: REBUILD ALL BUTTONS ====================
-
-    rebuildAllButtons() {
-      console.log("🔄 Rebuilding all buttons for current page...");
-      if (window.SimpleButtonRegistry?.debugMode) {
-        console.log("📍 Current location:", {
-          url: window.location.href,
-          title: getCurrentPageTitle(),
-        });
-      }
-
-      // STEP 1: Clear ALL existing buttons and stacks (default state)
-      this.clearAllButtons();
-      this.clearAllStacks();
-
-      if (window.SimpleButtonRegistry?.debugMode) {
-        console.log(
-          `📋 Evaluating ${this.registeredButtons.size} registered buttons`
-        );
-      }
-
-      // STEP 2: Collect buttons that should be visible
-      const visibleButtons = [];
-      this.registeredButtons.forEach((config) => {
-        if (this.shouldButtonBeVisible(config)) {
-          visibleButtons.push(config);
-          if (window.SimpleButtonRegistry?.debugMode) {
-            console.log(`✅ Button "${config.id}" will be shown`);
-          }
-        } else {
-          if (window.SimpleButtonRegistry?.debugMode) {
-            console.log(`❌ Button "${config.id}" will be hidden`);
-          }
-        }
-      });
-
-      if (window.SimpleButtonRegistry?.debugMode) {
-        console.log(
-          `📊 Visibility results: ${visibleButtons.length}/${this.registeredButtons.size} buttons will be shown`
-        );
-      }
-
-      // STEP 3: Sort by priority (priority buttons get slots first)
-      visibleButtons.sort((a, b) => {
-        if (a.priority && !b.priority) return -1;
-        if (!a.priority && b.priority) return 1;
-        return 0; // Maintain original order for same priority
-      });
-
-      // STEP 4: Assign to available stack slots
-      visibleButtons.forEach((config) => {
-        this.assignButtonToStack(config);
-      });
-
-      // STEP 5: Create and place all assigned buttons
-      this.placeAllStackedButtons();
-
-      console.log(
-        `✅ Button rebuild complete (${this.activeButtons.size} visible)`
-      );
-
-      if (window.SimpleButtonRegistry?.debugMode) {
-        console.log("📊 Final button status:", {
-          registered: Array.from(this.registeredButtons.keys()),
-          visible: Array.from(this.activeButtons.keys()),
-          stacks: {
-            "top-left": this.stacks["top-left"].map((b) => b.id),
-            "top-right": this.stacks["top-right"].map((b) => b.id),
-          },
-        });
-      }
-    }
-
-    clearAllButtons() {
-      this.activeButtons.forEach((element) => {
-        element.remove();
-      });
-      this.activeButtons.clear();
-    }
-
-    clearAllStacks() {
-      this.stacks["top-left"] = [];
-      this.stacks["top-right"] = [];
-    }
-
-    assignButtonToStack(config) {
-      const targetStack = config.stack || "top-right";
-      const stackConfig = BUTTON_STACKS[targetStack];
-
-      // Check if stack has available slots
-      if (this.stacks[targetStack].length < stackConfig.maxButtons) {
-        this.stacks[targetStack].push(config);
-        console.log(
-          `📍 Button "${config.id}" assigned to ${targetStack} slot ${this.stacks[targetStack].length}`
-        );
-      } else {
-        console.warn(
-          `⚠️ Button "${config.id}" skipped - no slots available in ${targetStack}`
-        );
-      }
-    }
-
-    placeAllStackedButtons() {
-      // Place buttons from both stacks
-      Object.keys(this.stacks).forEach((stackName) => {
-        this.stacks[stackName].forEach((config, index) => {
-          this.createAndPlaceButton(config, stackName, index);
-        });
-      });
-    }
-
-    shouldButtonBeVisible(config) {
-      const { showOn, hideOn, condition } = config;
-
-      // Enhanced debugging for this specific issue
-      if (window.SimpleButtonRegistry?.debugMode) {
-        console.group(`🔍 Evaluating visibility for button "${config.id}"`);
-        console.log("Button config:", {
-          showOn,
-          hideOn,
-          condition: !!condition,
-        });
-        console.log("Current page:", {
-          url: window.location.href,
-          title: getCurrentPageTitle(),
-        });
-      }
-
-      // Custom condition function (most flexible)
-      if (condition && typeof condition === "function") {
+    getCurrentPageInfo() {
+      const getCurrentPageTitle = () => {
         try {
-          const result = condition();
-          if (window.SimpleButtonRegistry?.debugMode) {
-            console.log(`Custom condition result: ${result}`);
-            console.groupEnd();
+          const url = window.location.href;
+          const pageMatch = url.match(/\/page\/([^/?#]+)/);
+          if (pageMatch) {
+            return decodeURIComponent(pageMatch[1]);
           }
-          return result;
+          const titleElement = document.querySelector(
+            ".roam-article h1, .rm-page-title"
+          );
+          return titleElement?.textContent?.trim() || null;
         } catch (error) {
-          console.error(`❌ Custom condition error for "${config.id}":`, error);
-          if (window.SimpleButtonRegistry?.debugMode) {
-            console.groupEnd();
-          }
-          return false;
+          return null;
         }
-      }
+      };
 
-      // Simple showOn/hideOn rules
-      if (showOn) {
-        const conditionResults = showOn.map((conditionName) => {
-          const hasCondition = ButtonConditions[conditionName]
-            ? ButtonConditions[conditionName]()
-            : false;
-          if (window.SimpleButtonRegistry?.debugMode) {
-            console.log(`Condition "${conditionName}": ${hasCondition}`);
-          }
-          return hasCondition;
-        });
-
-        const shouldShow = conditionResults.some((result) => result);
-        if (window.SimpleButtonRegistry?.debugMode) {
-          console.log(
-            `showOn evaluation: ${shouldShow} (${conditionResults.join(", ")})`
-          );
-        }
-
-        if (!shouldShow) {
-          if (window.SimpleButtonRegistry?.debugMode) {
-            console.log("❌ Button hidden by showOn rules");
-            console.groupEnd();
-          }
-          return false;
-        }
-      }
-
-      if (hideOn) {
-        const hideResults = hideOn.map((conditionName) => {
-          const shouldHide = ButtonConditions[conditionName]
-            ? ButtonConditions[conditionName]()
-            : false;
-          if (window.SimpleButtonRegistry?.debugMode) {
-            console.log(`Hide condition "${conditionName}": ${shouldHide}`);
-          }
-          return shouldHide;
-        });
-
-        const shouldHide = hideResults.some((result) => result);
-        if (window.SimpleButtonRegistry?.debugMode) {
-          console.log(
-            `hideOn evaluation: ${shouldHide} (${hideResults.join(", ")})`
-          );
-        }
-
-        if (shouldHide) {
-          if (window.SimpleButtonRegistry?.debugMode) {
-            console.log("❌ Button hidden by hideOn rules");
-            console.groupEnd();
-          }
-          return false;
-        }
-      }
-
-      if (window.SimpleButtonRegistry?.debugMode) {
-        console.log("✅ Button should be visible");
-        console.groupEnd();
-      }
-
-      return true; // Default: show button
+      return {
+        url: window.location.href,
+        title: getCurrentPageTitle(),
+        timestamp: new Date().toLocaleString(),
+      };
     }
 
-    createAndPlaceButton(config, stackName, stackIndex) {
-      const button = document.createElement("button");
-      button.textContent = config.text;
+    checkDependencies() {
+      const deps = {
+        extension15: {
+          available: !!window.RoamExtensionSuite,
+          platform: null,
+          utilities: {},
+        },
+        simpleButtonUtility20: {
+          available: false,
+          components: {},
+          registry: null,
+          initialized: false,
+        },
+      };
 
-      // Get position from stack configuration
-      const stackConfig = BUTTON_STACKS[stackName];
-      const position = stackConfig.positions[stackIndex];
+      // Check Extension 1.5
+      if (window.RoamExtensionSuite) {
+        deps.extension15.platform = "✅ Available";
+        const platform = window.RoamExtensionSuite;
 
-      // Base styling
-      Object.assign(button.style, {
-        position: "absolute",
-        padding: "8px 12px",
-        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-        color: "white",
-        border: "none",
-        borderRadius: "6px",
-        fontSize: "13px",
-        fontWeight: "500",
-        cursor: "pointer",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-        zIndex: "10000",
-        userSelect: "none",
-        transition: "all 200ms ease",
-        whiteSpace: "nowrap",
-      });
+        const requiredUtilities = [
+          "timezoneManager",
+          "modalUtilities",
+          "profileAnalysisUtilities",
+          "getCurrentUser",
+          "getGraphMembersFromList",
+        ];
 
-      // Apply custom styles
-      if (config.style) {
-        Object.assign(button.style, config.style);
-      }
-
-      // RESTORED: Smart positioning logic
-      if (position.x < 0) {
-        // Right-aligned positioning
-        button.style.right = `${Math.abs(position.x)}px`;
-        button.style.left = "auto";
+        requiredUtilities.forEach((util) => {
+          deps.extension15.utilities[util] = !!(
+            platform.getUtility && platform.getUtility(util)
+          );
+        });
       } else {
-        // Left-aligned positioning
-        button.style.left = `${position.x}px`;
-        button.style.right = "auto";
+        deps.extension15.platform = "❌ Not found";
       }
-      button.style.top = `${position.y}px`;
 
-      // Click handler
-      button.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+      // 🔧 UPDATED: Better detection for Simple Button Utility 2.0
+      deps.simpleButtonUtility20.components = {
+        SimpleExtensionButtonManager: !!window.SimpleExtensionButtonManager,
+        ButtonConditions: !!window.ButtonConditions,
+        SimpleButtonRegistry_Class: !!window.SimpleButtonRegistry, // Could be null (uninitialized) or instance
+      };
 
+      // Check if the system is available (core components exist)
+      const coreComponentsAvailable =
+        !!window.SimpleExtensionButtonManager && !!window.ButtonConditions;
+
+      deps.simpleButtonUtility20.available = coreComponentsAvailable;
+
+      // Check initialization status
+      if (
+        window.SimpleButtonRegistry &&
+        window.SimpleButtonRegistry.constructor
+      ) {
+        deps.simpleButtonUtility20.initialized = true;
         try {
-          config.onClick({
-            buttonId: config.id,
-            buttonStack: stackName,
-            buttonPosition: stackIndex + 1,
-            currentPage: {
-              url: window.location.href,
-              title: getCurrentPageTitle(),
-            },
+          deps.simpleButtonUtility20.registry =
+            window.SimpleButtonRegistry.getStatus();
+        } catch (error) {
+          deps.simpleButtonUtility20.registry = `Error: ${error.message}`;
+        }
+      } else if (window.SimpleButtonRegistry === null) {
+        deps.simpleButtonUtility20.initialized = false;
+        deps.simpleButtonUtility20.registry = "Available but not initialized";
+      } else {
+        deps.simpleButtonUtility20.initialized = false;
+        deps.simpleButtonUtility20.registry = "Not available";
+      }
+
+      return deps;
+    }
+
+    checkButtonSystems() {
+      const systems = {
+        simple_button_utility_20: {
+          available: false,
+          initialized: false,
+          buttons: {},
+          status: null,
+        },
+        legacy_systems: {
+          old_extension_16: !!window.RoamButtonRegistry,
+          old_extension_20: !!window.ExtensionButtonManager,
+        },
+      };
+
+      // 🔧 UPDATED: Check if core system is available vs initialized
+      const coreAvailable =
+        !!window.SimpleExtensionButtonManager && !!window.ButtonConditions;
+      systems.simple_button_utility_20.available = coreAvailable;
+
+      if (
+        window.SimpleButtonRegistry &&
+        typeof window.SimpleButtonRegistry.getStatus === "function"
+      ) {
+        systems.simple_button_utility_20.initialized = true;
+        try {
+          systems.simple_button_utility_20.status =
+            window.SimpleButtonRegistry.getStatus();
+
+          // Get button details
+          if (window.SimpleButtonRegistry.registeredButtons) {
+            const buttonDetails = {};
+            window.SimpleButtonRegistry.registeredButtons.forEach(
+              (config, id) => {
+                buttonDetails[id] = {
+                  text: config.text,
+                  stack: config.stack,
+                  priority: config.priority,
+                  showOn: config.showOn,
+                  hideOn: config.hideOn,
+                  hasCondition: !!config.condition,
+                };
+              }
+            );
+            systems.simple_button_utility_20.buttons = buttonDetails;
+          }
+        } catch (error) {
+          systems.simple_button_utility_20.status = `Error: ${error.message}`;
+        }
+      } else if (window.SimpleButtonRegistry === null && coreAvailable) {
+        systems.simple_button_utility_20.initialized = false;
+        systems.simple_button_utility_20.status =
+          "Available but not initialized - no extension has triggered initialization yet";
+      } else {
+        systems.simple_button_utility_20.initialized = false;
+        systems.simple_button_utility_20.status = "Not available";
+      }
+
+      return systems;
+    }
+
+    checkExtension6Status() {
+      const ext6 = {
+        userDirectoryButton: null,
+        buttonManager: null,
+        services: null,
+        domElements: [],
+      };
+
+      // Check for Extension 6 services
+      if (window.RoamExtensionSuite) {
+        try {
+          const platform = window.RoamExtensionSuite;
+          const services =
+            platform.getService && platform.getService("clean-user-directory");
+          ext6.services = services ? "✅ Registered" : "❌ Not found";
+        } catch (error) {
+          ext6.services = `Error: ${error.message}`;
+        }
+      }
+
+      // Check for User Directory buttons in DOM
+      const fallbackButtons = document.querySelectorAll(
+        ".user-directory-fallback-button"
+      );
+      const allButtons = Array.from(document.querySelectorAll("button")).filter(
+        (btn) =>
+          btn.textContent.includes("User Directory") ||
+          btn.textContent.includes("👥")
+      );
+
+      ext6.domElements = allButtons.map((btn) => ({
+        text: btn.textContent,
+        classes: btn.className,
+        visible: btn.style.display !== "none",
+        position: {
+          position: btn.style.position,
+          top: btn.style.top,
+          left: btn.style.left,
+          right: btn.style.right,
+        },
+      }));
+
+      return ext6;
+    }
+
+    checkContextDetection() {
+      const context = {
+        buttonConditions: [],
+        conditionResults: {},
+        currentContexts: [],
+        availableContexts: [],
+      };
+
+      // Check Simple Button Utility 2.0 ButtonConditions
+      if (window.ButtonConditions) {
+        try {
+          context.buttonConditions = Object.keys(
+            window.ButtonConditions
+          ).filter((key) => typeof window.ButtonConditions[key] === "function");
+
+          context.availableContexts = context.buttonConditions;
+
+          // Test each condition
+          context.buttonConditions.forEach((conditionName) => {
+            try {
+              const result = window.ButtonConditions[conditionName]();
+              context.conditionResults[conditionName] = result;
+              if (result) {
+                context.currentContexts.push(conditionName);
+              }
+            } catch (error) {
+              context.conditionResults[
+                conditionName
+              ] = `Error: ${error.message}`;
+            }
           });
         } catch (error) {
-          console.error(`❌ Button "${config.id}" click error:`, error);
+          context.conditionResults = { error: error.message };
+        }
+      }
+
+      return context;
+    }
+
+    generateRecommendations(data) {
+      const recommendations = [];
+
+      // Extension dependencies
+      if (!data.dependencies.extension15.available) {
+        recommendations.push({
+          type: "error",
+          title: "Extension 1.5 Missing",
+          message:
+            "Load Extension 1.5 first - it provides core utilities for Extension 6",
+          action: "Load Extension 1.5 before Extension 6",
+        });
+      }
+
+      // 🔧 UPDATED: Better recommendations for new button system
+      if (!data.dependencies.simpleButtonUtility20.available) {
+        recommendations.push({
+          type: "error",
+          title: "Simple Button Utility 2.0 Missing",
+          message:
+            "Extension 6 needs Simple Button Utility 2.0 for button management",
+          action: "Load Simple Button Utility 2.0",
+        });
+      } else if (!data.dependencies.simpleButtonUtility20.initialized) {
+        recommendations.push({
+          type: "info",
+          title: "Simple Button Manager Not Yet Initialized",
+          message:
+            "Button system is available but hasn't been initialized by any extension yet",
+          action:
+            "This is normal - it will initialize when an extension registers a button",
+        });
+      }
+
+      // Button system issues
+      if (
+        data.extension6Status.domElements.length === 0 &&
+        data.dependencies.simpleButtonUtility20.available
+      ) {
+        recommendations.push({
+          type: "warning",
+          title: "No User Directory Button Found",
+          message: "Extension 6 should create a button but none found",
+          action: "Check Extension 6 initialization in console",
+        });
+      }
+
+      if (data.extension6Status.domElements.length > 1) {
+        recommendations.push({
+          type: "warning",
+          title: "Multiple User Directory Buttons",
+          message:
+            "Found multiple User Directory buttons - possible duplicate loading",
+          action: "Reload page and load extensions in correct order",
+        });
+      }
+
+      // Context detection issues - updated for Simple Button Utility 2.0
+      const shouldHaveButton =
+        data.contextDetection.conditionResults.isUsernamePage ||
+        data.contextDetection.conditionResults.isChatRoom;
+      const hasButton = data.extension6Status.domElements.length > 0;
+
+      if (shouldHaveButton && !hasButton) {
+        recommendations.push({
+          type: "error",
+          title: "Missing Button on Conditional Page",
+          message:
+            "Current page should show User Directory button but none found",
+          action: "Check Extension 6 button registration",
+        });
+      }
+
+      if (!shouldHaveButton && hasButton) {
+        recommendations.push({
+          type: "warning",
+          title: "Button Visible on Wrong Page",
+          message: "User Directory button showing on non-conditional page",
+          action: "Check button conditional logic",
+        });
+      }
+
+      return recommendations;
+    }
+
+    onUpdate(callback) {
+      this.updateCallbacks.add(callback);
+      return () => this.updateCallbacks.delete(callback);
+    }
+
+    notifyUpdateCallbacks() {
+      this.updateCallbacks.forEach((callback) => {
+        try {
+          callback(this.debugData);
+        } catch (error) {
+          console.error("Debug update callback error:", error);
         }
       });
-
-      // Hover effects
-      button.addEventListener("mouseenter", () => {
-        button.style.transform = "translateY(-1px)";
-        button.style.boxShadow = "0 4px 12px rgba(0,0,0,0.2)";
-      });
-
-      button.addEventListener("mouseleave", () => {
-        button.style.transform = "translateY(0)";
-        button.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
-      });
-
-      // Add to DOM and track
-      this.container.appendChild(button);
-      this.activeButtons.set(config.id, button);
-
-      console.log(
-        `✅ Button "${config.id}" placed at ${stackName} #${stackIndex + 1} (${
-          position.x
-        }, ${position.y})`
-      );
     }
 
-    // ==================== SIMPLE PUBLIC API ====================
-
-    registerButton(config) {
-      const { id, text, onClick } = config;
-
-      // Validation
-      if (!id || !text || !onClick) {
-        throw new Error("Button must have id, text, and onClick");
+    // 🔧 NEW: Helper method to initialize button system for diagnostics
+    async initializeButtonSystemForDiagnostics() {
+      if (!window.SimpleExtensionButtonManager) {
+        return { success: false, error: "Simple Button Manager not available" };
       }
 
-      if (this.registeredButtons.has(id)) {
-        throw new Error(`Button "${id}" already registered`);
-      }
-
-      // Validate stack
-      const stack = config.stack || "top-right";
-      if (!BUTTON_STACKS[stack]) {
-        throw new Error(
-          `Invalid stack: ${stack}. Must be: ${Object.keys(BUTTON_STACKS).join(
-            ", "
-          )}`
+      try {
+        const testManager = new window.SimpleExtensionButtonManager(
+          "DebugTest"
         );
+        await testManager.initialize();
+        return { success: true, manager: testManager };
+      } catch (error) {
+        return { success: false, error: error.message };
       }
-
-      // Store configuration with stack positioning
-      this.registeredButtons.set(id, {
-        id,
-        text,
-        onClick,
-        stack,
-        priority: config.priority || false,
-        showOn: config.showOn || null,
-        hideOn: config.hideOn || null,
-        condition: config.condition || null,
-        style: config.style || {},
-      });
-
-      // If already initialized, trigger rebuild
-      if (this.container) {
-        this.rebuildAllButtons();
-      }
-
-      console.log(
-        `✅ Button "${id}" registered for ${stack} stack${
-          config.priority ? " (priority)" : ""
-        }`
-      );
-      return { success: true, id, stack };
-    }
-
-    removeButton(id) {
-      // Remove from registry
-      const removed = this.registeredButtons.delete(id);
-
-      // Remove from DOM if active
-      if (this.activeButtons.has(id)) {
-        this.activeButtons.get(id).remove();
-        this.activeButtons.delete(id);
-      }
-
-      if (removed) {
-        console.log(`🗑️ Button "${id}" removed`);
-      }
-
-      return removed;
-    }
-
-    getStatus() {
-      return {
-        registeredButtons: this.registeredButtons.size,
-        activeButtons: this.activeButtons.size,
-        stacks: {
-          "top-left": {
-            buttons: this.stacks["top-left"].length,
-            max: BUTTON_STACKS["top-left"].maxButtons,
-            available:
-              BUTTON_STACKS["top-left"].maxButtons -
-              this.stacks["top-left"].length,
-            buttonIds: this.stacks["top-left"].map((b) => b.id),
-          },
-          "top-right": {
-            buttons: this.stacks["top-right"].length,
-            max: BUTTON_STACKS["top-right"].maxButtons,
-            available:
-              BUTTON_STACKS["top-right"].maxButtons -
-              this.stacks["top-right"].length,
-            buttonIds: this.stacks["top-right"].map((b) => b.id),
-          },
-        },
-        currentPage: {
-          url: window.location.href,
-          title: getCurrentPageTitle(),
-        },
-        buttonIds: {
-          registered: Array.from(this.registeredButtons.keys()),
-          active: Array.from(this.activeButtons.keys()),
-        },
-      };
-    }
-
-    cleanup() {
-      this.clearAllButtons();
-      this.clearAllStacks();
-      this.registeredButtons.clear();
-      this.pageDetector.stopMonitoring();
-      console.log("🧹 Simple Button Registry cleaned up");
     }
   }
 
-  // ==================== EXTENSION MANAGER ====================
+  // ==================== DEBUG UI INTERFACE ====================
 
-  class SimpleExtensionButtonManager {
-    constructor(extensionName) {
-      this.extensionName = extensionName;
-      this.registry = null;
-      this.myButtons = new Set();
+  class DebugUI {
+    constructor(extensionDebugger) {
+      this.extensionDebugger = extensionDebugger;
+      this.modal = null;
+      this.updateInterval = null;
     }
 
-    async initialize() {
-      if (!window.SimpleButtonRegistry) {
-        window.SimpleButtonRegistry = new SimpleButtonRegistry();
-        await window.SimpleButtonRegistry.initialize();
+    async show() {
+      if (this.modal) {
+        this.modal.remove();
       }
 
-      this.registry = window.SimpleButtonRegistry;
-      return true;
+      this.modal = this.createModal();
+      document.body.appendChild(this.modal);
+
+      // Start auto-refresh
+      this.startAutoRefresh();
+
+      // Initial data load
+      await this.refresh();
     }
 
-    async registerButton(config) {
-      if (!this.registry) await this.initialize();
+    createModal() {
+      const modal = document.createElement("div");
+      modal.id = "extension-zero-debug-modal";
+      modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 20000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      `;
 
-      const buttonId = `${this.extensionName}-${config.id}`;
-      const result = this.registry.registerButton({
-        ...config,
-        id: buttonId,
+      const content = document.createElement("div");
+      content.style.cssText = `
+        background: white;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 1200px;
+        max-height: 90%;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      `;
+
+      // Header
+      const header = document.createElement("div");
+      header.style.cssText = `
+        padding: 20px 24px;
+        border-bottom: 1px solid #e5e7eb;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #f9fafb;
+        border-radius: 12px 12px 0 0;
+      `;
+
+      header.innerHTML = `
+        <div>
+          <h2 style="margin: 0; font-size: 20px; font-weight: 600; color: #1f2937;">
+            🐛 Extension Zero: Debug Interface v${EXTENSION_VERSION}
+          </h2>
+          <div style="font-size: 14px; color: #6b7280; margin-top: 4px;">
+            Real-time system monitoring • Auto-refresh every 5 seconds
+          </div>
+        </div>
+        <div style="display: flex; gap: 12px;">
+          <button id="debug-init-btn" style="
+            background: #8b5cf6; 
+            color: white; 
+            border: none; 
+            padding: 8px 16px; 
+            border-radius: 6px; 
+            font-size: 14px; 
+            cursor: pointer;
+          ">🔧 Initialize Button System</button>
+          <button id="debug-copy-btn" style="
+            background: #10b981; 
+            color: white; 
+            border: none; 
+            padding: 8px 16px; 
+            border-radius: 6px; 
+            font-size: 14px; 
+            cursor: pointer;
+          ">📋 Copy Report</button>
+          <button id="debug-close-btn" style="
+            background: #ef4444; 
+            color: white; 
+            border: none; 
+            padding: 8px 16px; 
+            border-radius: 6px; 
+            font-size: 14px; 
+            cursor: pointer;
+          ">✕ Close</button>
+        </div>
+      `;
+
+      // Content area
+      const contentArea = document.createElement("div");
+      contentArea.id = "debug-content";
+      contentArea.style.cssText = `
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px;
+      `;
+
+      content.appendChild(header);
+      content.appendChild(contentArea);
+      modal.appendChild(content);
+
+      // Event listeners
+      modal.addEventListener("click", (e) => {
+        if (e.target === modal) this.hide();
       });
 
-      if (result.success) {
-        this.myButtons.add(buttonId);
-      }
-
-      return result;
-    }
-
-    removeButton(id) {
-      const buttonId = `${this.extensionName}-${id}`;
-      const success = this.registry?.removeButton(buttonId);
-
-      if (success) {
-        this.myButtons.delete(buttonId);
-      }
-
-      return success;
-    }
-
-    cleanup() {
-      this.myButtons.forEach((buttonId) => {
-        this.registry?.removeButton(buttonId);
+      header.querySelector("#debug-close-btn").addEventListener("click", () => {
+        this.hide();
       });
-      this.myButtons.clear();
+
+      header.querySelector("#debug-copy-btn").addEventListener("click", () => {
+        this.copyReport();
+      });
+
+      header.querySelector("#debug-init-btn").addEventListener("click", () => {
+        this.initializeButtonSystem();
+      });
+
+      return modal;
+    }
+
+    async refresh() {
+      const data = await this.extensionDebugger.collectDebugData();
+      this.renderContent(data);
+    }
+
+    renderContent(data) {
+      const content = this.modal.querySelector("#debug-content");
+      content.innerHTML = `
+        <div style="display: grid; gap: 20px;">
+          ${this.renderPageSection(data.currentPage)}
+          ${this.renderDependenciesSection(data.dependencies)}
+          ${this.renderButtonSystemsSection(data.buttonSystems)}
+          ${this.renderContextSection(data.contextDetection)}
+          ${this.renderExtension6Section(data.extension6Status)}
+          ${this.renderRecommendationsSection(data.recommendations)}
+        </div>
+      `;
+    }
+
+    renderPageSection(page) {
+      return `
+        <div style="background: #f0f9ff; padding: 16px; border-radius: 8px; border-left: 4px solid #0ea5e9;">
+          <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #1f2937;">
+            📄 Current Page
+          </h3>
+          <div style="font-size: 14px;">
+            <div style="margin-bottom: 8px;"><strong>Title:</strong> ${
+              page.title || "No title"
+            }</div>
+            <div style="margin-bottom: 8px;"><strong>URL:</strong> <code style="background: #e0f2fe; padding: 2px 4px; border-radius: 3px;">${
+              page.url
+            }</code></div>
+            <div><strong>Last Updated:</strong> ${page.timestamp}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    renderRecommendationsSection(recommendations) {
+      if (!recommendations || recommendations.length === 0) {
+        return `
+          <div style="background: #f0fdf4; padding: 16px; border-radius: 8px; border-left: 4px solid #22c55e;">
+            <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #1f2937;">
+              ✅ System Status
+            </h3>
+            <div style="color: #16a34a; font-weight: 500;">No issues detected - system appears to be working correctly!</div>
+          </div>
+        `;
+      }
+
+      const items = recommendations
+        .map((rec) => {
+          const color =
+            rec.type === "error"
+              ? "#ef4444"
+              : rec.type === "warning"
+              ? "#f59e0b"
+              : rec.type === "info"
+              ? "#3b82f6"
+              : "#8b5cf6";
+          const icon =
+            rec.type === "error"
+              ? "🚨"
+              : rec.type === "warning"
+              ? "⚠️"
+              : rec.type === "info"
+              ? "ℹ️"
+              : "💡";
+
+          return `
+          <div style="margin-bottom: 12px; padding: 12px; background: white; border-radius: 6px; border-left: 3px solid ${color};">
+            <div style="font-weight: 600; color: ${color}; margin-bottom: 4px;">
+              ${icon} ${rec.title}
+            </div>
+            <div style="font-size: 13px; color: #6b7280; margin-bottom: 6px;">${rec.message}</div>
+            <div style="font-size: 12px; color: #374151; font-style: italic;">Action: ${rec.action}</div>
+          </div>
+        `;
+        })
+        .join("");
+
+      return `
+        <div style="background: #fef2f2; padding: 16px; border-radius: 8px; border-left: 4px solid #ef4444;">
+          <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #1f2937;">
+            🎯 Recommendations
+          </h3>
+          ${items}
+        </div>
+      `;
+    }
+
+    renderDependenciesSection(deps) {
+      // 🔧 UPDATED: Better status reporting for new system
+      const ext15Status =
+        deps.extension15 && deps.extension15.available ? "✅" : "❌";
+      const simpleButtonStatus =
+        deps.simpleButtonUtility20 && deps.simpleButtonUtility20.available
+          ? "✅"
+          : "❌";
+      const initStatus =
+        deps.simpleButtonUtility20 && deps.simpleButtonUtility20.initialized
+          ? "🟢 Initialized"
+          : "🟡 Not Initialized";
+
+      const ext15Utils =
+        deps.extension15 && deps.extension15.utilities
+          ? Object.entries(deps.extension15.utilities)
+              .map(
+                ([name, available]) =>
+                  `<div>${available ? "✅" : "❌"} ${name}</div>`
+              )
+              .join("")
+          : "";
+
+      const simpleButtonComponents =
+        deps.simpleButtonUtility20 && deps.simpleButtonUtility20.components
+          ? Object.entries(deps.simpleButtonUtility20.components)
+              .map(
+                ([name, available]) =>
+                  `<div>${available ? "✅" : "❌"} ${name}</div>`
+              )
+              .join("")
+          : "";
+
+      return `
+        <div style="background: #f9fafb; padding: 16px; border-radius: 8px; border-left: 4px solid #6b7280;">
+          <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #1f2937;">
+            🔧 Dependencies
+          </h3>
+          <div style="font-size: 14px;">
+            <div style="margin-bottom: 12px;">
+              <strong>${ext15Status} Extension 1.5</strong>
+              <div style="margin-left: 16px; margin-top: 4px; font-size: 13px;">
+                ${ext15Utils || "<em>No utilities checked</em>"}
+              </div>
+            </div>
+            <div>
+              <strong>${simpleButtonStatus} Simple Button Utility 2.0</strong>
+              <div style="margin-left: 16px; margin-top: 4px; font-size: 13px;">
+                ${simpleButtonComponents || "<em>No components checked</em>"}
+                <div style="margin-top: 4px; color: #6b7280;">${initStatus}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    renderContextSection(context) {
+      const currentContexts =
+        context.currentContexts && context.currentContexts.length > 0
+          ? context.currentContexts
+              .map(
+                (c) => `<span style="
+        background: #dbeafe; 
+        color: #1e40af; 
+        padding: 2px 6px; 
+        border-radius: 4px; 
+        font-size: 12px;
+        margin-right: 4px;
+      ">${c}</span>`
+              )
+              .join("")
+          : "";
+
+      return `
+        <div style="background: #f0f9ff; padding: 16px; border-radius: 8px; border-left: 4px solid #8b5cf6;">
+          <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #1f2937;">
+            🎯 Context Detection
+          </h3>
+          <div style="font-size: 14px;">
+            <div style="margin-bottom: 8px;"><strong>Current Contexts:</strong></div>
+            <div style="margin-bottom: 12px;">${
+              currentContexts || "<em>None detected</em>"
+            }</div>
+            
+            <div><strong>Available Conditions:</strong></div>
+            <div style="font-size: 13px; margin-top: 4px;">
+              ${
+                context.availableContexts && context.availableContexts.join
+                  ? context.availableContexts.join(", ")
+                  : "None available"
+              }
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    renderButtonSystemsSection(buttonSystems) {
+      const simpleButtonSystem = buttonSystems.simple_button_utility_20 || {};
+      const legacySystems = buttonSystems.legacy_systems || {};
+
+      // 🔧 UPDATED: Better status display
+      const simpleSystemStatus = simpleButtonSystem.available
+        ? simpleButtonSystem.initialized
+          ? "🟢 Available & Initialized"
+          : "🟡 Available but Not Initialized"
+        : "🔴 Not Available";
+
+      const simpleSystemButtons = simpleButtonSystem.buttons
+        ? Object.entries(simpleButtonSystem.buttons)
+            .map(
+              ([id, config]) => `
+          <div style="margin: 4px 0; padding: 8px; background: #f9fafb; border-radius: 4px; font-size: 13px;">
+            <strong>${id}:</strong> "${config.text}"<br>
+            <span style="color: #6b7280;">
+              Stack: ${config.stack}, Priority: ${
+                config.priority ? "High" : "Normal"
+              }, 
+              Show: ${
+                config.showOn && config.showOn.join
+                  ? config.showOn.join(", ")
+                  : "Always"
+              }
+            </span>
+          </div>
+        `
+            )
+            .join("")
+        : "";
+
+      return `
+        <div style="background: #fef3c7; padding: 16px; border-radius: 8px; border-left: 4px solid #f59e0b;">
+          <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #1f2937;">
+            🔘 Button Systems
+          </h3>
+          <div style="font-size: 14px;">
+            <div style="margin-bottom: 12px;">
+              <strong>Simple Button Utility 2.0:</strong> ${simpleSystemStatus}
+              <div style="margin-top: 8px;">
+                ${simpleSystemButtons || "<em>No buttons registered yet</em>"}
+              </div>
+              ${
+                simpleButtonSystem.status
+                  ? `<div style="margin-top: 8px; font-size: 12px; color: #6b7280;">Status: ${simpleButtonSystem.status}</div>`
+                  : ""
+              }
+            </div>
+            
+            <div>
+              <strong>Legacy Systems:</strong>
+              <div style="margin-left: 16px; margin-top: 4px; font-size: 13px;">
+                <div>${
+                  legacySystems.old_extension_16 ? "⚠️" : "✅"
+                } Old Extension 16: ${
+        legacySystems.old_extension_16 ? "⚠️ Present" : "✅ Absent"
+      }</div>
+                <div>${
+                  legacySystems.old_extension_20 ? "⚠️" : "✅"
+                } Old Extension 20: ${
+        legacySystems.old_extension_20 ? "⚠️ Present" : "✅ Absent"
+      }</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    renderExtension6Section(ext6) {
+      const domElements =
+        ext6.domElements && ext6.domElements.length > 0
+          ? ext6.domElements
+              .map(
+                (el, index) => `
+        <div style="margin: 4px 0; padding: 8px; background: #f9fafb; border-radius: 4px; font-size: 13px;">
+          <strong>Button ${index + 1}:</strong> "${el.text}"<br>
+          <span style="color: #6b7280;">
+            Classes: ${el.classes || "none"}, Visible: ${
+                  el.visible ? "yes" : "no"
+                }<br>
+            Position: ${
+              el.position && el.position.position
+                ? el.position.position
+                : "static"
+            } (${el.position && el.position.top ? el.position.top : "auto"}, ${
+                  el.position && el.position.left ? el.position.left : "auto"
+                }, ${
+                  el.position && el.position.right ? el.position.right : "auto"
+                })
+          </span>
+        </div>
+      `
+              )
+              .join("")
+          : "";
+
+      return `
+        <div style="background: #f0fdf4; padding: 16px; border-radius: 8px; border-left: 4px solid #22c55e;">
+          <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #1f2937;">
+            👥 Extension 6 Status
+          </h3>
+          <div style="font-size: 14px;">
+            <div style="margin-bottom: 12px;"><strong>Services:</strong> ${
+              ext6.services || "Not checked"
+            }</div>
+            <div><strong>DOM Elements (${
+              ext6.domElements && ext6.domElements.length
+                ? ext6.domElements.length
+                : 0
+            }):</strong></div>
+            <div style="margin-top: 8px;">
+              ${
+                domElements || "<em>No User Directory buttons found in DOM</em>"
+              }
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    async copyReport() {
+      const data = this.extensionDebugger.debugData;
+      const report = this.generateTextReport(data);
+
+      try {
+        await navigator.clipboard.writeText(report);
+
+        // Show success feedback
+        const btn = this.modal.querySelector("#debug-copy-btn");
+        const originalText = btn.textContent;
+        btn.textContent = "✅ Copied!";
+        btn.style.background = "#10b981";
+
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.style.background = "#10b981";
+        }, 2000);
+      } catch (error) {
+        console.error("Failed to copy to clipboard:", error);
+        alert("Failed to copy to clipboard. Check console for raw data.");
+        console.log("DEBUG REPORT:", report);
+      }
+    }
+
+    async initializeButtonSystem() {
+      const btn = this.modal.querySelector("#debug-init-btn");
+      const originalText = btn.textContent;
+      btn.textContent = "🔄 Initializing...";
+      btn.disabled = true;
+
+      try {
+        const result =
+          await this.extensionDebugger.initializeButtonSystemForDiagnostics();
+
+        if (result.success) {
+          btn.textContent = "✅ Initialized!";
+          btn.style.background = "#10b981";
+
+          // Refresh the data to show the new state
+          setTimeout(() => {
+            this.refresh();
+          }, 1000);
+        } else {
+          btn.textContent = "❌ Failed";
+          btn.style.background = "#ef4444";
+          console.error("Button system initialization failed:", result.error);
+        }
+
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.style.background = "#8b5cf6";
+          btn.disabled = false;
+        }, 3000);
+      } catch (error) {
+        console.error("Error initializing button system:", error);
+        btn.textContent = "❌ Error";
+        btn.style.background = "#ef4444";
+
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.style.background = "#8b5cf6";
+          btn.disabled = false;
+        }, 3000);
+      }
+    }
+
+    generateTextReport(data) {
+      return `
+EXTENSION ZERO DEBUG REPORT v${EXTENSION_VERSION}
+Generated: ${data.timestamp}
+
+CURRENT PAGE:
+- Title: ${data.currentPage?.title || "No title"}
+- URL: ${data.currentPage?.url}
+
+DEPENDENCIES:
+- Extension 1.5: ${
+        data.dependencies &&
+        data.dependencies.extension15 &&
+        data.dependencies.extension15.available
+          ? "Available"
+          : "Missing"
+      }
+- Simple Button Utility 2.0: ${
+        data.dependencies &&
+        data.dependencies.simpleButtonUtility20 &&
+        data.dependencies.simpleButtonUtility20.available
+          ? "Available"
+          : "Missing"
+      }
+  Initialized: ${
+    data.dependencies &&
+    data.dependencies.simpleButtonUtility20 &&
+    data.dependencies.simpleButtonUtility20.initialized
+      ? "Yes"
+      : "No"
+  }
+
+BUTTON SYSTEMS:
+- Simple Button Utility 2.0: ${
+        data.buttonSystems &&
+        data.buttonSystems.simple_button_utility_20 &&
+        data.buttonSystems.simple_button_utility_20.available
+          ? "Available"
+          : "Not found"
+      }
+  Initialized: ${
+    data.buttonSystems &&
+    data.buttonSystems.simple_button_utility_20 &&
+    data.buttonSystems.simple_button_utility_20.initialized
+      ? "Yes"
+      : "No"
+  }
+  Buttons: ${
+    Object.keys(
+      (data.buttonSystems &&
+        data.buttonSystems.simple_button_utility_20 &&
+        data.buttonSystems.simple_button_utility_20.buttons) ||
+        {}
+    ).join(", ") || "None"
+  }
+
+CONTEXT DETECTION:
+- Current Contexts: ${
+        data.contextDetection &&
+        data.contextDetection.currentContexts &&
+        data.contextDetection.currentContexts.join
+          ? data.contextDetection.currentContexts.join(", ")
+          : "None"
+      }
+- Available Contexts: ${
+        data.contextDetection &&
+        data.contextDetection.availableContexts &&
+        data.contextDetection.availableContexts.join
+          ? data.contextDetection.availableContexts.join(", ")
+          : "None"
+      }
+
+EXTENSION 6:
+- Services: ${
+        data.extension6Status && data.extension6Status.services
+          ? data.extension6Status.services
+          : "Unknown"
+      }
+- DOM Elements: ${
+        data.extension6Status && data.extension6Status.domElements
+          ? data.extension6Status.domElements.length
+          : 0
+      } User Directory button(s) found
+
+RECOMMENDATIONS:
+${
+  data.recommendations && data.recommendations.length > 0
+    ? data.recommendations
+        .map(
+          (rec) => `- ${rec.type.toUpperCase()}: ${rec.title} - ${rec.message}`
+        )
+        .join("\n")
+    : "No issues detected"
+}
+
+RAW DATA:
+${JSON.stringify(data, null, 2)}
+      `.trim();
+    }
+
+    startAutoRefresh() {
+      // Refresh every 5 seconds
+      this.updateInterval = setInterval(() => {
+        this.refresh();
+      }, 5000);
+    }
+
+    hide() {
+      if (this.updateInterval) {
+        clearInterval(this.updateInterval);
+        this.updateInterval = null;
+      }
+
+      if (this.modal) {
+        this.modal.remove();
+        this.modal = null;
+      }
     }
   }
 
   // ==================== GLOBAL API ====================
 
-  // Simple global access
-  window.SimpleButtonRegistry = null; // Will be created on first use
-  window.SimpleExtensionButtonManager = SimpleExtensionButtonManager;
-  window.ButtonConditions = ButtonConditions;
+  const extensionDebugger = new ExtensionDebugger();
+  const debugUI = new DebugUI(extensionDebugger);
 
-  // Simple testing
-  window.SimpleButtonUtilityTests = {
-    testBasicButton: async () => {
-      const manager = new SimpleExtensionButtonManager("TestExtension");
-      await manager.initialize();
-
-      // Test multiple buttons with different stacks and priorities
-      await manager.registerButton({
-        id: "test-button-1",
-        text: "🧪 Test 1",
-        onClick: () => console.log("Test button 1 clicked!"),
-        showOn: ["isMainPage"],
-        stack: "top-right",
-        priority: false,
-      });
-
-      await manager.registerButton({
-        id: "test-button-2",
-        text: "⭐ Priority",
-        onClick: () => console.log("Priority button clicked!"),
-        showOn: ["isMainPage"],
-        stack: "top-right",
-        priority: true, // This will get slot #1
-      });
-
-      await manager.registerButton({
-        id: "test-button-3",
-        text: "📍 Left",
-        onClick: () => console.log("Left stack button clicked!"),
-        showOn: ["isMainPage"],
-        stack: "top-left",
-      });
-
-      console.log("Test buttons registered");
-      console.log("Registry status:", window.SimpleButtonRegistry.getStatus());
-
-      // Clean up after 10 seconds
-      setTimeout(() => {
-        manager.cleanup();
-        console.log("Test cleaned up");
-      }, 10000);
-    },
-
-    // 🚨 SPECIAL: Debug Extension 6 User Directory button issue
-    debugUserDirectoryButton: () => {
-      console.group("🔍 Debugging User Directory Button Issue");
-
-      const registry = window.SimpleButtonRegistry;
-      if (!registry) {
-        console.error("❌ Simple Button Registry not found");
-        console.groupEnd();
-        return;
-      }
-
-      // Check if there's a User Directory button registered
-      let userDirButton = null;
-      registry.registeredButtons.forEach((config, id) => {
-        if (
-          id.includes("User") ||
-          id.includes("Directory") ||
-          config.text.includes("User") ||
-          config.text.includes("Directory")
-        ) {
-          userDirButton = { id, config };
-        }
-      });
-
-      if (!userDirButton) {
-        console.log("❌ No User Directory button found in registry");
-        console.log(
-          "📋 Registered buttons:",
-          Array.from(registry.registeredButtons.keys())
-        );
-        console.groupEnd();
-        return;
-      }
-
-      console.log("🎯 Found User Directory button:", userDirButton.id);
-      console.log("📝 Button config:", userDirButton.config);
-
-      // Test all conditions manually
-      console.log("\n🧪 Testing button conditions manually:");
-
-      // Test current page conditions
-      console.log("📄 Current page info:");
-      console.log("  URL:", window.location.href);
-      console.log("  Title:", getCurrentPageTitle());
-
-      // Test all ButtonConditions
-      console.log("\n🔍 Testing all button conditions:");
-      Object.keys(ButtonConditions).forEach((conditionName) => {
-        try {
-          const result = ButtonConditions[conditionName]();
-          console.log(`  ${conditionName}: ${result}`);
-        } catch (error) {
-          console.log(`  ${conditionName}: ERROR - ${error.message}`);
-        }
-      });
-
-      // Test the specific button's visibility logic
-      console.log("\n⚖️ Testing button visibility logic:");
-      const shouldBeVisible = registry.shouldButtonBeVisible(
-        userDirButton.config
-      );
-      console.log(`Should be visible: ${shouldBeVisible}`);
-
-      // Check if it's actually visible
-      const isActuallyVisible = registry.activeButtons.has(userDirButton.id);
-      console.log(`Actually visible: ${isActuallyVisible}`);
-
-      if (shouldBeVisible !== isActuallyVisible) {
-        console.error(
-          "🚨 MISMATCH: Expected visibility doesn't match actual visibility!"
-        );
-      }
-
-      console.groupEnd();
-    },
-
-    showStatus: () => {
-      if (window.SimpleButtonRegistry) {
-        console.log(
-          "📊 Registry Status:",
-          window.SimpleButtonRegistry.getStatus()
-        );
-      } else {
-        console.log("❌ Registry not initialized");
-      }
-    },
-
-    forceRebuild: () => {
-      if (window.SimpleButtonRegistry) {
-        console.log("🔄 Forcing button rebuild...");
-        window.SimpleButtonRegistry.rebuildAllButtons();
-      }
-    },
-
-    enableDebugMode: () => {
-      if (window.SimpleButtonRegistry) {
-        window.SimpleButtonRegistry.debugMode = true;
-        console.log(
-          "🐛 Debug mode enabled - you'll see detailed logs during button rebuilds"
-        );
-      } else {
-        console.log("❌ Registry not found");
-      }
-    },
-
-    disableDebugMode: () => {
-      if (window.SimpleButtonRegistry) {
-        window.SimpleButtonRegistry.debugMode = false;
-        console.log("✅ Debug mode disabled");
-      }
-    },
-
-    // 🔧 NEW: Test the fixed page title detection
-    testPageTitleDetection: () => {
-      console.group("🔧 Testing Fixed Page Title Detection");
-
-      console.log("Current page title:", getCurrentPageTitle());
-
-      // Test username detection with current title
-      const pageTitle = getCurrentPageTitle();
-      if (pageTitle) {
-        const isFirstLastPattern = /^[A-Z][a-z]+\s+[A-Z][a-z]+$/.test(
-          pageTitle
-        );
-        const isUsernamePattern = /^[a-zA-Z][a-zA-Z0-9_-]{2,}$/.test(pageTitle);
-
-        console.log(`Testing "${pageTitle}":`);
-        console.log("  Matches 'First Last' pattern:", isFirstLastPattern);
-        console.log("  Matches 'username123' pattern:", isUsernamePattern);
-        console.log(
-          "  Should be detected as username page:",
-          isFirstLastPattern || isUsernamePattern
-        );
-
-        // Test the actual condition
-        console.log(
-          "  isUsernamePage() result:",
-          ButtonConditions.isUsernamePage()
-        );
-      }
-
-      console.groupEnd();
-    },
+  // Global access
+  window.ExtensionZeroDebug = {
+    show: () => debugUI.show(),
+    hide: () => debugUI.hide(),
+    collectData: () => extensionDebugger.collectDebugData(),
+    extensionDebugger: extensionDebugger,
+    ui: debugUI,
   };
 
-  console.log(
-    `✅ ${EXTENSION_NAME} v${EXTENSION_VERSION} loaded - Fixed Page Title Detection! 🎯`
-  );
+  // Auto-register command
+  if (window.roamAlphaAPI?.ui?.commandPalette) {
+    window.roamAlphaAPI.ui.commandPalette.addCommand({
+      label: "Extension Zero: Show Debug Interface",
+      callback: () => debugUI.show(),
+    });
+  }
 
-  // Auto-test the page title detection
-  setTimeout(() => {
-    console.log("🔧 Auto-testing page title detection...");
-    window.SimpleButtonUtilityTests.testPageTitleDetection();
-  }, 1000);
+  console.log(`✅ ${EXTENSION_NAME} v${EXTENSION_VERSION} loaded`);
+  console.log(
+    "💡 Run: window.ExtensionZeroDebug.show() or use Command Palette"
+  );
+  console.log(
+    "🔧 UPDATED: Now compatible with new Simple Button Manager architecture"
+  );
 })();
