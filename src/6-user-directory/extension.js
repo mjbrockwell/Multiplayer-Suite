@@ -4,6 +4,7 @@
 // 🗑️ REMOVED: All fallback button logic (fails gracefully instead)
 // ✅ CONDITIONAL: Button only appears on username pages or "chat room" pages
 // 🔧 FIXED: Chat room detection with proper DOM-first title detection
+// 📝 ENHANCED: Opportunistic cache refresh during modal creation
 // ===================================================================
 
 // ===================================================================
@@ -217,6 +218,7 @@ const getUserProfileDataClean = async (username) => {
 
 /**
  * Get all user profiles using curated member list
+ * 📝 ENHANCED: Now includes opportunistic cache refresh
  */
 const getAllUserProfilesClean = async () => {
   try {
@@ -246,6 +248,21 @@ const getAllUserProfilesClean = async () => {
     const profiles = await Promise.all(
       members.map((username) => getUserProfileDataClean(username))
     );
+
+    // 🎯 OPPORTUNISTIC CACHE REFRESH: Perfect timing during modal creation
+    try {
+      const cache = platform.getUtility("GraphMemberCache");
+      if (cache) {
+        cache.refresh(); // Same data source, ensures cache freshness
+        console.log(
+          "✅ Opportunistically refreshed member cache during modal creation"
+        );
+      } else {
+        console.log("ℹ️ Member cache not available (non-critical)");
+      }
+    } catch (error) {
+      console.warn("⚠️ Cache refresh failed (non-critical):", error);
+    }
 
     return profiles.filter((profile) => profile.exists);
   } catch (error) {
@@ -437,7 +454,7 @@ const showUserDirectoryModalClean = async () => {
       window._extensionRegistry.elements.push(modal);
     }
 
-    // Load profiles using clean extraction
+    // 📝 Load profiles using clean extraction (now includes cache refresh!)
     const profiles = await getAllUserProfilesClean();
     const currentUser = platform.getUtility("getCurrentUser")();
 
@@ -816,6 +833,19 @@ const runCleanSystemTests = async () => {
     const members = getGraphMembersFromList("roam/graph members", "Directory");
     console.log(`📋 Curated members: ${members.length} found`);
 
+    // 📝 Test cache integration
+    try {
+      const cache = platform.getUtility("GraphMemberCache");
+      if (cache) {
+        const cacheStatus = cache.getStatus();
+        console.log("📝 Member cache status:", cacheStatus);
+      } else {
+        console.log("📝 Member cache not available");
+      }
+    } catch (error) {
+      console.warn("📝 Cache test failed:", error);
+    }
+
     console.log("✅ All system tests passed!");
   } catch (error) {
     console.error("❌ System test failed:", error);
@@ -840,7 +870,7 @@ const createUserDirectoryTable = async (profiles, currentUser) => {
 
   return `
     <div style="flex: 1; overflow: auto; padding: 0 32px;">
-      <table style="width: 100%; border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+      <table style="width: 100%; border-collapse: collapse;">
         <thead>
           <tr style="background: #f8f9fa; border-bottom: 2px solid #e1e5e9;">
             <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #374151; border-right: 1px solid #e1e5e9;">Avatar</th>
@@ -935,13 +965,13 @@ window.navigateToUserPageClean = (username) => {
 };
 
 // ===================================================================
-// 🎯 EXTENSION REGISTRATION - Fixed Button Management
+// 🎯 EXTENSION REGISTRATION - Fixed Button Management + Cache Integration
 // ===================================================================
 
 export default {
   onload: () => {
     console.log(
-      "🎯 User Directory loading (Fixed Button Management + Chat Room Detection)..."
+      "🎯 User Directory loading (Fixed Button Management + Chat Room Detection + Cache Integration)..."
     );
 
     // ✅ STEP 1: Check Extension 1.5 dependencies
@@ -1018,13 +1048,13 @@ export default {
       "clean-user-directory",
       {
         services: cleanDirectoryServices,
-        version: "9.1.1", // 🔧 Fixed Chat Room Detection version
+        version: "9.2.0", // 📝 Cache Integration version
       },
       {
         name: "✨ User Directory",
         description:
-          "Professional user directory with FIXED Simple Button Utility 2.0 integration, FIXED chat room conditional logic, and NO fallback buttons",
-        version: "9.1.1",
+          "Professional user directory with FIXED Simple Button Utility 2.0 integration, FIXED chat room conditional logic, NO fallback buttons, and OPPORTUNISTIC cache refresh",
+        version: "9.2.0",
         dependencies: requiredDependencies,
       }
     );
@@ -1046,13 +1076,14 @@ export default {
     // ✅ STEP 6: Success report
     const currentUser = platform.getUtility("getCurrentUser")();
     console.log(
-      "🎉 Extension SIX loaded successfully (FIXED Simple Button Utility 2.0 + Chat Room Detection)!"
+      "🎉 Extension SIX loaded successfully (FIXED Simple Button Utility 2.0 + Chat Room Detection + Cache Integration)!"
     );
     console.log("🗑️ REMOVED: All fallback button logic");
     console.log("🎯 FIXED: Proper Simple Button Utility 2.0 integration");
     console.log(
       "🔧 FIXED: Chat room detection with proper DOM-first title detection"
     );
+    console.log("📝 NEW: Opportunistic cache refresh during modal creation");
     console.log(
       "🎯 CONDITIONAL: Button only appears on username or chat room pages"
     );
@@ -1072,14 +1103,14 @@ export default {
     return {
       extensionId: "clean-user-directory",
       services: cleanDirectoryServices,
-      version: "9.1.1",
-      status: "fixed_simple_button_utility_integration",
+      version: "9.2.0",
+      status: "fixed_simple_button_utility_integration_with_cache",
     };
   },
 
   onunload: () => {
     console.log(
-      "🎯 User Directory unloading (Fixed Simple Button Utility 2.0 Integration)..."
+      "🎯 User Directory unloading (Fixed Simple Button Utility 2.0 Integration + Cache)..."
     );
 
     // 🎯 CLEAN: Proper button management cleanup
@@ -1104,7 +1135,7 @@ export default {
     delete window.navigateToUserPageClean;
 
     console.log(
-      "✅ User Directory cleanup complete (using Fixed Simple Button Utility 2.0)!"
+      "✅ User Directory cleanup complete (using Fixed Simple Button Utility 2.0 + Cache Integration)!"
     );
   },
 };
