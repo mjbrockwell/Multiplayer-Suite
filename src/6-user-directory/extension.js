@@ -869,7 +869,7 @@ const createUserDirectoryTable = async (profiles, currentUser) => {
   );
 
   return `
-    <div style="flex: 1; overflow: auto; padding: 0 32px;">
+    <div style="flex: 1; overflow: auto; padding: 0 32px 16px 32px;">
       <table style="width: 100%; border-collapse: collapse;">
         <thead>
           <tr style="background: #f8f9fa; border-bottom: 2px solid #e1e5e9;">
