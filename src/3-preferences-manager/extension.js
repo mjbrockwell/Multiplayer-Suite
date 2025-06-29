@@ -3,6 +3,7 @@
 // 🎵 Parrot Duet Edition: "O mio babbino caro" - Now with bulletproof fonts + color management!
 // 🎨 NEW: Complete smart font system with web font loading capabilities
 // 🌈 NEW: Journal color tag management system with bulk update capabilities
+// 🎯 NEW: Surgical precision color updates for Journal:: blocks
 // 🚀 INTEGRATED: Extension 14's proven font loading architecture
 // Uses proven step-by-step + retry pattern from working Subjournals extension
 // Format: **Field Name:** (bold single colons, not double like Extension 2)
@@ -45,8 +46,188 @@ const getColorNameFromCode = (colorCode) => {
   return entry ? entry[0] : "blue"; // Default to blue
 };
 
+// ===================================================================
+// 🎯 SURGICAL COLOR SYSTEM - Precision Updates for Journal:: Blocks
+// ===================================================================
+
 /**
- * 🌈 Core Journal Color Tag Update System
+ * 🎯 SURGICAL JOURNAL COLOR TAG UPDATER
+ * Simple, robust, precise: finds Journal:: block, replaces ALL color tags with current preference
+ */
+const surgicalUpdateJournalColorTags = async (username) => {
+  try {
+    console.log(
+      `🎯 [SURGICAL UPDATE] Starting surgical color tag update for ${username}`
+    );
+
+    // STEP 1: Get user's current color preference
+    const currentColor = await getUserPreferenceBulletproof(
+      username,
+      "Journal Header Color"
+    );
+    if (!currentColor) {
+      console.error(`❌ No journal color preference found for ${username}`);
+      return { success: false, error: "No color preference found" };
+    }
+
+    const currentColorCode = getColorCode(currentColor);
+    const newColorTag = `#clr-lgt-${currentColorCode}-act`;
+    console.log(`🎯 Target color: ${currentColor} → ${newColorTag}`);
+
+    // STEP 2: Get user's page UID
+    const userPageUid = await getUserPageUid(username);
+    if (!userPageUid) {
+      console.error(`❌ Could not find page for user: ${username}`);
+      return { success: false, error: `User page not found: ${username}` };
+    }
+
+    // STEP 3: Find "Journal::" block on user's page
+    const journalBlockUid = await findJournalBlock(userPageUid);
+    if (!journalBlockUid) {
+      console.log(`ℹ️ No "Journal::" block found on ${username}'s page`);
+      return { success: true, changed: 0, message: "No Journal:: block found" };
+    }
+
+    console.log(`✅ Found Journal:: block: ${journalBlockUid}`);
+
+    // STEP 4: Get ALL descendant blocks of Journal::
+    const descendantBlocks = await getAllDescendantBlocks(journalBlockUid);
+    console.log(
+      `🔍 Found ${descendantBlocks.length} descendant blocks to check`
+    );
+
+    // STEP 5: Surgical replacement on each block
+    let updatedCount = 0;
+    let failedCount = 0;
+    const colorTagPattern = /#clr-lgt-\w+-act/g;
+
+    for (const block of descendantBlocks) {
+      try {
+        // Check if block contains any color tags
+        if (colorTagPattern.test(block.text)) {
+          // Reset regex lastIndex for next use
+          colorTagPattern.lastIndex = 0;
+
+          // Replace ALL color tags with current preference
+          const updatedText = block.text.replace(colorTagPattern, newColorTag);
+
+          console.log(`🔄 Updating block ${block.uid}`);
+          console.log(`   Old: ${block.text}`);
+          console.log(`   New: ${updatedText}`);
+
+          await window.roamAlphaAPI.data.block.update({
+            block: {
+              uid: block.uid,
+              string: updatedText,
+            },
+          });
+
+          updatedCount++;
+          console.log(`✅ Block ${block.uid} updated successfully`);
+
+          // Small delay to prevent API overload
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+      } catch (blockError) {
+        console.error(`❌ Failed to update block ${block.uid}:`, blockError);
+        failedCount++;
+      }
+    }
+
+    // STEP 6: Report results
+    const summary = `Surgically updated ${updatedCount} blocks (${failedCount} failed)`;
+    console.log(`🎉 [SURGICAL UPDATE] ${summary}`);
+
+    return {
+      success: updatedCount > 0 || failedCount === 0,
+      changed: updatedCount,
+      failed: failedCount,
+      total: descendantBlocks.length,
+      message: summary,
+      targetColor: currentColor,
+      targetTag: newColorTag,
+    };
+  } catch (error) {
+    console.error(`❌ [SURGICAL UPDATE] Error during surgical update:`, error);
+    return {
+      success: false,
+      error: error.message,
+      changed: 0,
+    };
+  }
+};
+
+/**
+ * 🔍 Find "Journal::" block on user's page
+ */
+const findJournalBlock = async (pageUid) => {
+  try {
+    const blocks = window.roamAlphaAPI.q(`
+      [:find (pull ?block [:block/uid :block/string])
+       :where 
+       [?page :block/uid "${pageUid}"]
+       [?block :block/page ?page]
+       [?block :block/string ?string]
+       [(clojure.string/starts-with? ?string "Journal::")]]
+    `);
+
+    if (blocks.length === 0) {
+      console.log(
+        `ℹ️ No block starting with "Journal::" found on page ${pageUid}`
+      );
+      return null;
+    }
+
+    if (blocks.length > 1) {
+      console.warn(
+        `⚠️ Multiple blocks starting with "Journal::" found, using first one`
+      );
+    }
+
+    const journalBlock = blocks[0][0];
+    const uid = journalBlock[":block/uid"] || journalBlock.uid;
+    const text = journalBlock[":block/string"] || journalBlock.string;
+
+    console.log(`✅ Found Journal:: block: "${text}" (${uid})`);
+    return uid;
+  } catch (error) {
+    console.error(`❌ Error finding Journal:: block:`, error);
+    return null;
+  }
+};
+
+/**
+ * 🌳 Get ALL descendant blocks (children, grandchildren, etc.) of a block
+ */
+const getAllDescendantBlocks = async (parentUid) => {
+  try {
+    const descendants = window.roamAlphaAPI.q(`
+      [:find (pull ?descendant [:block/uid :block/string])
+       :where 
+       [?parent :block/uid "${parentUid}"]
+       [?descendant :block/parents ?parent]
+       [?descendant :block/string ?string]]
+    `);
+
+    const result = descendants.map(([block]) => ({
+      uid: block[":block/uid"] || block.uid,
+      text: block[":block/string"] || block.string,
+    }));
+
+    console.log(`🌳 Found ${result.length} descendant blocks of ${parentUid}`);
+    return result;
+  } catch (error) {
+    console.error(`❌ Error getting descendant blocks:`, error);
+    return [];
+  }
+};
+
+// ===================================================================
+// 🌈 LEGACY COLOR SYSTEM - Original Full-Page Updates
+// ===================================================================
+
+/**
+ * 🌈 Core Journal Color Tag Update System (LEGACY - Full Page)
  * Updates ALL color tags on user's home page from old color to new color
  */
 const updateUserJournalColorTags = async (username, oldColor, newColor) => {
@@ -736,6 +917,72 @@ const ensureRoamFontStyles = () => {
 };
 
 // ===================================================================
+// 🧪 FONT TESTING & DEBUGGING UTILITIES
+// ===================================================================
+
+/**
+ * 🧪 Test Font Loading (Debug Utility)
+ * Exported for Extension 14 integration testing
+ */
+const testFontLoading = async (fontName) => {
+  try {
+    console.group(`🧪 Testing font: ${fontName}`);
+
+    const fontInfo = FONT_REGISTRY.find((f) => f.name === fontName);
+
+    if (!fontInfo) {
+      console.error(`❌ Font not found in registry: ${fontName}`);
+      return { success: false, error: `Font not found: ${fontName}` };
+    }
+
+    console.log(`📋 Font info:`, fontInfo);
+
+    if (fontInfo.type === "webfont") {
+      console.log(`🌐 Testing web font loading...`);
+      const loaded = await loadWebFont(fontInfo.name, fontInfo.source);
+      console.log(`📊 Load result: ${loaded ? "SUCCESS" : "FAILED"}`);
+    } else {
+      console.log(`💻 System font - no loading required`);
+    }
+
+    console.log(`🎨 Testing font application...`);
+    const result = await applyFontToGraph(fontInfo);
+    console.log(`📊 Application result:`, result);
+
+    console.groupEnd();
+    return result;
+  } catch (error) {
+    console.error(`❌ Font test error:`, error);
+    console.groupEnd();
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * 📊 List Loaded Fonts (Debug Utility)
+ * Shows all currently loaded Google Fonts
+ */
+const listLoadedFonts = () => {
+  const links = document.querySelectorAll('link[href*="fonts.googleapis.com"]');
+  const loadedFonts = Array.from(links).map((link) => {
+    const match = link.href.match(/family=([^:&]+)/);
+    return match ? decodeURIComponent(match[1].replace(/\+/g, " ")) : "Unknown";
+  });
+
+  console.log("📊 Currently loaded web fonts:", loadedFonts);
+  return loadedFonts;
+};
+
+/**
+ * 🔍 Check Font Registry (Debug Utility)
+ * Returns the complete font registry for inspection
+ */
+const checkFontRegistry = () => {
+  console.log("📋 Font Registry:", FONT_REGISTRY);
+  return FONT_REGISTRY;
+};
+
+// ===================================================================
 // 🚀 CONFIGURATION SCHEMAS - Updated with Complete Font Registry
 // ===================================================================
 
@@ -819,72 +1066,6 @@ const CONFIGURATION_SCHEMAS = {
       return true;
     },
   },
-};
-
-// ===================================================================
-// 🧪 FONT TESTING & DEBUGGING UTILITIES
-// ===================================================================
-
-/**
- * 🧪 Test Font Loading (Debug Utility)
- * Exported for Extension 14 integration testing
- */
-const testFontLoading = async (fontName) => {
-  try {
-    console.group(`🧪 Testing font: ${fontName}`);
-
-    const fontInfo = FONT_REGISTRY.find((f) => f.name === fontName);
-
-    if (!fontInfo) {
-      console.error(`❌ Font not found in registry: ${fontName}`);
-      return { success: false, error: `Font not found: ${fontName}` };
-    }
-
-    console.log(`📋 Font info:`, fontInfo);
-
-    if (fontInfo.type === "webfont") {
-      console.log(`🌐 Testing web font loading...`);
-      const loaded = await loadWebFont(fontInfo.name, fontInfo.source);
-      console.log(`📊 Load result: ${loaded ? "SUCCESS" : "FAILED"}`);
-    } else {
-      console.log(`💻 System font - no loading required`);
-    }
-
-    console.log(`🎨 Testing font application...`);
-    const result = await applyFontToGraph(fontInfo);
-    console.log(`📊 Application result:`, result);
-
-    console.groupEnd();
-    return result;
-  } catch (error) {
-    console.error(`❌ Font test error:`, error);
-    console.groupEnd();
-    return { success: false, error: error.message };
-  }
-};
-
-/**
- * 📊 List Loaded Fonts (Debug Utility)
- * Shows all currently loaded Google Fonts
- */
-const listLoadedFonts = () => {
-  const links = document.querySelectorAll('link[href*="fonts.googleapis.com"]');
-  const loadedFonts = Array.from(links).map((link) => {
-    const match = link.href.match(/family=([^:&]+)/);
-    return match ? decodeURIComponent(match[1].replace(/\+/g, " ")) : "Unknown";
-  });
-
-  console.log("📊 Currently loaded web fonts:", loadedFonts);
-  return loadedFonts;
-};
-
-/**
- * 🔍 Check Font Registry (Debug Utility)
- * Returns the complete font registry for inspection
- */
-const checkFontRegistry = () => {
-  console.log("📋 Font Registry:", FONT_REGISTRY);
-  return FONT_REGISTRY;
 };
 
 // ===================================================================
@@ -1627,7 +1808,7 @@ const exportUserConfiguration = async (username) => {
       schemas: CONFIGURATION_SCHEMAS,
       fontRegistry: FONT_REGISTRY,
       colorMapping: COLOR_MAPPING, // Include color mapping
-      version: "3.0.0-smart-font-color",
+      version: "3.0.0-smart-font-color-surgical",
     };
 
     console.log(
@@ -1740,6 +1921,11 @@ const configurationServices = {
   getColorNameFromCode,
   getUserPageUid,
   findBlocksWithColorTag,
+
+  // 🎯 SURGICAL COLOR SERVICES - NEW!
+  surgicalUpdateJournalColorTags,
+  findJournalBlock,
+  getAllDescendantBlocks,
 
   // Schema access
   getConfigurationSchemas: () => CONFIGURATION_SCHEMAS,
@@ -1930,7 +2116,7 @@ const createConfigurationCommands = (platform) => {
         console.groupEnd();
       },
     },
-    // 🌈 JOURNAL COLOR COMMANDS
+    // 🌈 JOURNAL COLOR COMMANDS (LEGACY)
     {
       label: "Color: Check Journal Color Discrepancy",
       callback: async () => {
@@ -1995,7 +2181,7 @@ const createConfigurationCommands = (platform) => {
       },
     },
     {
-      label: "Color: Test Journal Color Update",
+      label: "Color: Test Journal Color Update (Legacy)",
       callback: async () => {
         const user = getAuthenticatedUser();
         if (user) {
@@ -2023,6 +2209,31 @@ const createConfigurationCommands = (platform) => {
         }
       },
     },
+    // 🎯 SURGICAL COLOR COMMANDS - NEW!
+    {
+      label: "Color: Surgical Journal Update",
+      callback: async () => {
+        const user = getAuthenticatedUser();
+        if (user) {
+          console.log(
+            `🎯 [SURGICAL] Starting surgical color update for: ${user.displayName}`
+          );
+          const result = await surgicalUpdateJournalColorTags(user.displayName);
+
+          if (result.success) {
+            console.log(`✅ Surgical update successful: ${result.message}`);
+            console.log(`   Updated ${result.changed} blocks`);
+            console.log(
+              `   Target: ${result.targetColor} (${result.targetTag})`
+            );
+          } else {
+            console.error(`❌ Surgical update failed: ${result.error}`);
+          }
+        } else {
+          console.error("❌ No authenticated user found");
+        }
+      },
+    },
     {
       label: "Color: Show Color Mapping",
       callback: () => {
@@ -2038,17 +2249,20 @@ const createConfigurationCommands = (platform) => {
 };
 
 // ===================================================================
-// 🚀 EXTENSION REGISTRATION - Complete Professional Registration with Smart Fonts + Colors
+// 🚀 EXTENSION REGISTRATION - Complete Professional Registration with Smart Fonts + Colors + Surgical Precision
 // ===================================================================
 
 export default {
   onload: async ({ extensionAPI }) => {
     console.log(
-      "🎵 Configuration Manager (SMART FONT + COLOR SYSTEM) starting..."
+      "🎯 Configuration Manager (SMART FONT + COLOR SURGICAL SYSTEM) starting..."
     );
     console.log("🦜 Preparing for parrot duet: 'O mio babbino caro'");
     console.log("🎨 NEW: Complete smart font system with web font loading!");
     console.log("🌈 NEW: Journal color tag management system!");
+    console.log(
+      "🎯 NEW: Surgical precision color updates for Journal:: blocks!"
+    );
 
     // Verify dependencies
     if (!window.RoamExtensionSuite) {
@@ -2075,7 +2289,7 @@ export default {
     }
 
     console.log(
-      "✅ Dependencies verified - proceeding with smart font + color resurrection"
+      "✅ Dependencies verified - proceeding with smart font + color + surgical resurrection"
     );
 
     // Register configuration services
@@ -2103,13 +2317,13 @@ export default {
         services: configurationServices,
         fontRegistry: FONT_REGISTRY,
         colorMapping: COLOR_MAPPING,
-        version: "3.0.0-smart-font-color",
+        version: "3.0.0-smart-font-color-surgical",
       },
       {
-        name: "🎵 Configuration Manager (SMART FONT + COLOR SYSTEM)",
+        name: "🎯 Configuration Manager (SMART FONT + COLOR SURGICAL SYSTEM)",
         description:
-          "Professional configuration interface with proven Subjournals cascading architecture + complete smart font system + journal color management",
-        version: "3.0.0-smart-font-color",
+          "Professional configuration interface with proven Subjournals cascading architecture + complete smart font system + journal color management + surgical precision updates",
+        version: "3.0.0-smart-font-color-surgical",
         dependencies: ["utility-library", "user-authentication"],
       }
     );
@@ -2128,6 +2342,7 @@ export default {
       updateJournalColorTags: updateUserJournalColorTags,
       checkColorDiscrepancy: checkJournalColorDiscrepancy,
       autoFixColorDiscrepancy: autoFixJournalColorDiscrepancy,
+      surgicalUpdate: surgicalUpdateJournalColorTags, // NEW!
       getColorCode,
       getColorNameFromCode,
       COLOR_MAPPING,
@@ -2147,7 +2362,7 @@ export default {
         const overview = await generateConfigurationOverview(user.displayName);
 
         console.log(
-          "🎵 Configuration Manager (SMART FONT + COLOR SYSTEM) loaded successfully!"
+          "🎯 Configuration Manager (SMART FONT + COLOR SURGICAL SYSTEM) loaded successfully!"
         );
         console.log(`⚙️ Initial configuration status: ${overview.summary}`);
 
@@ -2250,6 +2465,9 @@ export default {
             console.log(
               '💡 Run "Color: Auto-Fix Journal Color Discrepancy" to fix'
             );
+            console.log(
+              '🎯 Or use "Color: Surgical Journal Update" for precision updates'
+            );
           } else {
             console.log(`✅ [COLOR CHECK] ${colorDiscrepancy.reason}`);
             if (colorDiscrepancy.savedColor) {
@@ -2279,9 +2497,10 @@ export default {
         console.log(
           '🔧 Available: Cmd+P → "Color: Auto-Fix Journal Color Discrepancy"'
         );
+        console.log('🎯 Available: Cmd+P → "Color: Surgical Journal Update"');
       } else {
         console.log(
-          "✅ Configuration Manager (SMART FONT + COLOR SYSTEM) loaded successfully!"
+          "✅ Configuration Manager (SMART FONT + COLOR SURGICAL SYSTEM) loaded successfully!"
         );
         console.log(
           "ℹ️ No authenticated user detected - auto-creation will run when user logs in"
@@ -2299,11 +2518,12 @@ export default {
     console.log("🎨🔗 Font system ready for Extension 14 integration!");
     console.log("🌐 Web font loading system active and ready!");
     console.log("🌈🔗 Color system ready for Extension 14 integration!");
+    console.log("🎯🔗 Surgical color system ready for precision updates!");
   },
 
   onunload: () => {
     console.log(
-      "🎵 Configuration Manager (SMART FONT + COLOR SYSTEM) unloading..."
+      "🎯 Configuration Manager (SMART FONT + COLOR SURGICAL SYSTEM) unloading..."
     );
     console.log(
       "🦜 Parrot duet complete - 'O mio babbino caro' sung beautifully!"
