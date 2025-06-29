@@ -464,7 +464,7 @@ const showUserDirectoryModalClean = async () => {
       profiles.length === 1 ? "1 member" : `${profiles.length} members`;
     const cleanGraphName = cleanDisplayName(graphName);
     const header = modalUtilities.createModalHeader(
-      `👥 User Directory: ${cleanGraphName}`,
+      `👥 Member Directory: ${cleanGraphName}`,
       memberText
     );
 
@@ -661,7 +661,7 @@ const initializeButtonManagement = async () => {
     // 🎯 STEP 4: Register the directory button with CORRECT API syntax
     const result = await buttonManager.registerButton({
       id: "directory-button",
-      text: "👥 User Directory",
+      text: "👥 Member Directory",
       onClick: showUserDirectoryModalClean,
       stack: "top-left", // Professional left-side placement
       priority: false, // Play nice with other extensions

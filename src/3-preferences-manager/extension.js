@@ -1,6 +1,7 @@
 // ===================================================================
-// Extension 3: Configuration Manager - RESURRECTED with Subjournals Pattern
+// Extension 3: Configuration Manager - RESURRECTED with Font System
 // 🎵 Parrot Duet Edition: "O mio babbino caro" - Now sings beautifully!
+// 🎨 NEW: Dynamic font application system for entire Roam graph
 // Uses proven step-by-step + retry pattern from working Subjournals extension
 // Format: **Field Name:** (bold single colons, not double like Extension 2)
 // ===================================================================
@@ -109,6 +110,333 @@ const CONFIGURATION_SCHEMAS = {
       return true;
     },
   },
+};
+
+// ===================================================================
+// 🎨 FONT APPLICATION SYSTEM - Dynamic Graph Font Management
+// ===================================================================
+
+/**
+ * 🎨 Apply user's font preference to entire Roam graph
+ * Reads user's "Graph Display Font" preference and dynamically applies CSS
+ */
+const applyUserFont = async (username = null) => {
+  try {
+    console.log("🎨 Applying user font preference...");
+
+    // Get current user if not provided
+    if (!username) {
+      const platform = window.RoamExtensionSuite;
+      const getAuthenticatedUser = platform?.getUtility("getAuthenticatedUser");
+      const user = getAuthenticatedUser();
+
+      if (!user) {
+        console.log("ℹ️ No authenticated user - using default font");
+        username = null;
+      } else {
+        username = user.displayName;
+      }
+    }
+
+    let selectedFont = "Noto Sans"; // Default fallback
+
+    if (username) {
+      // Read user's font preference
+      const userFont = await getUserPreferenceBulletproof(
+        username,
+        "Graph Display Font"
+      );
+
+      if (userFont && typeof userFont === "string") {
+        selectedFont = userFont;
+        console.log(`🎨 Applying font for ${username}: ${selectedFont}`);
+      } else {
+        console.log(
+          `🎨 No font preference found for ${username}, using default: ${selectedFont}`
+        );
+      }
+    }
+
+    // Ensure font styles are injected (create once, update as needed)
+    ensureRoamFontStyles();
+
+    // Apply the font via CSS custom property
+    document.documentElement.style.setProperty("--roam-font", selectedFont);
+
+    console.log(`✅ Font applied successfully: ${selectedFont}`);
+    return { success: true, font: selectedFont };
+  } catch (error) {
+    console.error("❌ Error applying user font:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * 🎨 Ensure Roam font CSS styles are injected (one-time setup)
+ * Creates the CSS rules that use the --roam-font custom property
+ */
+const ensureRoamFontStyles = () => {
+  const styleId = "roam-font-styles";
+
+  // Check if styles already exist
+  if (document.getElementById(styleId)) {
+    return; // Already injected
+  }
+
+  console.log("🎨 Injecting Roam font CSS styles...");
+
+  const fontStyles = `
+    /* Define font variable at the root */
+    :root {
+      --roam-font: 'Noto Sans';
+    }
+    
+    /* Apply font to all div elements (main text) */
+    div {
+        font-family: var(--roam-font), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        line-height: 1.2em;
+        margin: 0px;
+        padding: 0px;
+    }
+    
+    /* Global size and color parameters */
+    .roam-body .roam-app .roam-main .roam-article {
+        color: #330033;
+        font-size: 18px; 
+    }    
+    
+    /* Headers inherit the font variable */
+    .rm-block.rm-heading-level-1 span {
+        font-family: var(--roam-font), serif;
+        line-height: 1.2em;
+    }
+    .rm-block.rm-heading-level-2 span {
+        font-family: var(--roam-font), serif;
+        line-height: 1.2em;
+    }
+    .rm-block.rm-heading-level-3 span {
+        font-family: var(--roam-font), serif;
+        line-height: 1.2em;
+    } 
+    
+    /* Edit mode also uses the font variable */
+    .rm-block-input {
+        font-family: var(--roam-font), monospace;
+    }
+
+    /* Ensure proper fallbacks for different font types */
+    .roam-article, .roam-block, .rm-block-text {
+        font-family: var(--roam-font), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+  `;
+
+  const styleElement = document.createElement("style");
+  styleElement.id = styleId;
+  styleElement.textContent = fontStyles;
+  document.head.appendChild(styleElement);
+
+  console.log("✅ Roam font CSS styles injected");
+};
+
+/**
+ * 🐛 FONT DEBUG WINDOW - Comprehensive font debugging interface
+ */
+const showFontDebugWindow = async () => {
+  try {
+    // Remove existing debug window if present
+    const existingDebug = document.getElementById("font-debug-window");
+    if (existingDebug) {
+      existingDebug.remove();
+    }
+
+    // Get current user
+    const platform = window.RoamExtensionSuite;
+    const getAuthenticatedUser = platform?.getUtility("getAuthenticatedUser");
+    const user = getAuthenticatedUser();
+
+    // Gather debug information
+    const debugInfo = {
+      timestamp: new Date().toISOString(),
+      currentUser: user ? user.displayName : "No authenticated user",
+      cssVariableValue:
+        document.documentElement.style.getPropertyValue("--roam-font"),
+      computedCSSValue: getComputedStyle(
+        document.documentElement
+      ).getPropertyValue("--roam-font"),
+      stylesInjected: !!document.getElementById("roam-font-styles"),
+      userPreference: null,
+      rawPreferenceData: null,
+    };
+
+    // Get user's font preference
+    if (user) {
+      try {
+        debugInfo.userPreference = await getUserPreferenceBulletproof(
+          user.displayName,
+          "Graph Display Font"
+        );
+
+        // Also get raw preference data for debugging
+        const pageTitle = `${user.displayName}/user preferences`;
+        const pageUid = await getOrCreatePageUid(pageTitle);
+        if (pageUid) {
+          const keyText = "**Graph Display Font:**";
+          const keyBlock = await findBlockByText(pageUid, keyText);
+          if (keyBlock) {
+            debugInfo.rawPreferenceData = await getBlockChildren(keyBlock.uid);
+          }
+        }
+      } catch (error) {
+        debugInfo.userPreference = `Error: ${error.message}`;
+      }
+    }
+
+    // Create debug window
+    const debugWindow = document.createElement("div");
+    debugWindow.id = "font-debug-window";
+    debugWindow.style.cssText = `
+      position: fixed;
+      top: 50px;
+      right: 50px;
+      width: 500px;
+      max-height: 80vh;
+      background: white;
+      border: 2px solid #007acc;
+      border-radius: 8px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      z-index: 10000;
+      font-family: monospace;
+      font-size: 12px;
+      overflow-y: auto;
+    `;
+
+    // Create debug content
+    const debugContent = `
+      <div style="background: linear-gradient(135deg, #007acc, #0056b3); color: white; padding: 16px; border-radius: 6px 6px 0 0;">
+        <h3 style="margin: 0; font-size: 16px; font-weight: bold;">🎨 Font Debug Window</h3>
+        <button id="close-debug" style="position: absolute; top: 12px; right: 12px; background: rgba(255,255,255,0.2); border: none; color: white; border-radius: 4px; width: 24px; height: 24px; cursor: pointer; font-size: 16px;">×</button>
+      </div>
+      <div style="padding: 16px;">
+        <div style="margin-bottom: 16px;">
+          <strong>📊 Font System Status:</strong>
+          <div style="background: #f8f9fa; padding: 12px; border-radius: 4px; margin-top: 8px; border-left: 4px solid #007acc;">
+            <div><strong>Timestamp:</strong> ${debugInfo.timestamp}</div>
+            <div><strong>Current User:</strong> ${debugInfo.currentUser}</div>
+            <div><strong>CSS Styles Injected:</strong> ${
+              debugInfo.stylesInjected ? "✅ Yes" : "❌ No"
+            }</div>
+            <div><strong>CSS Variable Set:</strong> ${
+              debugInfo.cssVariableValue
+                ? `✅ "${debugInfo.cssVariableValue}"`
+                : "❌ Not set"
+            }</div>
+            <div><strong>Computed CSS Value:</strong> ${
+              debugInfo.computedCSSValue
+                ? `"${debugInfo.computedCSSValue}"`
+                : "Not computed"
+            }</div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 16px;">
+          <strong>👤 User Preference Data:</strong>
+          <div style="background: #f8f9fa; padding: 12px; border-radius: 4px; margin-top: 8px; border-left: 4px solid #28a745;">
+            <div><strong>Preference Value:</strong> ${
+              debugInfo.userPreference
+                ? `"${debugInfo.userPreference}"`
+                : "None found"
+            }</div>
+            <div><strong>Raw Block Data:</strong></div>
+            <pre style="background: #e9ecef; padding: 8px; border-radius: 4px; margin-top: 4px; overflow-x: auto; font-size: 11px;">${JSON.stringify(
+              debugInfo.rawPreferenceData,
+              null,
+              2
+            )}</pre>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 16px;">
+          <strong>🔧 Available Font Options:</strong>
+          <div style="background: #f8f9fa; padding: 12px; border-radius: 4px; margin-top: 8px; border-left: 4px solid #ffc107;">
+            ${CONFIGURATION_SCHEMAS["Graph Display Font"].options
+              .map((font) => `<div style="margin: 4px 0;">• ${font}</div>`)
+              .join("")}
+          </div>
+        </div>
+
+        <div style="margin-bottom: 16px;">
+          <strong>🧪 Quick Actions:</strong>
+          <div style="margin-top: 8px;">
+            <button id="apply-font-debug" style="background: #007acc; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; margin-right: 8px;">🎨 Re-apply Font</button>
+            <button id="inject-styles-debug" style="background: #28a745; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; margin-right: 8px;">💉 Re-inject Styles</button>
+            <button id="copy-debug-info" style="background: #6c757d; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer;">📋 Copy Debug Info</button>
+          </div>
+        </div>
+
+        <div>
+          <strong>📋 Debug Data (Copy/Paste):</strong>
+          <textarea id="debug-data-text" style="width: 100%; height: 200px; margin-top: 8px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; font-size: 11px; resize: vertical;" readonly>${JSON.stringify(
+            debugInfo,
+            null,
+            2
+          )}</textarea>
+        </div>
+      </div>
+    `;
+
+    debugWindow.innerHTML = debugContent;
+    document.body.appendChild(debugWindow);
+
+    // Add event listeners
+    document.getElementById("close-debug").addEventListener("click", () => {
+      debugWindow.remove();
+    });
+
+    document
+      .getElementById("apply-font-debug")
+      .addEventListener("click", async () => {
+        const result = await applyUserFont(user?.displayName);
+        alert(
+          `Font application result: ${
+            result.success
+              ? `✅ Success: ${result.font}`
+              : `❌ Error: ${result.error}`
+          }`
+        );
+
+        // Refresh debug window
+        setTimeout(() => showFontDebugWindow(), 500);
+      });
+
+    document
+      .getElementById("inject-styles-debug")
+      .addEventListener("click", () => {
+        ensureRoamFontStyles();
+        alert("✅ Font styles re-injected!");
+
+        // Refresh debug window
+        setTimeout(() => showFontDebugWindow(), 500);
+      });
+
+    document.getElementById("copy-debug-info").addEventListener("click", () => {
+      const textArea = document.getElementById("debug-data-text");
+      textArea.select();
+      document.execCommand("copy");
+      alert("📋 Debug info copied to clipboard!");
+    });
+
+    // Auto-select debug text for easy copying
+    document
+      .getElementById("debug-data-text")
+      .addEventListener("click", function () {
+        this.select();
+      });
+
+    console.log("🐛 Font debug window opened");
+  } catch (error) {
+    console.error("❌ Error creating font debug window:", error);
+    alert(`❌ Debug window error: ${error.message}`);
+  }
 };
 
 // ===================================================================
@@ -941,6 +1269,10 @@ const configurationServices = {
   generateConfigurationOverview,
   displayConfigurationStatus,
 
+  // 🎨 FONT SERVICES - NEW!
+  applyUserFont,
+  ensureRoamFontStyles,
+
   // Schema access
   getConfigurationSchemas: () => CONFIGURATION_SCHEMAS,
 };
@@ -1064,6 +1396,23 @@ const createConfigurationCommands = (platform) => {
         console.groupEnd();
       },
     },
+    {
+      label: "Config: Apply Font Preference",
+      callback: async () => {
+        const user = getAuthenticatedUser();
+        if (user) {
+          console.log(`🎨 Applying font preference for: ${user.displayName}`);
+          const result = await applyUserFont(user.displayName);
+          if (result.success) {
+            console.log(`✅ Font applied: ${result.font}`);
+          } else {
+            console.error(`❌ Font application failed: ${result.error}`);
+          }
+        } else {
+          console.error("❌ No authenticated user found");
+        }
+      },
+    },
   ];
 };
 
@@ -1073,8 +1422,11 @@ const createConfigurationCommands = (platform) => {
 
 export default {
   onload: async ({ extensionAPI }) => {
-    console.log("🎵 Configuration Manager (RESURRECTED) starting...");
+    console.log(
+      "🎵 Configuration Manager (RESURRECTED + FONT SYSTEM) starting..."
+    );
     console.log("🦜 Preparing for parrot duet: 'O mio babbino caro'");
+    console.log("🎨 NEW: Dynamic font application system loaded!");
 
     // Verify dependencies
     if (!window.RoamExtensionSuite) {
@@ -1125,13 +1477,13 @@ export default {
       {
         schemas: CONFIGURATION_SCHEMAS,
         services: configurationServices,
-        version: "3.0.0-resurrected",
+        version: "3.0.0-resurrected-font",
       },
       {
-        name: "🎵 Configuration Manager (RESURRECTED)",
+        name: "🎵 Configuration Manager (RESURRECTED + FONT SYSTEM)",
         description:
-          "Professional configuration interface with proven Subjournals cascading architecture",
-        version: "3.0.0-resurrected",
+          "Professional configuration interface with proven Subjournals cascading architecture + dynamic font system",
+        version: "3.0.0-resurrected-font",
         dependencies: ["utility-library", "user-authentication"],
       }
     );
@@ -1150,7 +1502,7 @@ export default {
         const overview = await generateConfigurationOverview(user.displayName);
 
         console.log(
-          "🎵 Configuration Manager (RESURRECTED) loaded successfully!"
+          "🎵 Configuration Manager (RESURRECTED + FONT SYSTEM) loaded successfully!"
         );
         console.log(`⚙️ Initial configuration status: ${overview.summary}`);
 
@@ -1175,6 +1527,19 @@ export default {
                 user.displayName
               );
               console.log(`🎉 Final status: ${finalOverview.summary}`);
+
+              // 🎨 AUTO-APPLY FONT after successful auto-creation
+              console.log(
+                "🎨 Applying user font preference after auto-creation..."
+              );
+              const fontResult = await applyUserFont(user.displayName);
+              if (fontResult.success) {
+                console.log(`🎨 Startup font applied: ${fontResult.font}`);
+              } else {
+                console.warn(
+                  `⚠️ Font application warning: ${fontResult.error}`
+                );
+              }
             } else {
               console.error(
                 "❌ Auto-creation failed - manual initialization may be needed"
@@ -1188,14 +1553,26 @@ export default {
           }
         } else {
           console.log("✅ User preferences already configured!");
+
+          // 🎨 AUTO-APPLY FONT for existing configuration
+          console.log(
+            "🎨 Applying user font preference for existing configuration..."
+          );
+          const fontResult = await applyUserFont(user.displayName);
+          if (fontResult.success) {
+            console.log(`🎨 Startup font applied: ${fontResult.font}`);
+          } else {
+            console.warn(`⚠️ Font application warning: ${fontResult.error}`);
+          }
         }
 
         console.log(
           '💡 Available: Cmd+P → "Config: Show My Configuration Status"'
         );
+        console.log('🎨 Available: Cmd+P → "Config: Apply Font Preference"');
       } else {
         console.log(
-          "✅ Configuration Manager (RESURRECTED) loaded successfully!"
+          "✅ Configuration Manager (RESURRECTED + FONT SYSTEM) loaded successfully!"
         );
         console.log(
           "ℹ️ No authenticated user detected - auto-creation will run when user logs in"
@@ -1210,13 +1587,24 @@ export default {
     }
 
     console.log("🦜🎵 Ready for beautiful parrot duet with Extension 2!");
+    console.log("🎨 Font system ready for Extension 14 integration!");
   },
 
   onunload: () => {
-    console.log("🎵 Configuration Manager (RESURRECTED) unloading...");
+    console.log(
+      "🎵 Configuration Manager (RESURRECTED + FONT SYSTEM) unloading..."
+    );
     console.log(
       "🦜 Parrot duet complete - 'O mio babbino caro' sung beautifully!"
     );
+
+    // Clean up font styles
+    const fontStyleElement = document.getElementById("roam-font-styles");
+    if (fontStyleElement) {
+      fontStyleElement.remove();
+      console.log("🎨 Font styles cleaned up");
+    }
+
     console.log("✅ Configuration Manager cleanup complete!");
   },
 };
