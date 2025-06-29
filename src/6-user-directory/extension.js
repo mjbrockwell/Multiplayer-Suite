@@ -3,6 +3,7 @@
 // 🎯 FIXED: Proper Simple Button Utility 2.0 integration with no fallback
 // 🗑️ REMOVED: All fallback button logic (fails gracefully instead)
 // ✅ CONDITIONAL: Button only appears on username pages or "chat room" pages
+// 🔧 FIXED: Chat room detection with proper DOM-first title detection
 // ===================================================================
 
 // ===================================================================
@@ -72,12 +73,13 @@ const checkButtonUtilityDependency = () => {
 };
 
 // ===================================================================
-// 🎯 CONDITIONAL LOGIC - Chat Room Page Detection
+// 🎯 CONDITIONAL LOGIC - Chat Room Page Detection (FIXED)
 // ===================================================================
 
 /**
  * 💬 Register custom context detector for chat room pages
  * This detects any page with "chat room" in the title (case insensitive)
+ * 🔧 FIXED: Proper DOM-first title detection
  */
 const registerChatRoomContextDetector = () => {
   try {
@@ -93,15 +95,22 @@ const registerChatRoomContextDetector = () => {
     window.ButtonConditions.isChatRoom = () => {
       const getCurrentPageTitle = () => {
         try {
+          // ✅ FIXED: Check DOM first (has actual displayed title)
+          const titleElement = document.querySelector(
+            ".roam-article h1, .rm-page-title"
+          );
+          if (titleElement?.textContent?.trim()) {
+            return titleElement.textContent.trim();
+          }
+
+          // ✅ FIXED: Only fall back to URL parsing if DOM fails
           const url = window.location.href;
           const pageMatch = url.match(/\/page\/([^/?#]+)/);
           if (pageMatch) {
             return decodeURIComponent(pageMatch[1]);
           }
-          const titleElement = document.querySelector(
-            ".roam-article h1, .rm-page-title"
-          );
-          return titleElement?.textContent?.trim() || null;
+
+          return null;
         } catch (error) {
           console.error("❌ Failed to get current page title:", error);
           return null;
@@ -116,12 +125,16 @@ const registerChatRoomContextDetector = () => {
 
       if (hasMatchingText) {
         console.log(`💬 Chat room page detected: "${pageTitle}"`);
+      } else {
+        console.log(`📄 Current page: "${pageTitle}" (not a chat room)`);
       }
 
       return hasMatchingText;
     };
 
-    console.log("✅ Chat room condition added to ButtonConditions");
+    console.log(
+      "✅ Chat room condition added to ButtonConditions (FIXED VERSION)"
+    );
   } catch (error) {
     console.error("❌ Failed to register chat room context detector:", error);
   }
@@ -927,7 +940,9 @@ window.navigateToUserPageClean = (username) => {
 
 export default {
   onload: () => {
-    console.log("🎯 User Directory loading (Fixed Button Management)...");
+    console.log(
+      "🎯 User Directory loading (Fixed Button Management + Chat Room Detection)..."
+    );
 
     // ✅ STEP 1: Check Extension 1.5 dependencies
     if (!checkExtension15Dependencies()) {
@@ -1003,13 +1018,13 @@ export default {
       "clean-user-directory",
       {
         services: cleanDirectoryServices,
-        version: "9.1.0", // 🎯 Fixed API version
+        version: "9.1.1", // 🔧 Fixed Chat Room Detection version
       },
       {
         name: "✨ User Directory",
         description:
-          "Professional user directory with proper Simple Button Utility 2.0 integration, conditional button logic, and NO fallback buttons",
-        version: "9.1.0",
+          "Professional user directory with FIXED Simple Button Utility 2.0 integration, FIXED chat room conditional logic, and NO fallback buttons",
+        version: "9.1.1",
         dependencies: requiredDependencies,
       }
     );
@@ -1031,10 +1046,13 @@ export default {
     // ✅ STEP 6: Success report
     const currentUser = platform.getUtility("getCurrentUser")();
     console.log(
-      "🎉 Extension SIX loaded successfully (Simple Button Utility 2.0 Integration)!"
+      "🎉 Extension SIX loaded successfully (FIXED Simple Button Utility 2.0 + Chat Room Detection)!"
     );
     console.log("🗑️ REMOVED: All fallback button logic");
     console.log("🎯 FIXED: Proper Simple Button Utility 2.0 integration");
+    console.log(
+      "🔧 FIXED: Chat room detection with proper DOM-first title detection"
+    );
     console.log(
       "🎯 CONDITIONAL: Button only appears on username or chat room pages"
     );
@@ -1054,14 +1072,14 @@ export default {
     return {
       extensionId: "clean-user-directory",
       services: cleanDirectoryServices,
-      version: "9.1.0",
-      status: "simple_button_utility_integration",
+      version: "9.1.1",
+      status: "fixed_simple_button_utility_integration",
     };
   },
 
   onunload: () => {
     console.log(
-      "🎯 User Directory unloading (Simple Button Utility 2.0 Integration)..."
+      "🎯 User Directory unloading (Fixed Simple Button Utility 2.0 Integration)..."
     );
 
     // 🎯 CLEAN: Proper button management cleanup
@@ -1086,7 +1104,7 @@ export default {
     delete window.navigateToUserPageClean;
 
     console.log(
-      "✅ User Directory cleanup complete (using Simple Button Utility 2.0)!"
+      "✅ User Directory cleanup complete (using Fixed Simple Button Utility 2.0)!"
     );
   },
 };

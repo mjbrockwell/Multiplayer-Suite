@@ -2,13 +2,14 @@
 // Simple Button Utility Extension 2.0 - Page-Change Driven
 // 🎯 COMPLETELY REDESIGNED: Simple "tear down and rebuild" approach
 // 🔧 FIXED: Proper page title detection consistently throughout
+// ✅ UPDATED: Added isChatRoom condition and fixed custom condition bug
 // ===================================================================
 
 (() => {
   "use strict";
 
   const EXTENSION_NAME = "Simple Button Utility";
-  const EXTENSION_VERSION = "2.0.3"; // Cache-based username detection
+  const EXTENSION_VERSION = "2.0.4"; // ✅ FIXED: isChatRoom + custom condition
   const ANIMATION_DURATION = 200;
 
   // ==================== CENTRALIZED PAGE TITLE DETECTION ====================
@@ -87,54 +88,6 @@
       ],
     },
 
-    // 🎯 NEW: Test cache-based username detection
-
-    // 🎯 NEW: Test cache-based username detection
-    testCacheBasedUsernameDetection: () => {
-      console.group(
-        "🎯 Testing Cache-Based Username Detection in Button System"
-      );
-
-      // Test current page
-      const currentTitle = getCurrentPageTitle();
-      console.log(`Current page: "${currentTitle}"`);
-
-      if (window.GraphMemberCache) {
-        console.log("✅ GraphMemberCache available");
-        const cacheStatus = window.GraphMemberCache.getStatus();
-        console.log("Cache status:", cacheStatus);
-
-        // Test current page detection
-        const isMemberViaCache = window.GraphMemberCache.isMember(currentTitle);
-        const isUsernamePageResult = window.ButtonConditions.isUsernamePage();
-
-        console.log(
-          `Cache says "${currentTitle}" is member: ${isMemberViaCache}`
-        );
-        console.log(`isUsernamePage() returns: ${isUsernamePageResult}`);
-        console.log(
-          `Results match: ${isMemberViaCache === isUsernamePageResult}`
-        );
-
-        // Test some example cases
-        const testCases = [
-          "Matt Brockwell",
-          "Chat Room",
-          "Daily Notes",
-          "John Smith",
-        ];
-        testCases.forEach((testCase) => {
-          const cacheResult = window.GraphMemberCache.isMember(testCase);
-          console.log(`"${testCase}" → Cache: ${cacheResult}`);
-        });
-      } else {
-        console.log(
-          "❌ GraphMemberCache not available - using fallback detection"
-        );
-      }
-
-      console.groupEnd();
-    },
     "top-right": {
       maxButtons: 5,
       positions: [
@@ -294,6 +247,24 @@
       return result;
     },
 
+    // ✅ NEW: Chat room page detection - CASE INSENSITIVE
+    isChatRoom: () => {
+      const pageTitle = getCurrentPageTitle();
+      if (!pageTitle) return false;
+
+      // Case-insensitive check for "chat room"
+      const lowerTitle = pageTitle.toLowerCase();
+      const containsChatRoom = lowerTitle.includes("chat room");
+
+      if (window.SimpleButtonRegistry?.debugMode) {
+        console.log(
+          `🗨️ Chat room detection for "${pageTitle}": ${containsChatRoom} (lowercase: "${lowerTitle}")`
+        );
+      }
+
+      return containsChatRoom;
+    },
+
     // Daily note detection
     isDailyNote: () => {
       const url = window.location.href;
@@ -320,8 +291,13 @@
       );
     },
 
-    // Custom condition support
+    // ✅ FIXED: Custom condition support - handles missing parameters
     custom: (conditionFn) => {
+      // Handle being called without parameters (like from debug panel)
+      if (!conditionFn || typeof conditionFn !== "function") {
+        return false;
+      }
+
       try {
         return conditionFn();
       } catch (error) {
@@ -904,6 +880,39 @@
       }, 10000);
     },
 
+    // ✅ UPDATED: Test the new isChatRoom condition
+    testChatRoomDetection: () => {
+      console.group("🗨️ Testing Chat Room Detection");
+
+      const currentTitle = getCurrentPageTitle();
+      console.log(`Current page: "${currentTitle}"`);
+
+      if (window.ButtonConditions.isChatRoom) {
+        const result = window.ButtonConditions.isChatRoom();
+        console.log(`isChatRoom() result: ${result}`);
+
+        // Test various titles
+        const testTitles = [
+          "Chat Room",
+          "chat room",
+          "CHAT ROOM",
+          "Daily Chat Room",
+          "Matt Brockwell",
+          "Daily Notes",
+        ];
+
+        console.log("\nTesting various titles:");
+        testTitles.forEach((title) => {
+          const isMatch = title.toLowerCase().includes("chat room");
+          console.log(`"${title}" → ${isMatch}`);
+        });
+      } else {
+        console.log("❌ isChatRoom condition not found");
+      }
+
+      console.groupEnd();
+    },
+
     // 🚨 SPECIAL: Debug Extension 6 User Directory button issue
     debugUserDirectoryButton: () => {
       console.group("🔍 Debugging User Directory Button Issue");
@@ -1058,6 +1067,7 @@
 
       console.groupEnd();
     },
+
     testPageTitleDetection: () => {
       console.group("🔧 Testing Fixed Page Title Detection");
 
@@ -1101,10 +1111,57 @@
 
       console.groupEnd();
     },
+
+    // 🎯 NEW: Test cache-based username detection
+    testCacheBasedUsernameDetection: () => {
+      console.group(
+        "🎯 Testing Cache-Based Username Detection in Button System"
+      );
+
+      // Test current page
+      const currentTitle = getCurrentPageTitle();
+      console.log(`Current page: "${currentTitle}"`);
+
+      if (window.GraphMemberCache) {
+        console.log("✅ GraphMemberCache available");
+        const cacheStatus = window.GraphMemberCache.getStatus();
+        console.log("Cache status:", cacheStatus);
+
+        // Test current page detection
+        const isMemberViaCache = window.GraphMemberCache.isMember(currentTitle);
+        const isUsernamePageResult = window.ButtonConditions.isUsernamePage();
+
+        console.log(
+          `Cache says "${currentTitle}" is member: ${isMemberViaCache}`
+        );
+        console.log(`isUsernamePage() returns: ${isUsernamePageResult}`);
+        console.log(
+          `Results match: ${isMemberViaCache === isUsernamePageResult}`
+        );
+
+        // Test some example cases
+        const testCases = [
+          "Matt Brockwell",
+          "Chat Room",
+          "Daily Notes",
+          "John Smith",
+        ];
+        testCases.forEach((testCase) => {
+          const cacheResult = window.GraphMemberCache.isMember(testCase);
+          console.log(`"${testCase}" → Cache: ${cacheResult}`);
+        });
+      } else {
+        console.log(
+          "❌ GraphMemberCache not available - using fallback detection"
+        );
+      }
+
+      console.groupEnd();
+    },
   };
 
   console.log(
-    `✅ ${EXTENSION_NAME} v${EXTENSION_VERSION} loaded - Cache-Based Username Detection! 🎯`
+    `✅ ${EXTENSION_NAME} v${EXTENSION_VERSION} loaded - isChatRoom + Custom Fix! 🎯`
   );
 
   // Auto-test the page title detection and cache integration
@@ -1118,5 +1175,8 @@
     if (window.GraphMemberCache) {
       window.SimpleButtonUtilityTests.testCacheBasedUsernameDetection();
     }
+
+    // ✅ NEW: Test the chat room detection
+    window.SimpleButtonUtilityTests.testChatRoomDetection();
   }, 1000);
 })();
