@@ -1,8 +1,7 @@
 // ===================================================================
-// User Profile Nudges Extension - Refactored with Button Manager Integration
-// ✨ Clean integration with Extension 1.6 (Simple Button Utility 2.0)
-// 🎯 Smart profile completion nudging with sophisticated conditional logic
-// 🎨 Standardized warm yellow styling for consistency
+// User Profile Nudges Extension - Phase 1 MVP
+// Depends on: Extension 1.5 Enhanced Utility Library
+// Core functionality: Profile completion nudging with basic UX
 // ===================================================================
 
 const userProfileNudgesExtension = (() => {
@@ -11,9 +10,11 @@ const userProfileNudgesExtension = (() => {
   // ===================================================================
   let isInitialized = false;
   let extensionAPI = null;
-  let buttonManager = null;
   let currentUser = null;
+  let nudgeButton = null;
   let profileModal = null;
+  let pageMonitorInterval = null;
+  let lastCheckedPage = null;
 
   // ===================================================================
   // 🔧 UTILITY ACCESS - Extension 1.5 Integration
@@ -37,30 +38,7 @@ const userProfileNudgesExtension = (() => {
   };
 
   // ===================================================================
-  // 🔧 DEPENDENCY MANAGEMENT
-  // ===================================================================
-
-  // 🌟 Check if Extension 1.6 (Simple Button Utility 2.0) is available
-  const checkButtonUtilityDependency = () => {
-    if (!window.SimpleExtensionButtonManager) {
-      log(
-        "❌ Simple Button Utility 2.0 SimpleExtensionButtonManager not found",
-        "WARNING"
-      );
-      return false;
-    }
-
-    if (!window.ButtonConditions) {
-      log("❌ Simple Button Utility 2.0 ButtonConditions not found", "WARNING");
-      return false;
-    }
-
-    log("✅ Simple Button Utility 2.0 properly available", "SUCCESS");
-    return true;
-  };
-
-  // ===================================================================
-  // 🔍 USER & PAGE DETECTION - Core Intelligence Preserved
+  // 🔍 USER & PAGE DETECTION
   // ===================================================================
 
   const getCurrentUserSafe = () => {
@@ -160,8 +138,11 @@ const userProfileNudgesExtension = (() => {
     }
   };
 
+  // Note: No separate user data pages in current version
+  // All profile data lives on username page under "My Info::"
+
   // ===================================================================
-  // 📊 PROFILE ANALYSIS - Core Intelligence Preserved
+  // 📊 PROFILE ANALYSIS
   // ===================================================================
 
   const checkProfileCompleteness = () => {
@@ -265,146 +246,143 @@ const userProfileNudgesExtension = (() => {
   };
 
   // ===================================================================
-  // 🎯 BUTTON MANAGEMENT - Extension 1.6 Integration
+  // 🎨 UI COMPONENTS
   // ===================================================================
 
-  // 🌟 Initialize button management with Extension 1.6
-  const initializeButtonManagement = async () => {
-    try {
-      log(
-        "🎯 Profile Nudges: Initializing Simple Button Utility 2.0...",
-        "INFO"
-      );
+  // ===================================================================
+  // 🎨 COORDINATED BUTTON SYSTEM - Professional Design Harmony
+  // ===================================================================
 
-      // Check dependency availability
-      if (!checkButtonUtilityDependency()) {
-        log(
-          "❌ Simple Button Utility 2.0 not available - NO BUTTON will be created",
-          "WARNING"
-        );
-        log("💡 Please load Simple Button Utility 2.0 first", "WARNING");
-        return {
-          success: false,
-          reason: "Simple Button Utility 2.0 not available",
-        };
-      }
+  const getButtonCoordination = () => {
+    // Check if Journal Entry button exists
+    const journalButton = document.querySelector("#journal-quick-entry-button");
+    const hasJournalButton = !!journalButton;
 
-      // Wait for Simple Button Utility 2.0 to be ready
-      let retries = 0;
-      const maxRetries = 10;
-
-      while (retries < maxRetries) {
-        try {
-          // Create button manager
-          buttonManager = new window.SimpleExtensionButtonManager(
-            "ProfileNudges"
-          );
-          await buttonManager.initialize();
-          break;
-        } catch (error) {
-          retries++;
-          log(
-            `⏳ Simple Button Utility 2.0 not ready, retrying... (${retries}/${maxRetries})`,
-            "DEBUG"
-          );
-          await new Promise((resolve) => setTimeout(resolve, 500));
-        }
-      }
-
-      if (retries >= maxRetries) {
-        log(
-          "❌ Failed to initialize Simple Button Utility 2.0 after 10 retries",
-          "ERROR"
-        );
-        return {
-          success: false,
-          reason: "Simple Button Utility 2.0 initialization timeout",
-        };
-      }
-
-      // 🎯 EXACT STYLING: Warm yellow gradient with elegant brown border (consistent with other buttons)
-      const buttonStyle = {
-        background: "linear-gradient(135deg, #fffbeb, #fef3c7)", // Softer warm yellow
-        border: "1.5px solid #8b4513", // Elegant brown border
-        color: "#78716c", // Muted brown text
-        fontWeight: "600",
-        padding: "10px 16px",
-        borderRadius: "12px",
-        boxShadow: "0 4px 12px rgba(245, 158, 11, 0.3)",
+    // Calculate coordinated positioning
+    if (hasJournalButton) {
+      return {
+        // Stack vertically with proper spacing
+        top: "120px", // Below journal button
+        right: "20px",
+        // Harmonious purple that complements the journal yellow
+        background: "linear-gradient(135deg, #8b5cf6, #a855f7)",
+        borderColor: "#7c3aed",
+        // Match the journal button's professional styling
+        coordination: "stacked",
       };
-
-      // 🌟 Register Profile Nudge Button
-      const nudgeButtonResult = await buttonManager.registerButton({
-        id: "profile-nudge-button",
-        text: "✨ Complete Your Profile",
-        stack: "top-right", // Position at top-right with other action buttons
-        priority: false, // Play nice with other extensions
-        style: buttonStyle,
-        condition: () => {
-          // 🎯 SOPHISTICATED CONDITIONAL LOGIC: Only show if on own username page AND profile incomplete
-          const onUsernamePage = isOnOwnUsernamePage();
-          if (!onUsernamePage) return false;
-
-          const completeness = checkProfileCompleteness();
-          const shouldShow = !completeness.isComplete;
-
-          if (shouldShow) {
-            log(
-              `Profile incomplete (${completeness.percentage}%) - button should show`,
-              "DEBUG"
-            );
-          } else {
-            log(
-              `Profile complete (${completeness.percentage}%) - button hidden`,
-              "DEBUG"
-            );
-          }
-
-          return shouldShow;
-        },
-        onClick: async () => {
-          try {
-            await showProfileEditModal();
-            log("✅ Profile edit modal opened successfully!", "SUCCESS");
-          } catch (error) {
-            log(
-              `❌ Failed to open profile edit modal: ${error.message}`,
-              "ERROR"
-            );
-          }
-        },
-      });
-
-      // Report results
-      if (nudgeButtonResult.success) {
-        log(
-          `✅ Profile nudge button registered at ${nudgeButtonResult.stack}`,
-          "SUCCESS"
-        );
-        log(
-          "🎯 Button will appear when profile is incomplete on username page",
-          "INFO"
-        );
-        return { success: true, registeredButtons: 1 };
-      } else {
-        log(
-          `❌ Failed to register profile nudge button: ${nudgeButtonResult.error}`,
-          "ERROR"
-        );
-        return { success: false, reason: nudgeButtonResult.error };
-      }
-    } catch (error) {
-      log(
-        `❌ Button management initialization failed: ${error.message}`,
-        "ERROR"
-      );
-      return { success: false, reason: error.message };
+    } else {
+      return {
+        // Solo positioning when no journal button
+        top: "80px",
+        right: "20px",
+        background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+        borderColor: "#6366f1",
+        coordination: "solo",
+      };
     }
   };
 
-  // ===================================================================
-  // 🎨 UI COMPONENTS - Modal Functionality Preserved
-  // ===================================================================
+  const createNudgeButton = () => {
+    try {
+      // Remove existing button
+      if (nudgeButton) {
+        nudgeButton.remove();
+        nudgeButton = null;
+      }
+
+      const user = getCurrentUserSafe();
+      if (!user) return;
+
+      const onUsernamePage = isOnOwnUsernamePage();
+
+      // Only show nudge on username page (no separate user data pages anymore)
+      if (!onUsernamePage) return;
+
+      // Get coordinated positioning and styling
+      const coordination = getButtonCoordination();
+
+      // Create button - always shows modal directly since data is on this page
+      nudgeButton = document.createElement("button");
+      nudgeButton.id = "profile-nudge-button";
+      nudgeButton.textContent = "✨ Complete Your Profile";
+      nudgeButton.style.cssText = `
+        position: fixed;
+        top: ${coordination.top};
+        right: ${coordination.right};
+        background: ${coordination.background};
+        color: white;
+        border: 2px solid ${coordination.borderColor};
+        border-radius: 12px;
+        padding: 12px 20px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+        z-index: 9999;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        transition: all 0.2s ease;
+        opacity: 0;
+        transform: translateX(20px);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 200px;
+        justify-content: center;
+      `;
+
+      // Add coordination indicator
+      if (coordination.coordination === "stacked") {
+        nudgeButton.setAttribute("data-coordination", "stacked");
+        log(
+          "Profile button positioned in STACKED mode (coordinated with journal button)",
+          "INFO"
+        );
+      } else {
+        nudgeButton.setAttribute("data-coordination", "solo");
+        log("Profile button positioned in SOLO mode", "INFO");
+      }
+
+      // Enhanced hover effects that complement journal button
+      nudgeButton.addEventListener("mouseenter", () => {
+        nudgeButton.style.transform = "translateX(0) scale(1.03)";
+        nudgeButton.style.boxShadow = "0 6px 20px rgba(139, 92, 246, 0.4)";
+        nudgeButton.style.borderColor = "#6d28d9";
+      });
+
+      nudgeButton.addEventListener("mouseleave", () => {
+        nudgeButton.style.transform = "translateX(0) scale(1)";
+        nudgeButton.style.boxShadow = "0 4px 12px rgba(139, 92, 246, 0.3)";
+        nudgeButton.style.borderColor = coordination.borderColor;
+      });
+
+      // Click handler - always show modal directly (no navigation needed)
+      nudgeButton.addEventListener("click", async () => {
+        await showProfileEditModal();
+      });
+
+      document.body.appendChild(nudgeButton);
+
+      // Animate in with coordinated timing
+      setTimeout(
+        () => {
+          if (nudgeButton) {
+            nudgeButton.style.opacity = "1";
+            nudgeButton.style.transform = "translateX(0)";
+          }
+        },
+        coordination.coordination === "stacked" ? 200 : 100
+      ); // Slight delay for stacked
+
+      log(
+        `Profile nudge button created with ${coordination.coordination} coordination`,
+        "SUCCESS"
+      );
+    } catch (error) {
+      log(`Error creating nudge button: ${error.message}`, "ERROR");
+    }
+  };
+
+  // Removed navigateToUserDataPage() - no longer needed since data is on username page
 
   const showProfileEditModal = async () => {
     try {
@@ -688,10 +666,6 @@ const userProfileNudgesExtension = (() => {
     }
   };
 
-  // ===================================================================
-  // 💾 PROFILE DATA MANAGEMENT - Core Logic Preserved
-  // ===================================================================
-
   // Field name mapping: form keys to actual Roam field names
   const getActualFieldName = (formFieldKey) => {
     const fieldNameMap = {
@@ -900,12 +874,19 @@ const userProfileNudgesExtension = (() => {
           profileModal = null;
         }
 
-        // ✨ NEW: Trigger button manager to re-evaluate conditions
-        // This will hide the button if profile is now complete
-        if (buttonManager && buttonManager.registry) {
-          buttonManager.registry.rebuildAllButtons();
-          log("🔄 Triggered button condition re-evaluation", "INFO");
-        }
+        // Hide button since profile might now be complete
+        setTimeout(() => {
+          const newCompleteness = checkProfileCompleteness();
+          if (newCompleteness.isComplete && nudgeButton) {
+            nudgeButton.style.opacity = "0";
+            setTimeout(() => {
+              if (nudgeButton) {
+                nudgeButton.remove();
+                nudgeButton = null;
+              }
+            }, 300);
+          }
+        }, 1000);
       } else {
         log("Failed to save any profile data", "ERROR");
       }
@@ -915,15 +896,94 @@ const userProfileNudgesExtension = (() => {
   };
 
   // ===================================================================
+  // 🔄 PAGE MONITORING
+  // ===================================================================
+
+  const checkAndShowNudge = () => {
+    try {
+      const user = getCurrentUserSafe();
+      if (!user) return;
+
+      const onUsernamePage = isOnOwnUsernamePage();
+
+      // Only show nudge on username page (all data lives here now)
+      if (!onUsernamePage) {
+        if (nudgeButton) {
+          nudgeButton.remove();
+          nudgeButton = null;
+        }
+        return;
+      }
+
+      // Check if profile is already complete
+      const completeness = checkProfileCompleteness();
+      if (completeness.isComplete) {
+        log(
+          `Profile complete (${completeness.percentage}%) - no nudge needed`,
+          "INFO"
+        );
+        if (nudgeButton) {
+          nudgeButton.remove();
+          nudgeButton = null;
+        }
+        return;
+      }
+
+      log(
+        `Profile incomplete (${completeness.percentage}%) - showing coordinated nudge`,
+        "INFO"
+      );
+
+      // Small delay to allow journal button to render first (if present)
+      setTimeout(() => {
+        createNudgeButton();
+      }, 150);
+    } catch (error) {
+      log(`Error in checkAndShowNudge: ${error.message}`, "ERROR");
+    }
+  };
+
+  const startPageMonitoring = () => {
+    try {
+      // Initial check
+      setTimeout(checkAndShowNudge, 1000);
+
+      // Monitor URL changes
+      let lastUrl = window.location.href;
+      pageMonitorInterval = setInterval(() => {
+        const currentUrl = window.location.href;
+        if (currentUrl !== lastUrl) {
+          lastUrl = currentUrl;
+          log("Page change detected", "INFO");
+          setTimeout(checkAndShowNudge, 500);
+        }
+      }, 1000);
+
+      log("Page monitoring started", "SUCCESS");
+    } catch (error) {
+      log(`Error starting page monitoring: ${error.message}`, "ERROR");
+    }
+  };
+
+  const stopPageMonitoring = () => {
+    try {
+      if (pageMonitorInterval) {
+        clearInterval(pageMonitorInterval);
+        pageMonitorInterval = null;
+      }
+      log("Page monitoring stopped", "INFO");
+    } catch (error) {
+      log(`Error stopping page monitoring: ${error.message}`, "ERROR");
+    }
+  };
+
+  // ===================================================================
   // 🎛️ EXTENSION LIFECYCLE
   // ===================================================================
 
   const onload = ({ extensionAPI: api }) => {
     try {
-      log(
-        "User Profile Nudges Extension v2.0 - Button Manager Integration loading...",
-        "SUCCESS"
-      );
+      log("User Profile Nudges Extension loading (Phase 1 MVP)...", "SUCCESS");
 
       extensionAPI = api;
 
@@ -968,67 +1028,31 @@ const userProfileNudgesExtension = (() => {
       // Export public API
       window.userProfileNudges = {
         checkProfileCompleteness,
+        createNudgeButton,
         showProfileEditModal,
         getCurrentUserSafe,
         isOnOwnUsernamePage,
-        initializeButtonManagement, // ✨ NEW: Expose for manual initialization
+        checkAndShowButton: checkAndShowNudge, // Export for coordination
+        // Note: isOnOwnUserDataPage removed - no separate user data pages in current version
         debug: {
           checkCompleteness: checkProfileCompleteness,
+          forceShowButton: createNudgeButton,
           forceShowModal: showProfileEditModal,
-          testButtonCondition: () => {
-            return (
-              isOnOwnUsernamePage() && !checkProfileCompleteness().isComplete
-            );
-          },
         },
       };
 
       isInitialized = true;
 
-      // Initialize button management with proper delay
-      setTimeout(async () => {
-        const nudgesEnabled = extensionAPI.settings?.get("enableNudges");
-        if (nudgesEnabled !== false) {
-          try {
-            log("Starting profile nudge button management...", "INFO");
-            const result = await initializeButtonManagement();
-            if (result.success) {
-              log(
-                "🎉 Profile nudge button management initialized successfully!",
-                "SUCCESS"
-              );
-            } else {
-              log(
-                `⚠️ Profile nudge button management failed: ${result.reason}`,
-                "WARNING"
-              );
-            }
-          } catch (error) {
-            log(
-              `❌ Failed to initialize profile nudge button management: ${error.message}`,
-              "ERROR"
-            );
-          }
-        }
-      }, 2000); // Delay to ensure Extension 1.6 is ready
+      // Start monitoring if enabled
+      const nudgesEnabled = extensionAPI.settings?.get("enableNudges");
+      if (nudgesEnabled !== false) {
+        log("Starting profile nudge monitoring...", "INFO");
+        startPageMonitoring();
+      }
 
+      log("User Profile Nudges Extension loaded successfully!", "SUCCESS");
       log(
-        "User Profile Nudges Extension loaded successfully with Button Manager Integration!",
-        "SUCCESS"
-      );
-      log("🗑️ REMOVED: Complex button coordination system", "INFO");
-      log(
-        "🎯 NEW: Extension 1.6 (Simple Button Utility 2.0) integration",
-        "INFO"
-      );
-      log("🎨 STYLING: Standardized warm yellow with brown border", "INFO");
-      log(
-        "✨ CONDITIONAL: Sophisticated logic for profile completeness",
-        "INFO"
-      );
-      log("📍 POSITION: Top-right stack with automatic coordination", "INFO");
-      log(
-        "💡 Try: Navigate to your username page with incomplete profile",
+        "💡 Try: Navigate to your username page to see the nudge button",
         "INFO"
       );
     } catch (error) {
@@ -1038,19 +1062,16 @@ const userProfileNudgesExtension = (() => {
 
   const onunload = () => {
     try {
-      log("User Profile Nudges Extension unloading...", "INFO");
+      log("User Profile Nudges Extension unloading...");
 
-      // Clean up button management
-      if (buttonManager) {
-        try {
-          buttonManager.cleanup();
-          log("✅ Button management cleaned up", "SUCCESS");
-        } catch (error) {
-          log(`❌ Button manager cleanup error: ${error.message}`, "ERROR");
-        }
-      }
+      stopPageMonitoring();
 
       // Clean up UI elements
+      if (nudgeButton) {
+        nudgeButton.remove();
+        nudgeButton = null;
+      }
+
       if (profileModal) {
         profileModal.remove();
         profileModal = null;
@@ -1063,11 +1084,11 @@ const userProfileNudgesExtension = (() => {
 
       // Reset state
       currentUser = null;
+      lastCheckedPage = null;
       extensionAPI = null;
-      buttonManager = null;
       isInitialized = false;
 
-      log("User Profile Nudges Extension unloaded successfully", "SUCCESS");
+      log("User Profile Nudges Extension unloaded successfully");
     } catch (error) {
       console.error("Error in User Profile Nudges onunload:", error);
     }

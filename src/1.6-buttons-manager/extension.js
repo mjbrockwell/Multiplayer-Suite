@@ -3,13 +3,14 @@
 // 🎯 COMPLETELY REDESIGNED: Simple "tear down and rebuild" approach
 // 🔧 FIXED: Proper page title detection consistently throughout
 // ✅ UPDATED: Added isChatRoom condition and fixed custom condition bug
+// ✨ NEW: Dismissible buttons with centered-right [x] - Standard Behavior
 // ===================================================================
 
 (() => {
   "use strict";
 
   const EXTENSION_NAME = "Simple Button Utility";
-  const EXTENSION_VERSION = "2.0.4"; // ✅ FIXED: isChatRoom + custom condition
+  const EXTENSION_VERSION = "2.1.0"; // ✨ NEW: Dismissible buttons
   const ANIMATION_DURATION = 200;
 
   // ==================== CENTRALIZED PAGE TITLE DETECTION ====================
@@ -77,13 +78,13 @@
     }
   }
 
-  // ==================== BUTTON STACK POSITIONING (RESTORED) ====================
+  // ==================== BUTTON STACK POSITIONING (UPDATED) ====================
 
   const BUTTON_STACKS = {
     "top-left": {
       maxButtons: 2,
       positions: [
-        { x: 14, y: 6 }, // ← Sandbox coordinates: relative to content area
+        { x: 14, y: 6 }, // ← Updated coordinates: closer to edges
         { x: 14, y: 48 }, // ← Proper spacing for content positioning
       ],
     },
@@ -91,7 +92,7 @@
     "top-right": {
       maxButtons: 5,
       positions: [
-        { x: -14, y: 6 }, // ← Sandbox coordinates: -14px from right edge
+        { x: -14, y: 6 }, // ← Updated: -14px from right edge (closer than -100px)
         { x: -14, y: 48 },
         { x: -14, y: 90 },
         { x: -14, y: 132 },
@@ -312,7 +313,7 @@
   class SimpleButtonRegistry {
     constructor() {
       this.registeredButtons = new Map(); // button config storage
-      this.activeButtons = new Map(); // currently visible DOM elements
+      this.activeButtons = new Map(); // currently visible DOM elements (containers, not buttons)
       this.stacks = {
         // RESTORED: Stack management
         "top-left": [],
@@ -335,7 +336,9 @@
       // Initial button placement
       this.rebuildAllButtons();
 
-      console.log("✅ Simple Button Registry initialized");
+      console.log(
+        "✅ Simple Button Registry initialized with dismissible buttons"
+      );
       return true;
     }
 
@@ -580,18 +583,27 @@
       return true; // Default: show button
     }
 
+    // ✨ NEW: Enhanced createAndPlaceButton with dismissible functionality
     createAndPlaceButton(config, stackName, stackIndex) {
-      const button = document.createElement("button");
-      button.textContent = config.text;
+      // ✨ NEW: Create container instead of single button
+      const buttonContainer = document.createElement("div");
+      buttonContainer.style.position = "absolute";
+      buttonContainer.style.display = "flex";
+      buttonContainer.style.alignItems = "center";
+      buttonContainer.style.zIndex = "10000";
+
+      // ✨ NEW: Create main button
+      const mainButton = document.createElement("button");
+      mainButton.textContent = config.text;
 
       // Get position from stack configuration
       const stackConfig = BUTTON_STACKS[stackName];
       const position = stackConfig.positions[stackIndex];
 
-      // Base styling
-      Object.assign(button.style, {
-        position: "absolute",
+      // Base styling for main button
+      Object.assign(mainButton.style, {
         padding: "8px 12px",
+        paddingRight: "32px", // ✨ NEW: Extra space for dismiss button
         background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
         color: "white",
         border: "none",
@@ -600,31 +612,98 @@
         fontWeight: "500",
         cursor: "pointer",
         boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-        zIndex: "10000",
         userSelect: "none",
         transition: "all 200ms ease",
         whiteSpace: "nowrap",
+        position: "relative", // ✨ NEW: For dismiss button positioning
       });
 
-      // Apply custom styles
+      // Apply custom styles to main button
       if (config.style) {
-        Object.assign(button.style, config.style);
+        Object.assign(mainButton.style, config.style);
+        // ✨ NEW: Ensure padding-right is preserved for dismiss button
+        if (!config.style.paddingRight) {
+          mainButton.style.paddingRight = "32px";
+        }
       }
 
-      // RESTORED: Smart positioning logic
+      // ✨ NEW: Create dismiss button
+      const dismissButton = document.createElement("span");
+      dismissButton.innerHTML = "×";
+      dismissButton.style.cssText = `
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 16px;
+        height: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 14px;
+        font-weight: bold;
+        border-radius: 2px;
+        transition: all 150ms ease;
+        user-select: none;
+        line-height: 1;
+      `;
+
+      // ✨ NEW: Dismiss button hover effects
+      dismissButton.addEventListener("mouseenter", () => {
+        dismissButton.style.backgroundColor = "rgba(255, 255, 255, 0.2)";
+        dismissButton.style.color = "rgba(255, 255, 255, 0.9)";
+      });
+
+      dismissButton.addEventListener("mouseleave", () => {
+        dismissButton.style.backgroundColor = "transparent";
+        dismissButton.style.color = "rgba(255, 255, 255, 0.7)";
+      });
+
+      // ✨ NEW: Dismiss functionality
+      dismissButton.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation(); // Prevent main button click
+
+        console.log(`🗑️ Dismissing button "${config.id}"`);
+
+        // Remove from DOM
+        if (buttonContainer.parentNode) {
+          buttonContainer.remove();
+        }
+
+        // Remove from activeButtons tracking
+        this.activeButtons.delete(config.id);
+
+        console.log(
+          `✅ Button "${config.id}" dismissed (will reappear on page change)`
+        );
+      });
+
+      // Assemble the button structure
+      mainButton.appendChild(dismissButton);
+      buttonContainer.appendChild(mainButton);
+
+      // Position the container
       if (position.x < 0) {
         // Right-aligned positioning
-        button.style.right = `${Math.abs(position.x)}px`;
-        button.style.left = "auto";
+        buttonContainer.style.right = `${Math.abs(position.x)}px`;
+        buttonContainer.style.left = "auto";
       } else {
         // Left-aligned positioning
-        button.style.left = `${position.x}px`;
-        button.style.right = "auto";
+        buttonContainer.style.left = `${position.x}px`;
+        buttonContainer.style.right = "auto";
       }
-      button.style.top = `${position.y}px`;
+      buttonContainer.style.top = `${position.y}px`;
 
-      // Click handler
-      button.addEventListener("click", (e) => {
+      // Main button click handler
+      mainButton.addEventListener("click", (e) => {
+        // ✨ NEW: Check if click was on dismiss button
+        if (e.target === dismissButton) {
+          return; // Let dismiss button handle it
+        }
+
         e.preventDefault();
         e.stopPropagation();
 
@@ -643,26 +722,26 @@
         }
       });
 
-      // Hover effects
-      button.addEventListener("mouseenter", () => {
-        button.style.transform = "translateY(-1px)";
-        button.style.boxShadow = "0 4px 12px rgba(0,0,0,0.2)";
+      // Main button hover effects
+      mainButton.addEventListener("mouseenter", () => {
+        mainButton.style.transform = "translateY(-1px)";
+        mainButton.style.boxShadow = "0 4px 12px rgba(0,0,0,0.2)";
       });
 
-      button.addEventListener("mouseleave", () => {
-        button.style.transform = "translateY(0)";
-        button.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
+      mainButton.addEventListener("mouseleave", () => {
+        mainButton.style.transform = "translateY(0)";
+        mainButton.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
       });
 
-      // Add to DOM and track
+      // Add to DOM and track the container
       const container = this.getCurrentContainer(); // 🔧 DYNAMIC: Get fresh container
-      container.appendChild(button);
-      this.activeButtons.set(config.id, button);
+      container.appendChild(buttonContainer);
+      this.activeButtons.set(config.id, buttonContainer); // ✨ NEW: Track container, not button
 
       console.log(
-        `✅ Button "${config.id}" placed at ${stackName} #${stackIndex + 1} (${
-          position.x
-        }, ${position.y})`
+        `✅ Dismissible button "${config.id}" placed at ${stackName} #${
+          stackIndex + 1
+        } (${position.x}, ${position.y})`
       );
     }
 
@@ -710,7 +789,7 @@
       }
 
       console.log(
-        `✅ Button "${id}" registered for ${stack} stack${
+        `✅ Dismissible button "${id}" registered for ${stack} stack${
           config.priority ? " (priority)" : ""
         }`
       );
@@ -870,7 +949,7 @@
         stack: "top-left",
       });
 
-      console.log("Test buttons registered");
+      console.log("Test dismissible buttons registered");
       console.log("Registry status:", window.SimpleButtonRegistry.getStatus());
 
       // Clean up after 10 seconds
@@ -909,6 +988,30 @@
       } else {
         console.log("❌ isChatRoom condition not found");
       }
+
+      console.groupEnd();
+    },
+
+    // ✨ NEW: Test dismissible functionality
+    testDismissibleButtons: async () => {
+      console.group("✨ Testing Dismissible Button Functionality");
+
+      const manager = new SimpleExtensionButtonManager("DismissTest");
+      await manager.initialize();
+
+      // Create a test button
+      await manager.registerButton({
+        id: "dismissible-test",
+        text: "🧪 Try dismissing me with [×]",
+        onClick: () => console.log("Main button clicked!"),
+        showOn: ["isMainPage"],
+        stack: "top-right",
+      });
+
+      console.log("✨ Dismissible test button created");
+      console.log(
+        "💡 Click the [×] to dismiss, it will reappear on page change"
+      );
 
       console.groupEnd();
     },
@@ -1161,8 +1264,10 @@
   };
 
   console.log(
-    `✅ ${EXTENSION_NAME} v${EXTENSION_VERSION} loaded - isChatRoom + Custom Fix! 🎯`
+    `✅ ${EXTENSION_NAME} v${EXTENSION_VERSION} loaded - Now with dismissible buttons! ✨`
   );
+  console.log("💡 All buttons now have a [×] button for temporary dismissal");
+  console.log("🔄 Dismissed buttons reappear on page changes");
 
   // Auto-test the page title detection and cache integration
   setTimeout(() => {
@@ -1178,5 +1283,10 @@
 
     // ✅ NEW: Test the chat room detection
     window.SimpleButtonUtilityTests.testChatRoomDetection();
+
+    // ✨ NEW: Test dismissible functionality
+    setTimeout(() => {
+      window.SimpleButtonUtilityTests.testDismissibleButtons();
+    }, 2000);
   }, 1000);
 })();
