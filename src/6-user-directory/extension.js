@@ -5,6 +5,7 @@
 // ✅ CONDITIONAL: Button only appears on username pages or "chat room" pages
 // 🔧 FIXED: Chat room detection with proper DOM-first title detection
 // 📝 ENHANCED: Opportunistic cache refresh during modal creation
+// 🖱️ NEW: Clickable avatars and usernames for easy navigation
 // ===================================================================
 
 // ===================================================================
@@ -360,7 +361,7 @@ const createAvatarDisplay = async (profile) => {
                 profile.username
               }: ${imageUrl.substring(0, 50)}...`
             );
-            return `<img src="${imageUrl}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;" alt="${profile.username}">`;
+            return `<img src="${imageUrl}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; cursor: pointer;" alt="${profile.username}" onclick="navigateToUserPageClean('${profile.username}')" title="Click to visit ${profile.username}'s page">`;
           }
         }
       }
@@ -379,7 +380,7 @@ const createAvatarDisplay = async (profile) => {
             profile.username
           }: ${blockText.substring(0, 50)}...`
         );
-        return `<img src="${blockText}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;" alt="${profile.username}">`;
+        return `<img src="${blockText}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; cursor: pointer;" alt="${profile.username}" onclick="navigateToUserPageClean('${profile.username}')" title="Click to visit ${profile.username}'s page">`;
       }
     }
 
@@ -401,7 +402,7 @@ const createAvatarDisplay = async (profile) => {
  */
 const createInitialsAvatar = (username) => {
   const initials = username ? username.charAt(0).toUpperCase() : "?";
-  return `<div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px;">${initials}</div>`;
+  return `<div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px; cursor: pointer;" onclick="navigateToUserPageClean('${username}')" title="Click to visit ${username}'s page">${initials}</div>`;
 };
 
 // ===================================================================
@@ -495,10 +496,10 @@ const createCleanUserDirectoryRow = async (profile, currentUser, index) => {
 
   const isCurrentUser = profile.username === currentUser?.displayName;
 
-  // ✅ USING: Enhanced avatar display
+  // ✅ USING: Enhanced avatar display (now clickable!)
   const avatarDisplay = await createAvatarDisplay(profile);
 
-  // Create clickable username
+  // Create clickable username (both avatar and username navigate to user page)
   const usernameDisplay = `
     <div style="display: flex; align-items: center; gap: 8px;">
       <span onclick="navigateToUserPageClean('${profile.username}')" 
@@ -971,7 +972,7 @@ window.navigateToUserPageClean = (username) => {
 export default {
   onload: () => {
     console.log(
-      "🎯 User Directory loading (Fixed Button Management + Chat Room Detection + Cache Integration)..."
+      "🎯 User Directory loading (Fixed Button Management + Chat Room Detection + Cache Integration + Clickable Avatars)..."
     );
 
     // ✅ STEP 1: Check Extension 1.5 dependencies
@@ -1048,13 +1049,13 @@ export default {
       "clean-user-directory",
       {
         services: cleanDirectoryServices,
-        version: "9.2.0", // 📝 Cache Integration version
+        version: "9.3.0", // 🖱️ Clickable Avatars version
       },
       {
         name: "✨ User Directory",
         description:
-          "Professional user directory with FIXED Simple Button Utility 2.0 integration, FIXED chat room conditional logic, NO fallback buttons, and OPPORTUNISTIC cache refresh",
-        version: "9.2.0",
+          "Professional user directory with FIXED Simple Button Utility 2.0 integration, FIXED chat room conditional logic, NO fallback buttons, OPPORTUNISTIC cache refresh, and CLICKABLE avatars & usernames",
+        version: "9.3.0",
         dependencies: requiredDependencies,
       }
     );
@@ -1076,7 +1077,7 @@ export default {
     // ✅ STEP 6: Success report
     const currentUser = platform.getUtility("getCurrentUser")();
     console.log(
-      "🎉 Extension SIX loaded successfully (FIXED Simple Button Utility 2.0 + Chat Room Detection + Cache Integration)!"
+      "🎉 Extension SIX loaded successfully (FIXED Simple Button Utility 2.0 + Chat Room Detection + Cache Integration + Clickable Avatars)!"
     );
     console.log("🗑️ REMOVED: All fallback button logic");
     console.log("🎯 FIXED: Proper Simple Button Utility 2.0 integration");
@@ -1084,6 +1085,7 @@ export default {
       "🔧 FIXED: Chat room detection with proper DOM-first title detection"
     );
     console.log("📝 NEW: Opportunistic cache refresh during modal creation");
+    console.log("🖱️ NEW: Clickable avatars and usernames for easy navigation");
     console.log(
       "🎯 CONDITIONAL: Button only appears on username or chat room pages"
     );
@@ -1103,14 +1105,15 @@ export default {
     return {
       extensionId: "clean-user-directory",
       services: cleanDirectoryServices,
-      version: "9.2.0",
-      status: "fixed_simple_button_utility_integration_with_cache",
+      version: "9.3.0",
+      status:
+        "fixed_simple_button_utility_integration_with_cache_and_clickable_avatars",
     };
   },
 
   onunload: () => {
     console.log(
-      "🎯 User Directory unloading (Fixed Simple Button Utility 2.0 Integration + Cache)..."
+      "🎯 User Directory unloading (Fixed Simple Button Utility 2.0 Integration + Cache + Clickable Avatars)..."
     );
 
     // 🎯 CLEAN: Proper button management cleanup
@@ -1135,7 +1138,7 @@ export default {
     delete window.navigateToUserPageClean;
 
     console.log(
-      "✅ User Directory cleanup complete (using Fixed Simple Button Utility 2.0 + Cache Integration)!"
+      "✅ User Directory cleanup complete (using Fixed Simple Button Utility 2.0 + Cache Integration + Clickable Avatars)!"
     );
   },
 };

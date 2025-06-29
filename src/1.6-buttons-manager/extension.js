@@ -84,19 +84,19 @@
     "top-left": {
       maxButtons: 2,
       positions: [
-        { x: 14, y: 6 }, // ← Updated coordinates: closer to edges
-        { x: 14, y: 48 }, // ← Proper spacing for content positioning
+        { x: 14, y: 6 }, // ← First button stays the same
+        { x: 14, y: 54 }, // ← Increased spacing: 48px apart (was 42px)
       ],
     },
 
     "top-right": {
       maxButtons: 5,
       positions: [
-        { x: -14, y: 6 }, // ← Updated: -14px from right edge (closer than -100px)
-        { x: -14, y: 48 },
-        { x: -14, y: 90 },
-        { x: -14, y: 132 },
-        { x: -14, y: 174 },
+        { x: -14, y: 6 }, // ← First button stays the same
+        { x: -14, y: 54 }, // ← 48px spacing (was 42px)
+        { x: -14, y: 102 }, // ← 48px spacing (was 42px)
+        { x: -14, y: 150 }, // ← 48px spacing (was 42px)
+        { x: -14, y: 198 }, // ← 48px spacing (was 42px)
       ],
     },
   };
@@ -641,7 +641,7 @@
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        color: rgba(255, 255, 255, 0.7);
+        color: #8b4513;
         font-size: 14px;
         font-weight: bold;
         border-radius: 2px;
@@ -650,15 +650,15 @@
         line-height: 1;
       `;
 
-      // ✨ NEW: Dismiss button hover effects
+      // ✨ NEW: Dismiss button hover effects - warm brown colors for contrast
       dismissButton.addEventListener("mouseenter", () => {
-        dismissButton.style.backgroundColor = "rgba(255, 255, 255, 0.2)";
-        dismissButton.style.color = "rgba(255, 255, 255, 0.9)";
+        dismissButton.style.backgroundColor = "rgba(139, 69, 19, 0.15)";
+        dismissButton.style.color = "#6b4423";
       });
 
       dismissButton.addEventListener("mouseleave", () => {
         dismissButton.style.backgroundColor = "transparent";
-        dismissButton.style.color = "rgba(255, 255, 255, 0.7)";
+        dismissButton.style.color = "#8b4513";
       });
 
       // ✨ NEW: Dismiss functionality
@@ -1268,6 +1268,9 @@
   );
   console.log("💡 All buttons now have a [×] button for temporary dismissal");
   console.log("🔄 Dismissed buttons reappear on page changes");
+  console.log(
+    "🧪 Manual test available: window.SimpleButtonUtilityTests.testDismissibleButtons()"
+  );
 
   // Auto-test the page title detection and cache integration
   setTimeout(() => {
@@ -1284,9 +1287,7 @@
     // ✅ NEW: Test the chat room detection
     window.SimpleButtonUtilityTests.testChatRoomDetection();
 
-    // ✨ NEW: Test dismissible functionality
-    setTimeout(() => {
-      window.SimpleButtonUtilityTests.testDismissibleButtons();
-    }, 2000);
+    // ✨ REMOVED: Auto-test dismissible functionality (was creating distracting test button)
+    // Users can manually test with: window.SimpleButtonUtilityTests.testDismissibleButtons()
   }, 1000);
 })();
