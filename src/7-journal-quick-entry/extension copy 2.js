@@ -1,13 +1,17 @@
-// 🌳 Extension 7: Journal Entry Creator - Refactored with Button Manager Integration
-// ✨ Clean integration with Extension 1.6 (Simple Button Utility 2.0)
-// 🎯 Smart journal creation with sophisticated conditional logic
-// 🎨 Standardized warm yellow styling for consistency
+// 🌳 Extension 7: Journal Entry Creator - Ultra-Nuclear with Position Enforcement
+// 🚨 Includes Position Enforcement System to fight interference
+// ✨ Auto-corrects position multiple times to ensure perfect placement
+// 🎯 NEW: Smart banner placement above topmost existing date banner
 
 const journalEntryCreator = (() => {
-  // 🌟 State Management
+  // 🌟 State Management (Simplified)
   let extensionAPI = null;
-  let buttonManager = null;
+  let quickEntryButton = null;
   let isInitialized = false;
+  let positionEnforcer = null; // NEW: Position enforcement interval
+
+  // Safety variable (Extension Six handles directory buttons)
+  let standingButton = null;
 
   // 🌟 Enhanced Logging with Registry Integration
   const log = (message, level = "INFO") => {
@@ -32,30 +36,8 @@ const journalEntryCreator = (() => {
   // 🌟 Get Platform Utilities (Leveraging Extension Suite)
   const getPlatform = () => window.RoamExtensionSuite;
   const getCoreData = () => getPlatform()?.get("core-data");
+  const getUIEngine = () => getPlatform()?.get("ui-engine");
   const getUtilities = () => getPlatform()?.getUtility;
-
-  // ═══════════════════════════════════════════════════════════════
-  // 🔧 DEPENDENCY MANAGEMENT
-  // ═══════════════════════════════════════════════════════════════
-
-  // 🌟 Check if Extension 1.6 (Simple Button Utility 2.0) is available
-  const checkButtonUtilityDependency = () => {
-    if (!window.SimpleExtensionButtonManager) {
-      log(
-        "❌ Simple Button Utility 2.0 SimpleExtensionButtonManager not found",
-        "WARN"
-      );
-      return false;
-    }
-
-    if (!window.ButtonConditions) {
-      log("❌ Simple Button Utility 2.0 ButtonConditions not found", "WARN");
-      return false;
-    }
-
-    log("✅ Simple Button Utility 2.0 properly available", "SUCCESS");
-    return true;
-  };
 
   // ═══════════════════════════════════════════════════════════════
   // 📅 DATE & FORMATTING - Using Roam Native + Simple Extensions
@@ -339,7 +321,7 @@ const journalEntryCreator = (() => {
   };
 
   // ═══════════════════════════════════════════════════════════════
-  // 🎯 SMART BANNER PLACEMENT LOGIC
+  // 🎯 NEW: SMART BANNER PLACEMENT LOGIC
   // ═══════════════════════════════════════════════════════════════
 
   // 🌟 Find topmost existing date banner for smart placement
@@ -524,7 +506,7 @@ const journalEntryCreator = (() => {
         throw new Error(`Could not find Chat Room page UID for "${pageName}"`);
       }
 
-      // 🎯 Smart placement logic
+      // 🎯 NEW: Smart placement logic
       const placement = findTopmostDateBannerPosition(pageUid);
       log(
         `📍 Placement strategy: ${placement.strategy}, order: ${placement.order}`,
@@ -590,174 +572,409 @@ const journalEntryCreator = (() => {
   };
 
   // ═══════════════════════════════════════════════════════════════
-  // 🎯 BUTTON MANAGEMENT - Extension 1.6 Integration
+  // 🚨 POSITION ENFORCEMENT SYSTEM - FIGHTS INTERFERENCE
   // ═══════════════════════════════════════════════════════════════
 
-  // 🌟 Initialize button management with Extension 1.6
-  const initializeButtonManagement = async () => {
+  // 🌟 Position Enforcement System - Your console magic built-in!
+  const enforceButtonPosition = (
+    button,
+    targetTop = "138px",
+    targetRight = "20px"
+  ) => {
+    if (!button) return;
+
+    try {
+      const computedTop = window.getComputedStyle(button).top;
+      const computedRight = window.getComputedStyle(button).right;
+
+      if (computedTop !== targetTop || computedRight !== targetRight) {
+        log(
+          `🚨 INTERFERENCE DETECTED! Position is ${computedTop},${computedRight} but should be ${targetTop},${targetRight}`,
+          "WARN"
+        );
+
+        // Apply the console magic directly!
+        button.style.setProperty("top", targetTop, "important");
+        button.style.setProperty("right", targetRight, "important");
+        button.style.setProperty("left", "auto", "important");
+        button.style.setProperty("position", "fixed", "important");
+
+        log(`✅ Position corrected to ${targetTop},${targetRight}`, "SUCCESS");
+        return true; // Position was corrected
+      }
+
+      return false; // No correction needed
+    } catch (error) {
+      log(`❌ Error in position enforcement: ${error.message}`, "ERROR");
+      return false;
+    }
+  };
+
+  // 🌟 Start continuous position monitoring
+  const startPositionEnforcement = (button) => {
+    // Clear any existing enforcer
+    if (positionEnforcer) {
+      clearInterval(positionEnforcer);
+    }
+
+    log("🛡️ Starting position enforcement system...", "INFO");
+
+    // Check position every 500ms for 10 seconds, then every 2 seconds
+    let checkCount = 0;
+
+    positionEnforcer = setInterval(() => {
+      checkCount++;
+
+      if (!button || !button.parentNode) {
+        clearInterval(positionEnforcer);
+        positionEnforcer = null;
+        log("🛡️ Position enforcement stopped - button removed", "DEBUG");
+        return;
+      }
+
+      const wasCorrected = enforceButtonPosition(button, "138px", "20px");
+
+      if (wasCorrected) {
+        log(
+          `🛡️ Position enforcement #${checkCount} - interference blocked!`,
+          "INFO"
+        );
+      }
+
+      // After 20 checks (10 seconds), reduce frequency
+      if (checkCount >= 20) {
+        clearInterval(positionEnforcer);
+
+        // Start less frequent monitoring
+        positionEnforcer = setInterval(() => {
+          if (!button || !button.parentNode) {
+            clearInterval(positionEnforcer);
+            positionEnforcer = null;
+            return;
+          }
+
+          enforceButtonPosition(button, "138px", "20px");
+        }, 2000); // Every 2 seconds
+
+        log("🛡️ Position enforcement switched to maintenance mode", "DEBUG");
+      }
+    }, 500); // Every 500ms initially
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  // 🚨 ULTRA-NUCLEAR BUTTON SYSTEM - NOW WITH ENFORCEMENT
+  // ═══════════════════════════════════════════════════════════════
+
+  // 🌟 Button management
+  const updateButtons = () => {
+    try {
+      log("🔄 Starting button update process...", "DEBUG");
+
+      const pageContext = detectPageContext();
+      log(
+        `📋 Page context result: type="${pageContext.type}", page="${pageContext.page}"`,
+        "DEBUG"
+      );
+
+      // Clear existing buttons
+      hideButtons();
+
+      // Show quick entry button only where needed
+      if (
+        pageContext.type === "username" &&
+        shouldShowUsernameButton(pageContext.page)
+      ) {
+        log("🏠 Showing USERNAME daily entry button", "INFO");
+        showQuickEntryButton("Add daily entry", () =>
+          createUsernameEntry(pageContext.page)
+        );
+      } else if (
+        pageContext.type === "chatroom" &&
+        shouldShowChatRoomButton(pageContext.page)
+      ) {
+        log("🗨️ Showing CHAT ROOM daily banner button", "INFO");
+        showQuickEntryButton("Add a daily banner?", () =>
+          createChatRoomEntry(pageContext.page)
+        );
+      } else {
+        log(`🚫 No button needed for page type: ${pageContext.type}`, "DEBUG");
+      }
+
+      log("✅ Button update process completed", "DEBUG");
+    } catch (error) {
+      log(`❌ Error updating buttons: ${error.message}`, "ERROR");
+      console.error("Button update error details:", error);
+    }
+  };
+
+  // 🌟 Show quick entry button (UI Engine + Ultra-Nuclear Fallback)
+  const showQuickEntryButton = (text, onClick) => {
+    const uiEngine = getUIEngine();
+
+    // Try UI Engine first
+    if (uiEngine?.showButton) {
+      quickEntryButton = uiEngine.showButton({
+        text,
+        icon: "✏️",
+        position: "top-right",
+        onClick: async () => {
+          try {
+            await onClick();
+            hideButtons();
+          } catch (error) {
+            log(`Button click error: ${error.message}`, "ERROR");
+          }
+        },
+      });
+      log("Quick entry button created via UI Engine", "SUCCESS");
+    } else {
+      // Fallback: Ultra-Nuclear button creation
+      log(
+        "UI Engine not available, creating ultra-nuclear button with enforcement",
+        "INFO"
+      );
+      createUltraNuclearButton(text, onClick);
+    }
+  };
+
+  // ===================================================================
+  // 🚨 ULTRA-NUCLEAR BUTTON CREATION - WITH POSITION ENFORCEMENT
+  // ===================================================================
+
+  const createUltraNuclearButton = (text, onClick) => {
     try {
       log(
-        "🎯 Journal Entry Creator: Initializing Simple Button Utility 2.0...",
+        "🚨 ULTRA-NUCLEAR BUTTON: Creating with position enforcement...",
         "INFO"
       );
 
-      // Check dependency availability
-      if (!checkButtonUtilityDependency()) {
-        log(
-          "❌ Simple Button Utility 2.0 not available - NO BUTTONS will be created",
-          "WARN"
-        );
-        log("💡 Please load Simple Button Utility 2.0 first", "WARN");
-        return {
-          success: false,
-          reason: "Simple Button Utility 2.0 not available",
-        };
-      }
+      // Remove any existing buttons (including hijacked ones)
+      const existingButtons = [
+        document.getElementById("journal-quick-entry-button"),
+        document.getElementById("journal-quick-entry-button-nuclear"),
+      ];
 
-      // Wait for Simple Button Utility 2.0 to be ready
-      let retries = 0;
-      const maxRetries = 10;
-
-      while (retries < maxRetries) {
-        try {
-          // Create button manager
-          buttonManager = new window.SimpleExtensionButtonManager(
-            "JournalEntryCreator"
-          );
-          await buttonManager.initialize();
-          break;
-        } catch (error) {
-          retries++;
-          log(
-            `⏳ Simple Button Utility 2.0 not ready, retrying... (${retries}/${maxRetries})`,
-            "DEBUG"
-          );
-          await new Promise((resolve) => setTimeout(resolve, 500));
+      existingButtons.forEach((btn) => {
+        if (btn) {
+          btn.remove();
+          log("🗑️ Removed existing button", "DEBUG");
         }
-      }
-
-      if (retries >= maxRetries) {
-        log(
-          "❌ Failed to initialize Simple Button Utility 2.0 after 10 retries",
-          "ERROR"
-        );
-        return {
-          success: false,
-          reason: "Simple Button Utility 2.0 initialization timeout",
-        };
-      }
-
-      // 🎯 EXACT STYLING: Warm yellow gradient with elegant brown border
-      const buttonStyle = {
-        background: "linear-gradient(135deg, #fffbeb, #fef3c7)", // Softer warm yellow
-        border: "1.5px solid #8b4513", // Elegant brown border
-        color: "#78716c", // Muted brown text
-        fontWeight: "600",
-        padding: "10px 16px",
-        borderRadius: "12px",
-        boxShadow: "0 4px 12px rgba(245, 158, 11, 0.3)",
-      };
-
-      // 🌟 Register Username Page Journal Entry Button
-      const usernameButtonResult = await buttonManager.registerButton({
-        id: "journal-entry-button",
-        text: "✏️ Add journal entry for today?",
-        stack: "top-right", // Position at top-right as requested
-        priority: false, // Play nice with other extensions
-        style: buttonStyle,
-        condition: () => {
-          // Custom condition function - only show if username page AND no entry exists today
-          const context = detectPageContext();
-          return (
-            context.type === "username" &&
-            shouldShowUsernameButton(context.page)
-          );
-        },
-        onClick: async () => {
-          try {
-            const context = detectPageContext();
-            await createUsernameEntry(context.page);
-            log("✅ Journal entry created successfully!", "SUCCESS");
-          } catch (error) {
-            log(`❌ Failed to create journal entry: ${error.message}`, "ERROR");
-          }
-        },
       });
 
-      // 🌟 Register Chat Room Banner Button
-      const chatRoomButtonResult = await buttonManager.registerButton({
-        id: "chat-banner-button",
-        text: "📅 Add banner for today?",
-        stack: "top-right", // Position at top-right as requested
-        priority: false, // Play nice with other extensions
-        style: buttonStyle,
-        condition: () => {
-          // Custom condition function - only show if chat room page AND no banner exists today
-          const context = detectPageContext();
-          return (
-            context.type === "chatroom" &&
-            shouldShowChatRoomButton(context.page)
+      // ULTRA-NUCLEAR BUTTON - IMMUNE TO INTERFERENCE
+      const button = document.createElement("div");
+      button.id = "journal-quick-entry-button-nuclear"; // Nuclear ID
+
+      // ULTRA-NUCLEAR STYLING - BULLETPROOF POSITIONING AT 138PX
+      const nuclearCSS = `
+        position: fixed !important;
+        top: 138px !important;
+        right: 20px !important;
+        left: auto !important;
+        background: linear-gradient(135deg, #fef3c7, #fde68a) !important;
+        border: 2px solid #f59e0b !important;
+        border-radius: 12px !important;
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3) !important;
+        z-index: 99999 !important;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+        color: #92400e !important;
+        cursor: pointer !important;
+        user-select: none !important;
+        transition: all 0.3s ease !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        padding: 12px 26px !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+        min-width: 212px !important;
+        justify-content: center !important;
+        white-space: nowrap !important;
+        box-sizing: border-box !important;
+        margin: 0 !important;
+        opacity: 1 !important;
+        transform: none !important;
+        pointer-events: auto !important;
+      `;
+
+      // Apply nuclear CSS with multiple methods for immunity
+      button.style.cssText = nuclearCSS;
+
+      // TRIPLE INSURANCE - setProperty with important
+      button.style.setProperty("position", "fixed", "important");
+      button.style.setProperty("top", "138px", "important");
+      button.style.setProperty("right", "20px", "important");
+      button.style.setProperty("left", "auto", "important");
+      button.style.setProperty("z-index", "99999", "important");
+
+      button.innerHTML = `
+        <span style="font-size: 16px;">✏️</span>
+        <span>${text}</span>
+      `;
+
+      // ULTRA-NUCLEAR CLICK HANDLER
+      button.addEventListener("click", async () => {
+        try {
+          log("🚨 Ultra-nuclear button clicked!", "INFO");
+
+          // Visual feedback
+          button.innerHTML = `<span style="font-size: 16px;">⏳</span><span>Creating...</span>`;
+          button.style.setProperty(
+            "background",
+            "linear-gradient(135deg, #fde68a, #fcd34d)",
+            "important"
           );
-        },
-        onClick: async () => {
-          try {
-            const context = detectPageContext();
-            await createChatRoomEntry(context.page);
-            log("✅ Daily banner created successfully!", "SUCCESS");
-          } catch (error) {
-            log(`❌ Failed to create daily banner: ${error.message}`, "ERROR");
-          }
-        },
+
+          await onClick();
+
+          // Success feedback
+          button.innerHTML = `<span style="font-size: 16px;">✅</span><span>Entry Added!</span>`;
+          button.style.setProperty(
+            "background",
+            "linear-gradient(135deg, #10b981, #059669)",
+            "important"
+          );
+          button.style.setProperty("border-color", "#047857", "important");
+          button.style.setProperty("color", "#065f46", "important");
+
+          // Hide after success
+          setTimeout(() => {
+            if (button && button.parentNode) {
+              button.remove();
+              quickEntryButton = null;
+              // Stop position enforcement when button is removed
+              if (positionEnforcer) {
+                clearInterval(positionEnforcer);
+                positionEnforcer = null;
+              }
+            }
+          }, 2000);
+        } catch (error) {
+          log(`Ultra-nuclear button click error: ${error.message}`, "ERROR");
+
+          // Error feedback
+          button.innerHTML = `<span style="font-size: 16px;">❌</span><span>Try Again</span>`;
+          button.style.setProperty(
+            "background",
+            "linear-gradient(135deg, #f87171, #ef4444)",
+            "important"
+          );
+          button.style.setProperty("border-color", "#dc2626", "important");
+          button.style.setProperty("color", "#7f1d1d", "important");
+
+          // Reset after error
+          setTimeout(() => {
+            button.innerHTML = `<span style="font-size: 16px;">✏️</span><span>${text}</span>`;
+            button.style.setProperty(
+              "background",
+              "linear-gradient(135deg, #fef3c7, #fde68a)",
+              "important"
+            );
+            button.style.setProperty("border-color", "#f59e0b", "important");
+            button.style.setProperty("color", "#92400e", "important");
+          }, 3000);
+        }
       });
 
-      // Report results
-      let successCount = 0;
-      if (usernameButtonResult.success) {
-        log(
-          `✅ Journal entry button registered at ${usernameButtonResult.stack}`,
-          "SUCCESS"
+      // ULTRA-NUCLEAR HOVER EFFECTS
+      button.addEventListener("mouseenter", () => {
+        button.style.setProperty(
+          "transform",
+          "translateY(-2px) scale(1.02)",
+          "important"
         );
-        successCount++;
-      } else {
-        log(
-          `❌ Failed to register journal entry button: ${usernameButtonResult.error}`,
-          "ERROR"
+        button.style.setProperty(
+          "box-shadow",
+          "0 6px 16px rgba(245, 158, 11, 0.4)",
+          "important"
         );
-      }
+        button.style.setProperty(
+          "background",
+          "linear-gradient(135deg, #fde68a, #fcd34d)",
+          "important"
+        );
+      });
 
-      if (chatRoomButtonResult.success) {
-        log(
-          `✅ Chat room banner button registered at ${chatRoomButtonResult.stack}`,
-          "SUCCESS"
+      button.addEventListener("mouseleave", () => {
+        button.style.setProperty("transform", "none", "important");
+        button.style.setProperty(
+          "box-shadow",
+          "0 4px 12px rgba(245, 158, 11, 0.3)",
+          "important"
         );
-        successCount++;
-      } else {
-        log(
-          `❌ Failed to register chat room banner button: ${chatRoomButtonResult.error}`,
-          "ERROR"
+        button.style.setProperty(
+          "background",
+          "linear-gradient(135deg, #fef3c7, #fde68a)",
+          "important"
         );
-      }
+      });
 
-      if (successCount > 0) {
-        log(
-          `🎉 Button management initialized successfully! (${successCount}/2 buttons registered)`,
-          "SUCCESS"
-        );
-        log(
-          "🎯 Buttons will appear based on sophisticated conditional logic",
-          "INFO"
-        );
-        return { success: true, registeredButtons: successCount };
-      } else {
-        log("❌ No buttons were successfully registered", "ERROR");
-        return { success: false, reason: "Button registration failed" };
-      }
-    } catch (error) {
+      // ULTRA-NUCLEAR DEPLOYMENT
+      document.body.appendChild(button);
+      quickEntryButton = button;
+
+      // 🛡️ START POSITION ENFORCEMENT SYSTEM!
+      startPositionEnforcement(button);
+
+      // Immediate enforcement after creation
+      setTimeout(() => enforceButtonPosition(button, "138px", "20px"), 50);
+      setTimeout(() => enforceButtonPosition(button, "138px", "20px"), 200);
+      setTimeout(() => enforceButtonPosition(button, "138px", "20px"), 500);
+
       log(
-        `❌ Button management initialization failed: ${error.message}`,
-        "ERROR"
+        "🚨 ULTRA-NUCLEAR BUTTON DEPLOYED WITH POSITION ENFORCEMENT!",
+        "SUCCESS"
       );
-      return { success: false, reason: error.message };
+      log("📍 Target Position: 138px from top, 20px from right", "INFO");
+      log("🛡️ Position enforcement system activated", "INFO");
+
+      return button;
+    } catch (error) {
+      log(`💥 Ultra-nuclear button creation failed: ${error.message}`, "ERROR");
+      throw error;
+    }
+  };
+
+  // 🌟 Enhanced hide function with enforcement cleanup
+  const hideButtons = () => {
+    // Stop position enforcement
+    if (positionEnforcer) {
+      clearInterval(positionEnforcer);
+      positionEnforcer = null;
+      log("🛡️ Position enforcement stopped", "DEBUG");
+    }
+
+    // Hide quick entry button (both IDs)
+    const buttonIds = [
+      "journal-quick-entry-button",
+      "journal-quick-entry-button-nuclear",
+    ];
+
+    buttonIds.forEach((id) => {
+      const button = document.getElementById(id);
+      if (button) {
+        button.remove();
+        log(`🗑️ Removed button: ${id}`, "DEBUG");
+      }
+    });
+
+    if (quickEntryButton) {
+      if (quickEntryButton.remove) {
+        quickEntryButton.remove();
+      } else if (quickEntryButton.parentNode) {
+        quickEntryButton.parentNode.removeChild(quickEntryButton);
+      }
+      quickEntryButton = null;
+    }
+
+    // Hide standing button
+    if (standingButton) {
+      if (standingButton.remove) {
+        standingButton.remove();
+      } else if (standingButton.parentNode) {
+        standingButton.parentNode.removeChild(standingButton);
+      }
+      standingButton = null;
     }
   };
 
@@ -779,7 +996,7 @@ const journalEntryCreator = (() => {
       window.journalEntryCreatorActive = true;
 
       log(
-        "Journal Entry Creator v2.0 - Button Manager Integration loading...",
+        "Journal Entry Creator v1.1 - Ultra-Nuclear with Smart Banner Placement loading...",
         "SUCCESS"
       );
       extensionAPI = api;
@@ -792,7 +1009,7 @@ const journalEntryCreator = (() => {
             id: "enableQuickEntry",
             name: "Enable Quick Entry Buttons",
             description:
-              "Show smart journal entry buttons on username and chat room pages",
+              "Show quick entry buttons on username and chat room pages",
             action: { type: "switch" },
           },
         ],
@@ -804,11 +1021,10 @@ const journalEntryCreator = (() => {
         createChatRoomEntry,
         detectPageContext,
         getUserJournalColor,
+        updateButtons,
         getTodaysRoamDate,
         getTodaysDayName,
-        findTopmostDateBannerPosition,
-        shouldShowUsernameButton,
-        shouldShowChatRoomButton,
+        findTopmostDateBannerPosition, // NEW: Expose smart placement function
       };
 
       if (window.RoamExtensionSuite) {
@@ -816,14 +1032,10 @@ const journalEntryCreator = (() => {
           "journal-entry-creator",
           journalAPI,
           {
-            version: "2.0.0-button-manager-integration",
-            dependencies: [
-              "core-data",
-              "extension-1.5",
-              "simple-button-utility",
-            ],
+            version: "1.1.0-smart-placement",
+            dependencies: ["core-data", "ui-engine", "extension-1.5"],
             description:
-              "Smart journal entry creation with Button Manager integration and sophisticated conditional logic",
+              "Lean journal entry creation + Smart Banner Placement + Ultra-Nuclear Button with Position Enforcement",
           }
         );
       }
@@ -833,57 +1045,71 @@ const journalEntryCreator = (() => {
 
       isInitialized = true;
 
-      // Initialize button management with proper delay
-      setTimeout(async () => {
-        try {
-          const result = await initializeButtonManagement();
-          if (result.success) {
-            log("🎉 Button management initialized successfully!", "SUCCESS");
-          } else {
-            log(`⚠️ Button management failed: ${result.reason}`, "WARN");
-          }
-        } catch (error) {
-          log(
-            `❌ Failed to initialize button management: ${error.message}`,
-            "ERROR"
-          );
-        }
-      }, 2000); // Delay to ensure Extension 1.6 is ready
+      // Setup monitoring and initial button check
+      setTimeout(() => {
+        updateButtons();
+        setupPageMonitoring();
+      }, 1000);
 
       log(
-        "Journal Entry Creator loaded successfully with Button Manager Integration!",
+        "Journal Entry Creator loaded successfully with Smart Banner Placement!",
         "SUCCESS"
       );
-      log("🗑️ REMOVED: Ultra-nuclear button system", "INFO");
-      log(
-        "🎯 NEW: Extension 1.6 (Simple Button Utility 2.0) integration",
-        "INFO"
-      );
-      log("🎨 STYLING: Standardized warm yellow with brown border", "INFO");
-      log("✨ CONDITIONAL: Sophisticated logic for button visibility", "INFO");
-      log("📍 POSITION: Top-right stack for action buttons", "INFO");
     } catch (error) {
       log(`Error loading Journal Entry Creator: ${error.message}`, "ERROR");
     }
+  };
+
+  // 🌟 Simple page monitoring
+  const setupPageMonitoring = () => {
+    let lastUrl = window.location.href;
+
+    const checkForPageChange = () => {
+      const currentUrl = window.location.href;
+      if (currentUrl !== lastUrl) {
+        lastUrl = currentUrl;
+        setTimeout(updateButtons, 500);
+      }
+    };
+
+    // Monitor URL changes
+    setInterval(checkForPageChange, 1000);
+
+    // Monitor DOM changes for dynamic navigation
+    const observer = new MutationObserver((mutations) => {
+      const hasSignificantChange = mutations.some(
+        (mutation) =>
+          mutation.type === "childList" &&
+          mutation.addedNodes.length > 0 &&
+          Array.from(mutation.addedNodes).some(
+            (node) =>
+              node.nodeType === 1 &&
+              (node.classList?.contains("roam-article") ||
+                node.classList?.contains("roam-log-container"))
+          )
+      );
+
+      if (hasSignificantChange) {
+        setTimeout(updateButtons, 300);
+      }
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
   };
 
   const onunload = () => {
     try {
       log("Journal Entry Creator unloading...", "INFO");
 
-      // Clean up button management
-      if (buttonManager) {
-        try {
-          buttonManager.cleanup();
-          log("✅ Button management cleaned up", "SUCCESS");
-        } catch (error) {
-          log(`❌ Button manager cleanup error: ${error.message}`, "ERROR");
-        }
-      }
-
+      hideButtons();
       isInitialized = false;
       extensionAPI = null;
-      buttonManager = null;
+
+      // Clean up position enforcer
+      if (positionEnforcer) {
+        clearInterval(positionEnforcer);
+        positionEnforcer = null;
+      }
 
       // Clean up instance protection
       if (window.journalEntryCreatorActive) {
