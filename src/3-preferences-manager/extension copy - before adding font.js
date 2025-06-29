@@ -66,37 +66,6 @@ const CONFIGURATION_SCHEMAS = {
       ].includes(value) || "Invalid color option",
   },
 
-  "Graph Display Font": {
-    type: "select",
-    description: "Font family for graph display and interface elements",
-    options: [
-      "Noto Sans", // Default - comprehensive, neutral
-      "Georgia", // Serif - classic, readable
-      "Merriweather", // Serif - modern, web-optimized
-      "Avenir", // Sans - geometric, clean
-      "Roboto", // Sans - modern, friendly
-      "Inter", // Sans - popular for UI/interfaces
-      "Source Sans Pro", // Sans - professional, Adobe design
-      "Playfair Display", // Serif - elegant, display font
-      "Lato", // Sans - humanist, approachable
-      "Crimson Text", // Serif - scholarly, traditional
-    ],
-    default: "Noto Sans",
-    validation: (value) =>
-      [
-        "Noto Sans",
-        "Georgia",
-        "Merriweather",
-        "Avenir",
-        "Roboto",
-        "Inter",
-        "Source Sans Pro",
-        "Playfair Display",
-        "Lato",
-        "Crimson Text",
-      ].includes(value) || "Invalid font option",
-  },
-
   "Personal Shortcuts": {
     type: "array",
     description: "Personal navigation shortcuts (recommended: 8-10 pages)",
