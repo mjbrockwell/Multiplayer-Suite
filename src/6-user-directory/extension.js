@@ -1042,7 +1042,7 @@ window.clearDebugLog = () => {
 };
 
 /**
- * Navigate to user page helper function (WITH CLEAN DEBUG WINDOW)
+ * Navigate to user page helper function (FIXED - Uses Page UID!)
  */
 window.navigateToUserPageClean = (username) => {
   // Create debug window first
@@ -1067,68 +1067,72 @@ window.navigateToUserPageClean = (username) => {
       return;
     }
 
-    // Get graph name with multiple methods
+    // Get graph name
     let graphName = null;
-
-    // Method 1: Direct API call
     try {
       graphName = window.roamAlphaAPI.graph.name;
-      debugLog(`Graph name (API): "${graphName}"`);
+      debugLog(`Graph name: "${graphName}"`);
     } catch (error) {
       debugLog(`Graph API failed: ${error.message}`, "error");
-    }
-
-    // Method 2: Extract from URL
-    try {
-      const urlMatch = window.location.href.match(/#\/app\/([^\/]+)/);
-      const urlGraphName = urlMatch ? decodeURIComponent(urlMatch[1]) : null;
-      debugLog(`Graph name (URL): "${urlGraphName}"`);
-
-      if (!graphName && urlGraphName) {
-        graphName = urlGraphName;
-        debugLog("Using URL-extracted graph name", "warn");
-      }
-    } catch (error) {
-      debugLog(`URL extraction failed: ${error.message}`, "error");
-    }
-
-    if (!graphName) {
-      debugLog("CRITICAL: No graph name found!", "error");
       return;
     }
 
-    // Construct target URL
-    const encodedUsername = encodeURIComponent(username);
-    debugLog(`Encoded username: "${encodedUsername}"`);
+    // 🎯 CRITICAL FIX: Get page UID instead of using title!
+    debugLog("=== LOOKING UP PAGE UID ===");
 
-    // Test different URL patterns
-    const urlPatterns = [
-      `#/app/${graphName}/page/${encodedUsername}`,
-      `/#/app/${graphName}/page/${encodedUsername}`,
-      `#/app/${encodeURIComponent(graphName)}/page/${encodedUsername}`,
-      `#/page/${encodedUsername}`,
-    ];
+    const pageUidQuery = `
+      [:find ?uid 
+       :where 
+       [?page :node/title "${username}"]
+       [?page :block/uid ?uid]]
+    `;
 
-    debugLog("=== URL PATTERNS TO TRY ===");
-    urlPatterns.forEach((url, i) => {
-      debugLog(`Pattern ${i + 1}: ${url}`);
-    });
+    debugLog(`Page UID query: ${pageUidQuery}`);
 
-    const targetUrl = urlPatterns[0]; // Use first pattern
-    debugLog(`Selected target URL: ${targetUrl}`, "success");
+    let pageUid = null;
+    try {
+      const pageUidResult = window.roamAlphaAPI.data.fast.q(pageUidQuery);
+      pageUid = pageUidResult?.[0]?.[0];
+      debugLog(`Page UID result: ${pageUid}`);
+    } catch (error) {
+      debugLog(`Page UID query failed: ${error.message}`, "error");
+      return;
+    }
+
+    if (!pageUid) {
+      debugLog(
+        `CRITICAL: No page UID found for username "${username}"`,
+        "error"
+      );
+      debugLog("This means the user page doesn't exist in Roam", "error");
+      return;
+    }
+
+    debugLog(
+      `✅ Found page UID: "${pageUid}" for username: "${username}"`,
+      "success"
+    );
+
+    // 🎯 CONSTRUCT CORRECT URL using UID (not title!)
+    const targetUrl = `#/app/${graphName}/page/${pageUid}`;
+    debugLog(`✅ Correct target URL: ${targetUrl}`, "success");
+
+    // Compare with old (broken) method
+    const oldBrokenUrl = `#/app/${graphName}/page/${encodeURIComponent(
+      username
+    )}`;
+    debugLog(`❌ Old broken URL would have been: ${oldBrokenUrl}`, "warn");
 
     // CAPTURE BEFORE STATE
     debugLog("=== BEFORE NAVIGATION ===");
     debugLog(`Before URL: ${window.location.href}`);
     debugLog(`Before hash: ${window.location.hash}`);
 
-    // ATTEMPT NAVIGATION
-    debugLog("=== ATTEMPTING NAVIGATION ===");
-
-    // Method 1: Direct hash change (often more reliable in SPAs)
-    debugLog("Trying window.location.hash assignment...");
+    // ATTEMPT NAVIGATION with correct UID
+    debugLog("=== ATTEMPTING NAVIGATION (with UID) ===");
+    debugLog("Using window.location.hash assignment...");
     window.location.hash = targetUrl.replace("#", "");
-    debugLog("Hash assignment completed", "success");
+    debugLog("UID-based hash assignment completed", "success");
 
     // DELAY TO CHECK RESULTS
     setTimeout(() => {
@@ -1138,18 +1142,17 @@ window.navigateToUserPageClean = (username) => {
 
       // Check if we ended up where we intended
       const currentHash = window.location.hash;
-      const expectedPath = targetUrl.replace("#", "");
+      const expectedUid = pageUid;
 
-      if (currentHash.includes(expectedPath)) {
-        debugLog("✅ SUCCESS: Navigation reached target!", "success");
-      } else if (currentHash.includes(encodedUsername)) {
+      if (currentHash.includes(expectedUid)) {
+        debugLog("🎉 SUCCESS: Navigation reached correct page UID!", "success");
         debugLog(
-          "⚠️ PARTIAL: Username found in URL but path different",
-          "warn"
+          `✅ Found expected UID "${expectedUid}" in current URL`,
+          "success"
         );
       } else {
-        debugLog("❌ FAILED: Navigation did not reach target", "error");
-        debugLog(`Expected path: ${expectedPath}`);
+        debugLog("❌ FAILED: UID not found in current URL", "error");
+        debugLog(`Expected UID: ${expectedUid}`);
         debugLog(`Actual hash: ${currentHash}`);
       }
 
