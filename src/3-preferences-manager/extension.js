@@ -2445,43 +2445,49 @@ export default {
           }
         }
 
-        // 🌈 JOURNAL COLOR DISCREPANCY CHECK - Load-time Checkpoint
+        // 🎯 SURGICAL COLOR AUTO-FIX - Automatic startup color correction
         console.log(
-          "🌈 [COLOR CHECK] Checking journal color discrepancy on startup..."
+          "🎯 [SURGICAL AUTO-FIX] Running automatic color correction on startup..."
         );
 
         try {
-          const colorDiscrepancy = await checkJournalColorDiscrepancy(
+          const surgicalResult = await surgicalUpdateJournalColorTags(
             user.displayName
           );
 
-          if (colorDiscrepancy.hasDiscrepancy) {
-            console.log(`⚠️ [COLOR DISCREPANCY] ${colorDiscrepancy.reason}`);
-            console.log(`   Expected: ${colorDiscrepancy.savedColor}`);
-            console.log(
-              `   Found other colors:`,
-              colorDiscrepancy.foundOtherColors
-            );
-            console.log(
-              '💡 Run "Color: Auto-Fix Journal Color Discrepancy" to fix'
-            );
-            console.log(
-              '🎯 Or use "Color: Surgical Journal Update" for precision updates'
-            );
-          } else {
-            console.log(`✅ [COLOR CHECK] ${colorDiscrepancy.reason}`);
-            if (colorDiscrepancy.savedColor) {
+          if (surgicalResult.success) {
+            if (surgicalResult.changed > 0) {
+              console.log(`🎯 ✅ Automatic surgical update completed!`);
+              console.log(`   ${surgicalResult.message}`);
               console.log(
-                `   Current journal color: ${colorDiscrepancy.savedColor}`
+                `   Target: ${surgicalResult.targetColor} (${surgicalResult.targetTag})`
               );
+            } else {
+              console.log(
+                `✅ [SURGICAL CHECK] No color tags found in Journal:: block - nothing to update`
+              );
+              if (surgicalResult.targetColor) {
+                console.log(
+                  `   Current preference: ${surgicalResult.targetColor}`
+                );
+              }
+            }
+          } else {
+            console.log(
+              `ℹ️ [SURGICAL CHECK] ${
+                surgicalResult.message || surgicalResult.error
+              }`
+            );
+            if (
+              surgicalResult.error &&
+              !surgicalResult.error.includes("No Journal:: block")
+            ) {
+              console.warn(`⚠️ Surgical update issue: ${surgicalResult.error}`);
             }
           }
         } catch (colorError) {
-          console.warn(
-            "⚠️ Color discrepancy check warning:",
-            colorError.message
-          );
-          console.log("   Color system is available but check failed");
+          console.warn("⚠️ Surgical color update warning:", colorError.message);
+          console.log("   Color system is available but auto-fix failed");
         }
 
         console.log(
