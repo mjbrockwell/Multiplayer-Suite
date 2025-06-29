@@ -1,13 +1,387 @@
 // ===================================================================
-// Extension 3: Configuration Manager - RESURRECTED with Font System
-// 🎵 Parrot Duet Edition: "O mio babbino caro" - Now sings beautifully!
-// 🎨 NEW: Dynamic font application system for entire Roam graph
+// Extension 3: Configuration Manager - SMART FONT SYSTEM UPGRADE
+// 🎵 Parrot Duet Edition: "O mio babbino caro" - Now with bulletproof fonts!
+// 🎨 NEW: Complete smart font system with web font loading capabilities
+// 🚀 INTEGRATED: Extension 14's proven font loading architecture
 // Uses proven step-by-step + retry pattern from working Subjournals extension
 // Format: **Field Name:** (bold single colons, not double like Extension 2)
 // ===================================================================
 
 // ===================================================================
-// 🎨 CONFIGURATION SCHEMAS - Define all possible settings
+// 🎨 SMART FONT SYSTEM - Complete Font Registry & Loading
+// ===================================================================
+
+/**
+ * 🎨 FONT_REGISTRY - Smart Font Classification System
+ * Categorizes fonts as system (local) or webfont (Google Fonts)
+ * Provides fallback chains for bulletproof font handling
+ */
+const FONT_REGISTRY = [
+  // System fonts - No loading required
+  { name: "Noto Sans", type: "system", fallback: "sans-serif" },
+  { name: "Georgia", type: "system", fallback: "serif" },
+  { name: "Avenir", type: "system", fallback: "sans-serif" },
+
+  // Google Web Fonts - Require loading
+  {
+    name: "Merriweather",
+    type: "webfont",
+    fallback: "serif",
+    source: "google",
+  },
+  {
+    name: "Crimson Text",
+    type: "webfont",
+    fallback: "serif",
+    source: "google",
+  },
+  { name: "Lora", type: "webfont", fallback: "serif", source: "google" },
+  {
+    name: "Playfair Display",
+    type: "webfont",
+    fallback: "serif",
+    source: "google",
+  },
+  {
+    name: "Source Serif Pro",
+    type: "webfont",
+    fallback: "serif",
+    source: "google",
+  },
+  { name: "Roboto", type: "webfont", fallback: "sans-serif", source: "google" },
+  { name: "Inter", type: "webfont", fallback: "sans-serif", source: "google" },
+  {
+    name: "Source Sans Pro",
+    type: "webfont",
+    fallback: "sans-serif",
+    source: "google",
+  },
+  { name: "Lato", type: "webfont", fallback: "sans-serif", source: "google" },
+];
+
+/**
+ * 🌐 Smart Web Font Loading System
+ * Loads Google Fonts with proper error handling and caching
+ */
+const loadWebFont = (fontName, source) => {
+  return new Promise((resolve) => {
+    console.log(`🎨 Loading web font: ${fontName} from ${source}`);
+
+    if (source === "google") {
+      // Check if already loaded (caching optimization)
+      const fontFamily = fontName.replace(/\s+/g, "+");
+      const existingLink = document.querySelector(
+        `link[href*="${fontFamily}"]`
+      );
+
+      if (existingLink) {
+        console.log(`✅ Font already loaded: ${fontName}`);
+        resolve(true);
+        return;
+      }
+
+      // Load from Google Fonts with comprehensive weights
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = `https://fonts.googleapis.com/css2?family=${fontFamily}:ital,wght@0,400;0,700;1,400&display=swap`;
+
+      // Professional loading with timeout
+      let loaded = false;
+
+      link.onload = () => {
+        if (!loaded) {
+          loaded = true;
+          console.log(`✅ Web font loaded successfully: ${fontName}`);
+          resolve(true);
+        }
+      };
+
+      link.onerror = () => {
+        if (!loaded) {
+          loaded = true;
+          console.error(`❌ Failed to load web font: ${fontName}`);
+          resolve(false);
+        }
+      };
+
+      // 3 second timeout for font loading
+      setTimeout(() => {
+        if (!loaded) {
+          loaded = true;
+          console.warn(`⏰ Font loading timeout: ${fontName}`);
+          resolve(false);
+        }
+      }, 3000);
+
+      document.head.appendChild(link);
+    } else {
+      // Non-Google fonts not supported yet
+      console.warn(`⚠️ Unsupported font source: ${source}`);
+      resolve(false);
+    }
+  });
+};
+
+/**
+ * 🎨 Enhanced Font Application with Smart Loading
+ * Replaces the basic applyUserFont with intelligent web font support
+ */
+const applyUserFont = async (username = null) => {
+  try {
+    console.log("🎨 [SMART FONT] Applying user font preference...");
+
+    // Get current user if not provided
+    if (!username) {
+      const platform = window.RoamExtensionSuite;
+      const getAuthenticatedUser = platform?.getUtility("getAuthenticatedUser");
+      const user = getAuthenticatedUser();
+
+      if (!user) {
+        console.log("ℹ️ No authenticated user - applying default font");
+        username = null;
+      } else {
+        username = user.displayName;
+      }
+    }
+
+    let selectedFont = "Noto Sans"; // Safe default
+
+    if (username) {
+      // Read user's font preference
+      const userFont = await getUserPreferenceBulletproof(
+        username,
+        "Graph Display Font"
+      );
+
+      if (userFont && typeof userFont === "string") {
+        selectedFont = userFont;
+        console.log(`🎨 User font preference found: ${selectedFont}`);
+      } else {
+        console.log(
+          `🎨 No font preference found, using default: ${selectedFont}`
+        );
+      }
+    }
+
+    // STEP 1: Look up font info in registry
+    const fontInfo = FONT_REGISTRY.find((f) => f.name === selectedFont);
+
+    if (!fontInfo) {
+      console.error(
+        `❌ Unknown font: ${selectedFont}, falling back to Noto Sans`
+      );
+      return await applySystemFont("Noto Sans");
+    }
+
+    console.log(`🎨 Font info: ${fontInfo.name} (${fontInfo.type})`);
+
+    // STEP 2: Load web font if needed
+    if (fontInfo.type === "webfont") {
+      console.log(`🌐 Loading web font: ${fontInfo.name}`);
+
+      const loaded = await loadWebFont(fontInfo.name, fontInfo.source);
+
+      if (!loaded) {
+        console.error(`❌ Failed to load web font: ${fontInfo.name}`);
+        return await applyFontWithFallback(fontInfo);
+      }
+
+      // Wait for font to register in browser
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      console.log(`✅ Web font loaded and registered: ${fontInfo.name}`);
+    }
+
+    // STEP 3: Apply font to graph
+    const result = await applyFontToGraph(fontInfo);
+
+    if (result.success) {
+      console.log(`🎉 Font applied successfully: ${fontInfo.name}`);
+      return { success: true, font: fontInfo.name, type: fontInfo.type };
+    } else {
+      console.error(`❌ Font application failed: ${result.error}`);
+      return await applyFontWithFallback(fontInfo);
+    }
+  } catch (error) {
+    console.error("❌ [SMART FONT] Error in applyUserFont:", error);
+    return await applySystemFont("Noto Sans");
+  }
+};
+
+/**
+ * 🎨 Apply Font to Entire Roam Graph
+ * Handles the actual CSS application with proper font stacks
+ */
+const applyFontToGraph = async (fontInfo) => {
+  try {
+    // Ensure font styles are injected
+    ensureRoamFontStyles();
+
+    // Build proper font stack
+    const fontStack =
+      fontInfo.type === "system"
+        ? `${fontInfo.name}, ${fontInfo.fallback}`
+        : `"${fontInfo.name}", ${fontInfo.fallback}`;
+
+    console.log(`🎨 Applying font stack: ${fontStack}`);
+
+    // Apply via CSS custom property
+    document.documentElement.style.setProperty("--roam-font", fontStack);
+
+    return { success: true, fontStack };
+  } catch (error) {
+    console.error("❌ Error applying font to graph:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * 🛡️ Apply System Font (Fallback Helper)
+ * For reliable fallback to system fonts
+ */
+const applySystemFont = async (fontName) => {
+  try {
+    const systemFont = FONT_REGISTRY.find(
+      (f) => f.name === fontName && f.type === "system"
+    );
+
+    if (!systemFont) {
+      console.error(`❌ Invalid system font: ${fontName}`);
+      return { success: false, error: `Invalid system font: ${fontName}` };
+    }
+
+    const result = await applyFontToGraph(systemFont);
+
+    if (result.success) {
+      console.log(`✅ System font applied: ${fontName}`);
+      return { success: true, font: fontName, type: "system", fallback: true };
+    } else {
+      return { success: false, error: result.error };
+    }
+  } catch (error) {
+    console.error(`❌ Error applying system font ${fontName}:`, error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * 🔄 Apply Font with Intelligent Fallback
+ * Tries multiple fallback strategies for maximum reliability
+ */
+const applyFontWithFallback = async (fontInfo) => {
+  console.log(`🔄 Attempting fallback for font: ${fontInfo.name}`);
+
+  // Strategy 1: Try applying with system fallback only
+  try {
+    const fallbackStack = `${fontInfo.fallback}, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`;
+    document.documentElement.style.setProperty("--roam-font", fallbackStack);
+
+    console.log(`✅ Fallback applied: ${fallbackStack}`);
+    return {
+      success: true,
+      font: fontInfo.fallback,
+      type: "fallback",
+      originalFont: fontInfo.name,
+    };
+  } catch (error) {
+    console.error("❌ Fallback strategy 1 failed:", error);
+  }
+
+  // Strategy 2: Fall back to reliable system font
+  console.log("🔄 Trying ultimate fallback: Georgia");
+  return await applySystemFont("Georgia");
+};
+
+/**
+ * 🎨 Ensure Roam Font CSS Styles (Enhanced)
+ * Creates comprehensive CSS rules with better targeting
+ */
+const ensureRoamFontStyles = () => {
+  const styleId = "roam-smart-font-styles";
+
+  // Check if styles already exist
+  if (document.getElementById(styleId)) {
+    return; // Already injected
+  }
+
+  console.log("🎨 Injecting enhanced Roam font CSS styles...");
+
+  const fontStyles = `
+    /* Smart Font System - CSS Custom Properties */
+    :root {
+      --roam-font: 'Noto Sans', sans-serif;
+    }
+    
+    /* Main Content - All div elements */
+    div {
+        font-family: var(--roam-font) !important;
+        line-height: 1.2em;
+    }
+    
+    /* Global Article Styling */
+    .roam-body .roam-app .roam-main .roam-article {
+        color: #330033;
+        font-size: 18px; 
+        font-family: var(--roam-font) !important;
+    }    
+    
+    /* Block Text */
+    .rm-block-text {
+        font-family: var(--roam-font) !important;
+    }
+    
+    /* Headers - All Levels */
+    .rm-heading-level-1,
+    .rm-heading-level-2,
+    .rm-heading-level-3 {
+        font-family: var(--roam-font) !important;
+        line-height: 1.2em;
+    }
+    
+    .rm-block.rm-heading-level-1 span,
+    .rm-block.rm-heading-level-2 span,
+    .rm-block.rm-heading-level-3 span {
+        font-family: var(--roam-font) !important;
+        line-height: 1.2em;
+    }
+    
+    /* Edit Mode */
+    .rm-block-input {
+        font-family: var(--roam-font) !important;
+    }
+
+    /* Roam Article and Blocks */
+    .roam-article, 
+    .roam-block,
+    .rm-block {
+        font-family: var(--roam-font) !important;
+    }
+    
+    /* Page Title */
+    .rm-title-display {
+        font-family: var(--roam-font) !important;
+    }
+    
+    /* Sidebar */
+    .roam-sidebar-container {
+        font-family: var(--roam-font) !important;
+    }
+    
+    /* References */
+    .rm-reference-main {
+        font-family: var(--roam-font) !important;
+    }
+  `;
+
+  const styleElement = document.createElement("style");
+  styleElement.id = styleId;
+  styleElement.textContent = fontStyles;
+  document.head.appendChild(styleElement);
+
+  console.log("✅ Enhanced Roam font CSS styles injected");
+};
+
+// ===================================================================
+// 🚀 CONFIGURATION SCHEMAS - Updated with Complete Font Registry
 // ===================================================================
 
 const CONFIGURATION_SCHEMAS = {
@@ -69,33 +443,13 @@ const CONFIGURATION_SCHEMAS = {
 
   "Graph Display Font": {
     type: "select",
-    description: "Font family for graph display and interface elements",
-    options: [
-      "Noto Sans", // Default - comprehensive, neutral
-      "Georgia", // Serif - classic, readable
-      "Merriweather", // Serif - modern, web-optimized
-      "Avenir", // Sans - geometric, clean
-      "Roboto", // Sans - modern, friendly
-      "Inter", // Sans - popular for UI/interfaces
-      "Source Sans Pro", // Sans - professional, Adobe design
-      "Playfair Display", // Serif - elegant, display font
-      "Lato", // Sans - humanist, approachable
-      "Crimson Text", // Serif - scholarly, traditional
-    ],
+    description:
+      "Font family for graph display and interface elements (includes web fonts)",
+    options: FONT_REGISTRY.map((font) => font.name), // Dynamic from registry
     default: "Noto Sans",
     validation: (value) =>
-      [
-        "Noto Sans",
-        "Georgia",
-        "Merriweather",
-        "Avenir",
-        "Roboto",
-        "Inter",
-        "Source Sans Pro",
-        "Playfair Display",
-        "Lato",
-        "Crimson Text",
-      ].includes(value) || "Invalid font option",
+      FONT_REGISTRY.some((font) => font.name === value) ||
+      "Invalid font option",
   },
 
   "Personal Shortcuts": {
@@ -113,129 +467,69 @@ const CONFIGURATION_SCHEMAS = {
 };
 
 // ===================================================================
-// 🎨 FONT APPLICATION SYSTEM - Dynamic Graph Font Management
+// 🧪 FONT TESTING & DEBUGGING UTILITIES
 // ===================================================================
 
 /**
- * 🎨 Apply user's font preference to entire Roam graph
- * Reads user's "Graph Display Font" preference and dynamically applies CSS
+ * 🧪 Test Font Loading (Debug Utility)
+ * Exported for Extension 14 integration testing
  */
-const applyUserFont = async (username = null) => {
+const testFontLoading = async (fontName) => {
   try {
-    console.log("🎨 Applying user font preference...");
+    console.group(`🧪 Testing font: ${fontName}`);
 
-    // Get current user if not provided
-    if (!username) {
-      const platform = window.RoamExtensionSuite;
-      const getAuthenticatedUser = platform?.getUtility("getAuthenticatedUser");
-      const user = getAuthenticatedUser();
+    const fontInfo = FONT_REGISTRY.find((f) => f.name === fontName);
 
-      if (!user) {
-        console.log("ℹ️ No authenticated user - using default font");
-        username = null;
-      } else {
-        username = user.displayName;
-      }
+    if (!fontInfo) {
+      console.error(`❌ Font not found in registry: ${fontName}`);
+      return { success: false, error: `Font not found: ${fontName}` };
     }
 
-    let selectedFont = "Noto Sans"; // Default fallback
+    console.log(`📋 Font info:`, fontInfo);
 
-    if (username) {
-      // Read user's font preference
-      const userFont = await getUserPreferenceBulletproof(
-        username,
-        "Graph Display Font"
-      );
-
-      if (userFont && typeof userFont === "string") {
-        selectedFont = userFont;
-        console.log(`🎨 Applying font for ${username}: ${selectedFont}`);
-      } else {
-        console.log(
-          `🎨 No font preference found for ${username}, using default: ${selectedFont}`
-        );
-      }
+    if (fontInfo.type === "webfont") {
+      console.log(`🌐 Testing web font loading...`);
+      const loaded = await loadWebFont(fontInfo.name, fontInfo.source);
+      console.log(`📊 Load result: ${loaded ? "SUCCESS" : "FAILED"}`);
+    } else {
+      console.log(`💻 System font - no loading required`);
     }
 
-    // Ensure font styles are injected (create once, update as needed)
-    ensureRoamFontStyles();
+    console.log(`🎨 Testing font application...`);
+    const result = await applyFontToGraph(fontInfo);
+    console.log(`📊 Application result:`, result);
 
-    // Apply the font via CSS custom property
-    document.documentElement.style.setProperty("--roam-font", selectedFont);
-
-    console.log(`✅ Font applied successfully: ${selectedFont}`);
-    return { success: true, font: selectedFont };
+    console.groupEnd();
+    return result;
   } catch (error) {
-    console.error("❌ Error applying user font:", error);
+    console.error(`❌ Font test error:`, error);
+    console.groupEnd();
     return { success: false, error: error.message };
   }
 };
 
 /**
- * 🎨 Ensure Roam font CSS styles are injected (one-time setup)
- * Creates the CSS rules that use the --roam-font custom property
+ * 📊 List Loaded Fonts (Debug Utility)
+ * Shows all currently loaded Google Fonts
  */
-const ensureRoamFontStyles = () => {
-  const styleId = "roam-font-styles";
+const listLoadedFonts = () => {
+  const links = document.querySelectorAll('link[href*="fonts.googleapis.com"]');
+  const loadedFonts = Array.from(links).map((link) => {
+    const match = link.href.match(/family=([^:&]+)/);
+    return match ? decodeURIComponent(match[1].replace(/\+/g, " ")) : "Unknown";
+  });
 
-  // Check if styles already exist
-  if (document.getElementById(styleId)) {
-    return; // Already injected
-  }
+  console.log("📊 Currently loaded web fonts:", loadedFonts);
+  return loadedFonts;
+};
 
-  console.log("🎨 Injecting Roam font CSS styles...");
-
-  const fontStyles = `
-    /* Define font variable at the root */
-    :root {
-      --roam-font: 'Noto Sans';
-    }
-    
-    /* Apply font to all div elements (main text) */
-    div {
-        font-family: var(--roam-font), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        line-height: 1.2em;
-        margin: 0px;
-        padding: 0px;
-    }
-    
-    /* Global size and color parameters */
-    .roam-body .roam-app .roam-main .roam-article {
-        color: #330033;
-        font-size: 18px; 
-    }    
-    
-    /* Headers inherit the font variable */
-    .rm-block.rm-heading-level-1 span {
-        font-family: var(--roam-font), serif;
-        line-height: 1.2em;
-    }
-    .rm-block.rm-heading-level-2 span {
-        font-family: var(--roam-font), serif;
-        line-height: 1.2em;
-    }
-    .rm-block.rm-heading-level-3 span {
-        font-family: var(--roam-font), serif;
-        line-height: 1.2em;
-    } 
-    
-    /* Edit mode also uses the font variable */
-    .rm-block-input {
-        font-family: var(--roam-font), monospace;
-    }
-
-    /* Ensure proper fallbacks for different font types */
-    .roam-article, .roam-block, .rm-block-text {
-        font-family: var(--roam-font), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    }
-  `;
-
-  const styleElement = document.createElement("style");
-  styleElement.id = styleId;
-  styleElement.textContent = fontStyles;
-  document.head.appendChild(styleElement);
-
-  console.log("✅ Roam font CSS styles injected");
+/**
+ * 🔍 Check Font Registry (Debug Utility)
+ * Returns the complete font registry for inspection
+ */
+const checkFontRegistry = () => {
+  console.log("📋 Font Registry:", FONT_REGISTRY);
+  return FONT_REGISTRY;
 };
 
 // ===================================================================
@@ -976,7 +1270,8 @@ const exportUserConfiguration = async (username) => {
       timestamp: new Date().toISOString(),
       preferences,
       schemas: CONFIGURATION_SCHEMAS,
-      version: "3.0.0-resurrected",
+      fontRegistry: FONT_REGISTRY, // Include font registry
+      version: "3.0.0-smart-font",
     };
 
     console.log(
@@ -1044,7 +1339,7 @@ const displayConfigurationStatus = async (username) => {
 };
 
 // ===================================================================
-// 🎛️ CONFIGURATION SERVICES - Service Registration
+// 🎛️ CONFIGURATION SERVICES - Service Registration with Smart Fonts
 // ===================================================================
 
 const configurationServices = {
@@ -1068,16 +1363,26 @@ const configurationServices = {
   generateConfigurationOverview,
   displayConfigurationStatus,
 
-  // 🎨 FONT SERVICES - NEW!
+  // 🎨 SMART FONT SERVICES - COMPLETE SYSTEM!
   applyUserFont,
+  applyFontToGraph,
+  applySystemFont,
+  applyFontWithFallback,
   ensureRoamFontStyles,
+  loadWebFont,
+
+  // 🧪 Font debugging utilities
+  testFontLoading,
+  listLoadedFonts,
+  checkFontRegistry,
 
   // Schema access
   getConfigurationSchemas: () => CONFIGURATION_SCHEMAS,
+  getFontRegistry: () => FONT_REGISTRY,
 };
 
 // ===================================================================
-// 🎮 COMMAND PALETTE - Professional Configuration Commands
+// 🎮 COMMAND PALETTE - Professional Configuration Commands + Font Commands
 // ===================================================================
 
 const createConfigurationCommands = (platform) => {
@@ -1195,15 +1500,18 @@ const createConfigurationCommands = (platform) => {
         console.groupEnd();
       },
     },
+    // 🎨 SMART FONT COMMANDS
     {
-      label: "Config: Apply Font Preference",
+      label: "Font: Apply Current Font Preference",
       callback: async () => {
         const user = getAuthenticatedUser();
         if (user) {
-          console.log(`🎨 Applying font preference for: ${user.displayName}`);
+          console.log(
+            `🎨 [SMART FONT] Applying font preference for: ${user.displayName}`
+          );
           const result = await applyUserFont(user.displayName);
           if (result.success) {
-            console.log(`✅ Font applied: ${result.font}`);
+            console.log(`✅ Font applied: ${result.font} (${result.type})`);
           } else {
             console.error(`❌ Font application failed: ${result.error}`);
           }
@@ -1212,20 +1520,62 @@ const createConfigurationCommands = (platform) => {
         }
       },
     },
+    {
+      label: "Font: Test Web Font Loading",
+      callback: async () => {
+        const testFont = "Crimson Text"; // Test the problematic font
+        console.log(`🧪 Testing web font loading: ${testFont}`);
+        const result = await testFontLoading(testFont);
+        if (result.success) {
+          console.log(`✅ Font test successful: ${testFont}`);
+        } else {
+          console.error(`❌ Font test failed: ${result.error}`);
+        }
+      },
+    },
+    {
+      label: "Font: Show Font Registry",
+      callback: () => {
+        console.group("📋 Smart Font Registry");
+        checkFontRegistry();
+        console.log("\n🌐 Currently loaded web fonts:");
+        listLoadedFonts();
+        console.groupEnd();
+      },
+    },
+    {
+      label: "Font: Test All Web Fonts",
+      callback: async () => {
+        console.group("🧪 Testing All Web Fonts");
+
+        const webFonts = FONT_REGISTRY.filter((f) => f.type === "webfont");
+        console.log(`Testing ${webFonts.length} web fonts...`);
+
+        for (const font of webFonts) {
+          console.log(`🧪 Testing: ${font.name}`);
+          const result = await testFontLoading(font.name);
+          console.log(
+            `   Result: ${result.success ? "✅ SUCCESS" : "❌ FAILED"}`
+          );
+          await new Promise((resolve) => setTimeout(resolve, 500)); // Small delay
+        }
+
+        console.log("🎉 Web font testing complete!");
+        console.groupEnd();
+      },
+    },
   ];
 };
 
 // ===================================================================
-// 🚀 EXTENSION REGISTRATION - Complete Professional Registration
+// 🚀 EXTENSION REGISTRATION - Complete Professional Registration with Smart Fonts
 // ===================================================================
 
 export default {
   onload: async ({ extensionAPI }) => {
-    console.log(
-      "🎵 Configuration Manager (RESURRECTED + FONT SYSTEM) starting..."
-    );
+    console.log("🎵 Configuration Manager (SMART FONT SYSTEM) starting...");
     console.log("🦜 Preparing for parrot duet: 'O mio babbino caro'");
-    console.log("🎨 NEW: Dynamic font application system loaded!");
+    console.log("🎨 NEW: Complete smart font system with web font loading!");
 
     // Verify dependencies
     if (!window.RoamExtensionSuite) {
@@ -1251,7 +1601,9 @@ export default {
       return;
     }
 
-    console.log("✅ Dependencies verified - proceeding with resurrection");
+    console.log(
+      "✅ Dependencies verified - proceeding with smart font resurrection"
+    );
 
     // Register configuration services
     Object.entries(configurationServices).forEach(([name, service]) => {
@@ -1276,18 +1628,29 @@ export default {
       {
         schemas: CONFIGURATION_SCHEMAS,
         services: configurationServices,
-        version: "3.0.0-resurrected-font",
+        fontRegistry: FONT_REGISTRY,
+        version: "3.0.0-smart-font",
       },
       {
-        name: "🎵 Configuration Manager (RESURRECTED + FONT SYSTEM)",
+        name: "🎵 Configuration Manager (SMART FONT SYSTEM)",
         description:
-          "Professional configuration interface with proven Subjournals cascading architecture + dynamic font system",
-        version: "3.0.0-resurrected-font",
+          "Professional configuration interface with proven Subjournals cascading architecture + complete smart font system with web font loading",
+        version: "3.0.0-smart-font",
         dependencies: ["utility-library", "user-authentication"],
       }
     );
 
-    // Startup validation with auto-creation
+    // Export font utilities for Extension 14 integration
+    window.fontService = {
+      testFont: testFontLoading,
+      listLoadedFonts,
+      checkFontRegistry,
+      applyFont: applyUserFont,
+      loadWebFont,
+      FONT_REGISTRY,
+    };
+
+    // Startup validation with auto-creation + SMART FONT APPLICATION
     try {
       const getAuthenticatedUser = platform.getUtility("getAuthenticatedUser");
       const user = getAuthenticatedUser();
@@ -1301,7 +1664,7 @@ export default {
         const overview = await generateConfigurationOverview(user.displayName);
 
         console.log(
-          "🎵 Configuration Manager (RESURRECTED + FONT SYSTEM) loaded successfully!"
+          "🎵 Configuration Manager (SMART FONT SYSTEM) loaded successfully!"
         );
         console.log(`⚙️ Initial configuration status: ${overview.summary}`);
 
@@ -1326,19 +1689,6 @@ export default {
                 user.displayName
               );
               console.log(`🎉 Final status: ${finalOverview.summary}`);
-
-              // 🎨 AUTO-APPLY FONT after successful auto-creation
-              console.log(
-                "🎨 Applying user font preference after auto-creation..."
-              );
-              const fontResult = await applyUserFont(user.displayName);
-              if (fontResult.success) {
-                console.log(`🎨 Startup font applied: ${fontResult.font}`);
-              } else {
-                console.warn(
-                  `⚠️ Font application warning: ${fontResult.error}`
-                );
-              }
             } else {
               console.error(
                 "❌ Auto-creation failed - manual initialization may be needed"
@@ -1352,26 +1702,61 @@ export default {
           }
         } else {
           console.log("✅ User preferences already configured!");
+        }
 
-          // 🎨 AUTO-APPLY FONT for existing configuration
-          console.log(
-            "🎨 Applying user font preference for existing configuration..."
-          );
+        // 🎨 SMART FONT APPLICATION - Always attempt on startup
+        console.log(
+          "🎨 [SMART FONT] Applying user font preference on startup..."
+        );
+
+        try {
           const fontResult = await applyUserFont(user.displayName);
+
           if (fontResult.success) {
-            console.log(`🎨 Startup font applied: ${fontResult.font}`);
+            console.log(
+              `🎨 ✅ Startup font applied: ${fontResult.font} (${fontResult.type})`
+            );
+            if (fontResult.fallback) {
+              console.log(
+                `   ℹ️ Used fallback due to loading issue with original font`
+              );
+            }
           } else {
             console.warn(`⚠️ Font application warning: ${fontResult.error}`);
+            console.log("   🔄 Will attempt fallback to system font...");
+
+            // Attempt ultimate fallback
+            const fallbackResult = await applySystemFont("Noto Sans");
+            if (fallbackResult.success) {
+              console.log(
+                `✅ Ultimate fallback applied: ${fallbackResult.font}`
+              );
+            } else {
+              console.error("❌ Even ultimate fallback failed!");
+            }
+          }
+        } catch (fontError) {
+          console.error("❌ Font application error:", fontError.message);
+          console.log("   🔄 Attempting safe fallback...");
+
+          try {
+            await applySystemFont("Noto Sans");
+            console.log("✅ Safe fallback applied");
+          } catch (safeError) {
+            console.error("❌ Even safe fallback failed:", safeError.message);
           }
         }
 
         console.log(
           '💡 Available: Cmd+P → "Config: Show My Configuration Status"'
         );
-        console.log('🎨 Available: Cmd+P → "Config: Apply Font Preference"');
+        console.log(
+          '🎨 Available: Cmd+P → "Font: Apply Current Font Preference"'
+        );
+        console.log('🧪 Available: Cmd+P → "Font: Test Web Font Loading"');
       } else {
         console.log(
-          "✅ Configuration Manager (RESURRECTED + FONT SYSTEM) loaded successfully!"
+          "✅ Configuration Manager (SMART FONT SYSTEM) loaded successfully!"
         );
         console.log(
           "ℹ️ No authenticated user detected - auto-creation will run when user logs in"
@@ -1386,22 +1771,27 @@ export default {
     }
 
     console.log("🦜🎵 Ready for beautiful parrot duet with Extension 2!");
-    console.log("🎨 Font system ready for Extension 14 integration!");
+    console.log("🎨🔗 Font system ready for Extension 14 integration!");
+    console.log("🌐 Web font loading system active and ready!");
   },
 
   onunload: () => {
-    console.log(
-      "🎵 Configuration Manager (RESURRECTED + FONT SYSTEM) unloading..."
-    );
+    console.log("🎵 Configuration Manager (SMART FONT SYSTEM) unloading...");
     console.log(
       "🦜 Parrot duet complete - 'O mio babbino caro' sung beautifully!"
     );
 
     // Clean up font styles
-    const fontStyleElement = document.getElementById("roam-font-styles");
+    const fontStyleElement = document.getElementById("roam-smart-font-styles");
     if (fontStyleElement) {
       fontStyleElement.remove();
-      console.log("🎨 Font styles cleaned up");
+      console.log("🎨 Smart font styles cleaned up");
+    }
+
+    // Clean up font service
+    if (window.fontService) {
+      delete window.fontService;
+      console.log("🧪 Font service cleaned up");
     }
 
     console.log("✅ Configuration Manager cleanup complete!");

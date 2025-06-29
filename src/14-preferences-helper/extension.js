@@ -1,8 +1,8 @@
 // ===================================================================
-// Preferences Editor Extension - Built on Profile Nudges Pattern
-// 🎛️ Intelligent preferences editing with sophisticated conditional logic
-// 🎯 Smart detection of own user preferences page
-// 🎨 Standardized warm yellow styling for consistency
+// Enhanced Preferences Editor Extension - Professional UX + Font Integration
+// 🎛️ Fixed save button + immediate font application + 25% larger modal
+// 🎯 Three-section layout: Fixed header + Scrollable content + Fixed footer
+// 🎨 Professional user experience with real-time feedback
 // ===================================================================
 
 const preferencesEditorExtension = (() => {
@@ -14,6 +14,7 @@ const preferencesEditorExtension = (() => {
   let buttonManager = null;
   let currentUser = null;
   let preferencesModal = null;
+  let initialPreferences = {}; // Track initial state for change detection
 
   // ===================================================================
   // 🔧 UTILITY ACCESS - Extension 1.5 Integration
@@ -232,6 +233,10 @@ const preferencesEditorExtension = (() => {
         }`,
         "INFO"
       );
+
+      // Store initial preferences for change detection
+      initialPreferences = { ...preferences };
+
       return preferences;
     } catch (error) {
       log(`Error getting current preferences: ${error.message}`, "ERROR");
@@ -427,7 +432,7 @@ const preferencesEditorExtension = (() => {
   };
 
   // ===================================================================
-  // 🎨 UI COMPONENTS - Modal Functionality
+  // 🎨 UI COMPONENTS - Enhanced Modal with Fixed Layout
   // ===================================================================
 
   const showPreferencesEditModal = async () => {
@@ -447,7 +452,7 @@ const preferencesEditorExtension = (() => {
       // Get current preferences
       const currentPreferences = await getCurrentPreferences();
 
-      // Create modal
+      // Create modal with enhanced sizing (25% larger)
       preferencesModal = modalUtilities.createModal("preferences-edit-modal", {
         closeOnEscape: true,
         closeOnBackdrop: true,
@@ -456,13 +461,28 @@ const preferencesEditorExtension = (() => {
       const modalContent = modalUtilities.createModalContent({
         width: "95%",
         maxWidth: "900px",
-        maxHeight: "90%",
+        height: "75vh", // Increased from ~60vh (25% larger)
+        maxHeight: "800px", // Increased accordingly
       });
 
-      // Ensure relative positioning for scroll indicator
-      modalContent.style.position = "relative";
+      // 🚨 CRITICAL: Three-section layout with flexbox
+      modalContent.style.cssText = `
+        width: 95%;
+        max-width: 900px;
+        height: 75vh;
+        max-height: 800px;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        border-radius: 20px;
+        overflow: hidden;
+        background: white;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+      `;
 
-      // Custom header with consistent styling
+      // ===================================================================
+      // 📱 FIXED HEADER SECTION
+      // ===================================================================
       const header = document.createElement("div");
       header.style.cssText = `
         background: linear-gradient(135deg, #6366f1, #8b5cf6);
@@ -471,16 +491,18 @@ const preferencesEditorExtension = (() => {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        border-radius: 20px 20px 0 0;
+        flex-shrink: 0;
+        position: relative;
+        z-index: 10;
       `;
 
       const headerContent = document.createElement("div");
       headerContent.innerHTML = `
         <h2 style="margin: 0; font-size: 24px; font-weight: 600; display: flex; align-items: center; gap: 12px;">
-          🎛️ TESTING - Edit Your Preferences
+          🎛️ Edit Your Preferences
         </h2>
         <div style="margin-top: 6px; font-size: 16px; opacity: 0.9;">
-          TEST MODE - Customize your Roam experience
+          Customize your Roam experience
         </div>
       `;
 
@@ -521,13 +543,15 @@ const preferencesEditorExtension = (() => {
       header.appendChild(headerContent);
       header.appendChild(closeModalButton);
 
-      // Create form content
-      const formContainer = document.createElement("div");
-      formContainer.style.cssText = `
-        padding: 32px;
+      // ===================================================================
+      // 📜 SCROLLABLE CONTENT SECTION
+      // ===================================================================
+      const scrollableContent = document.createElement("div");
+      scrollableContent.style.cssText = `
+        flex: 1;
         overflow-y: auto;
-        max-height: 60vh;
-        font-size: 16px;
+        padding: 32px;
+        background: white;
         scrollbar-width: thin;
         scrollbar-color: #cbd5e1 #f1f5f9;
       `;
@@ -535,25 +559,25 @@ const preferencesEditorExtension = (() => {
       // Add webkit scrollbar styling for better visibility
       const scrollbarStyle = document.createElement("style");
       scrollbarStyle.textContent = `
-        .preferences-modal-form::-webkit-scrollbar {
+        .preferences-scrollable-content::-webkit-scrollbar {
           width: 8px;
         }
-        .preferences-modal-form::-webkit-scrollbar-track {
+        .preferences-scrollable-content::-webkit-scrollbar-track {
           background: #f1f5f9;
           border-radius: 4px;
         }
-        .preferences-modal-form::-webkit-scrollbar-thumb {
+        .preferences-scrollable-content::-webkit-scrollbar-thumb {
           background: #cbd5e1;
           border-radius: 4px;
         }
-        .preferences-modal-form::-webkit-scrollbar-thumb:hover {
+        .preferences-scrollable-content::-webkit-scrollbar-thumb:hover {
           background: #94a3b8;
         }
       `;
       document.head.appendChild(scrollbarStyle);
-      formContainer.classList.add("preferences-modal-form");
+      scrollableContent.classList.add("preferences-scrollable-content");
 
-      // Create form fields
+      // Create form fields container
       const fieldsContainer = document.createElement("div");
       fieldsContainer.style.cssText =
         "display: flex; flex-direction: column; gap: 24px;";
@@ -601,7 +625,21 @@ const preferencesEditorExtension = (() => {
       const shortcutsField = createPersonalShortcutsField();
       fieldsContainer.appendChild(shortcutsField);
 
-      // Save button
+      scrollableContent.appendChild(fieldsContainer);
+
+      // ===================================================================
+      // 🔒 FIXED FOOTER SECTION - ALWAYS VISIBLE SAVE BUTTON
+      // ===================================================================
+      const footer = document.createElement("div");
+      footer.style.cssText = `
+        background: white;
+        padding: 24px 32px;
+        border-top: 1px solid #e5e7eb;
+        flex-shrink: 0;
+        position: relative;
+        z-index: 10;
+      `;
+
       const saveButton = document.createElement("button");
       saveButton.textContent = "💾 Save Changes";
       saveButton.style.cssText = `
@@ -614,62 +652,47 @@ const preferencesEditorExtension = (() => {
         font-size: 18px;
         font-weight: 600;
         cursor: pointer;
-        margin-top: 32px;
         transition: transform 0.2s ease;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
       `;
 
       saveButton.addEventListener("mouseenter", () => {
         saveButton.style.transform = "translateY(-1px)";
+        saveButton.style.boxShadow = "0 6px 16px rgba(99, 102, 241, 0.4)";
       });
 
       saveButton.addEventListener("mouseleave", () => {
         saveButton.style.transform = "translateY(0)";
+        saveButton.style.boxShadow = "0 4px 12px rgba(99, 102, 241, 0.3)";
       });
 
       saveButton.addEventListener("click", async () => {
         await handleSavePreferences();
       });
 
-      // Assemble modal
-      formContainer.appendChild(fieldsContainer);
-      formContainer.appendChild(saveButton);
+      footer.appendChild(saveButton);
 
-      // Add scroll indicator overlay
-      const scrollIndicator = document.createElement("div");
-      scrollIndicator.style.cssText = `
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        height: 30px;
-        background: linear-gradient(transparent, rgba(255, 255, 255, 0.95));
-        pointer-events: none;
-        border-radius: 0 0 20px 20px;
-      `;
-
+      // ===================================================================
+      // 🏗️ ASSEMBLE MODAL - Three-section layout
+      // ===================================================================
       modalContent.appendChild(header);
-      modalContent.appendChild(formContainer);
-      modalContent.appendChild(scrollIndicator);
+      modalContent.appendChild(scrollableContent);
+      modalContent.appendChild(footer);
       preferencesModal.appendChild(modalContent);
-
-      // Hide scroll indicator when at bottom
-      formContainer.addEventListener("scroll", () => {
-        const isAtBottom =
-          formContainer.scrollTop + formContainer.clientHeight >=
-          formContainer.scrollHeight - 10;
-        scrollIndicator.style.opacity = isAtBottom ? "0" : "1";
-      });
 
       document.body.appendChild(preferencesModal);
 
-      log("Preferences edit modal created", "SUCCESS");
+      log(
+        "Enhanced preferences edit modal created with fixed footer",
+        "SUCCESS"
+      );
     } catch (error) {
       log(`Error showing preferences edit modal: ${error.message}`, "ERROR");
     }
   };
 
   // ===================================================================
-  // 🎨 FIELD CREATION HELPERS
+  // 🎨 FIELD CREATION HELPERS (Same as before, keeping existing functionality)
   // ===================================================================
 
   const createFieldContainer = (label, description) => {
@@ -848,14 +871,48 @@ const preferencesEditorExtension = (() => {
   const createFontField = (label, description, currentValue) => {
     const fieldDiv = createFieldContainer(label, description);
 
-    // Trimmed to 6 well-supported fonts
+    // Smart font list with system vs web font detection - EXPANDED!
     const fonts = [
-      "Noto Sans", // Default - comprehensive, neutral
-      "Georgia", // Serif - classic, readable
-      "Merriweather", // Serif - modern, web-optimized
-      "Avenir", // Sans - geometric, clean
-      "Roboto", // Sans - modern, friendly
-      "Inter", // Sans - popular for UI/interfaces
+      { name: "Noto Sans", type: "system", fallback: "sans-serif" },
+      { name: "Georgia", type: "system", fallback: "serif" },
+      {
+        name: "Merriweather",
+        type: "webfont",
+        fallback: "serif",
+        source: "google",
+      },
+      {
+        name: "Crimson Text",
+        type: "webfont",
+        fallback: "serif",
+        source: "google",
+      },
+      { name: "Lora", type: "webfont", fallback: "serif", source: "google" },
+      {
+        name: "Playfair Display",
+        type: "webfont",
+        fallback: "serif",
+        source: "google",
+      },
+      {
+        name: "Source Serif Pro",
+        type: "webfont",
+        fallback: "serif",
+        source: "google",
+      },
+      { name: "Avenir", type: "system", fallback: "sans-serif" },
+      {
+        name: "Roboto",
+        type: "webfont",
+        fallback: "sans-serif",
+        source: "google",
+      },
+      {
+        name: "Inter",
+        type: "webfont",
+        fallback: "sans-serif",
+        source: "google",
+      },
     ];
 
     // Regular select dropdown
@@ -874,15 +931,78 @@ const preferencesEditorExtension = (() => {
 
     fonts.forEach((font) => {
       const optionElement = document.createElement("option");
-      optionElement.value = font;
-      optionElement.textContent = font;
+      optionElement.value = font.name;
+      optionElement.textContent = `${font.name}${
+        font.type === "webfont" ? " (Web Font)" : ""
+      }`;
       select.appendChild(optionElement);
     });
 
     // Set current value
     const initialFont =
-      currentValue && fonts.includes(currentValue) ? currentValue : fonts[0];
+      currentValue && fonts.find((f) => f.name === currentValue)
+        ? currentValue
+        : fonts[0].name;
     select.value = initialFont;
+
+    // Web font loader function
+    const loadWebFont = (fontName, source) => {
+      return new Promise((resolve) => {
+        if (source === "google") {
+          // Check if already loaded
+          const existingLink = document.querySelector(
+            `link[href*="${fontName.replace(/\s+/g, "+")}"]`
+          );
+          if (existingLink) {
+            resolve(true);
+            return;
+          }
+
+          // Load from Google Fonts
+          const link = document.createElement("link");
+          link.rel = "stylesheet";
+          link.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(
+            /\s+/g,
+            "+"
+          )}:ital,wght@0,400;0,700;1,400&display=swap`;
+
+          link.onload = () => {
+            log(`✅ Web font loaded: ${fontName}`, "SUCCESS");
+            resolve(true);
+          };
+
+          link.onerror = () => {
+            log(`❌ Failed to load web font: ${fontName}`, "ERROR");
+            resolve(false);
+          };
+
+          document.head.appendChild(link);
+
+          // Timeout fallback
+          setTimeout(() => resolve(false), 3000);
+        } else {
+          resolve(true); // System fonts don't need loading
+        }
+      });
+    };
+
+    // Font availability checker
+    const checkFontAvailability = (fontName) => {
+      // Create a test element to check if font loads
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d");
+
+      // Test with a fallback font first
+      context.font = "16px Arial";
+      const fallbackWidth = context.measureText("Test Font").width;
+
+      // Test with the target font
+      context.font = `16px ${fontName}, Arial`;
+      const testWidth = context.measureText("Test Font").width;
+
+      // If widths differ, font is available
+      return testWidth !== fallbackWidth;
+    };
 
     // Font preview area
     const previewContainer = document.createElement("div");
@@ -910,16 +1030,58 @@ const preferencesEditorExtension = (() => {
       color: #374151;
     `;
 
-    const updatePreview = (fontName) => {
-      // Create completely isolated preview elements
+    const updatePreview = async (fontName) => {
+      const font = fonts.find((f) => f.name === fontName);
+      if (!font) return;
+
+      // Show loading state
+      previewText.innerHTML =
+        '<div style="color: #6b7280; font-style: italic;">Loading font preview...</div>';
+
+      // Load web font if needed
+      if (font.type === "webfont") {
+        const loaded = await loadWebFont(font.name, font.source);
+        if (!loaded) {
+          previewText.innerHTML = `
+            <div style="color: #ef4444; font-weight: 600;">⚠️ ${font.name} could not be loaded</div>
+            <div style="color: #6b7280; font-size: 14px; margin-top: 8px;">
+              This font may not display correctly when applied. Try selecting a different font.
+            </div>
+          `;
+          return;
+        }
+
+        // Wait a bit for font to register
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+
+      // Check if font is actually available
+      const isAvailable =
+        font.type === "system" || checkFontAvailability(font.name);
+
+      if (!isAvailable && font.type === "webfont") {
+        previewText.innerHTML = `
+          <div style="color: #f59e0b; font-weight: 600;">⚠️ ${font.name} may not be fully loaded</div>
+          <div style="color: #6b7280; font-size: 14px; margin-top: 8px;">
+            Preview may not reflect actual appearance. Font should work when applied.
+          </div>
+        `;
+        return;
+      }
+
+      // Create preview with proper font stack
       previewText.innerHTML = "";
+      const fontStack =
+        font.type === "system"
+          ? `${font.name}, ${font.fallback}`
+          : `"${font.name}", ${font.fallback}`;
 
       // First line - normal text
       const normalDiv = document.createElement("div");
       normalDiv.textContent = "The quick brown fox jumps over the lazy dog";
       normalDiv.style.cssText = `
         all: unset !important;
-        font-family: ${fontName}, serif !important;
+        font-family: ${fontStack} !important;
         font-size: 16px !important;
         font-weight: normal !important;
         font-style: normal !important;
@@ -932,10 +1094,10 @@ const preferencesEditorExtension = (() => {
 
       // Second line - bold text
       const boldDiv = document.createElement("div");
-      boldDiv.textContent = `Bold text looks like this in ${fontName}`;
+      boldDiv.textContent = `Bold text looks like this in ${font.name}`;
       boldDiv.style.cssText = `
         all: unset !important;
-        font-family: ${fontName}, serif !important;
+        font-family: ${fontStack} !important;
         font-size: 16px !important;
         font-weight: bold !important;
         font-style: normal !important;
@@ -951,7 +1113,7 @@ const preferencesEditorExtension = (() => {
       italicDiv.textContent = "Italic text in this beautiful font";
       italicDiv.style.cssText = `
         all: unset !important;
-        font-family: ${fontName}, serif !important;
+        font-family: ${fontStack} !important;
         font-size: 16px !important;
         font-weight: normal !important;
         font-style: italic !important;
@@ -965,6 +1127,22 @@ const preferencesEditorExtension = (() => {
       previewText.appendChild(normalDiv);
       previewText.appendChild(boldDiv);
       previewText.appendChild(italicDiv);
+
+      // Add font info
+      const infoDiv = document.createElement("div");
+      infoDiv.style.cssText = `
+        margin-top: 12px;
+        padding: 8px 12px;
+        background: ${font.type === "webfont" ? "#dbeafe" : "#f3f4f6"};
+        border-radius: 6px;
+        font-size: 12px;
+        color: #6b7280;
+      `;
+      infoDiv.textContent =
+        font.type === "webfont"
+          ? `✅ Web font loaded from ${font.source}`
+          : `✅ System font available`;
+      previewText.appendChild(infoDiv);
     };
 
     // Initial preview
@@ -1008,11 +1186,209 @@ const preferencesEditorExtension = (() => {
   };
 
   // ===================================================================
-  // 💾 SAVE PREFERENCES HANDLER
+  // 🎯 FONT INTEGRATION - Extension 3 Integration
+  // ===================================================================
+
+  const checkFontPreferenceChange = (updatedPreferences) => {
+    const initialFont = initialPreferences["Graph Display Font"];
+    const newFont = updatedPreferences["Graph Display Font"];
+
+    log(
+      `Font change check: Initial="${initialFont}", New="${newFont}"`,
+      "DEBUG"
+    );
+
+    return initialFont !== newFont && newFont;
+  };
+
+  const applyFontChange = async (newFont, username) => {
+    try {
+      log(`🔤 Attempting to apply font change to: ${newFont}`, "INFO");
+
+      // Access Extension 3's font service through platform registry
+      const platform = window.RoamExtensionSuite;
+
+      if (!platform) {
+        log("❌ RoamExtensionSuite platform not available", "ERROR");
+        return { success: false, error: "Platform not available" };
+      }
+
+      // Get font info for proper handling - EXPANDED FONT LIST!
+      const fontList = [
+        { name: "Noto Sans", type: "system", fallback: "sans-serif" },
+        { name: "Georgia", type: "system", fallback: "serif" },
+        {
+          name: "Merriweather",
+          type: "webfont",
+          fallback: "serif",
+          source: "google",
+        },
+        {
+          name: "Crimson Text",
+          type: "webfont",
+          fallback: "serif",
+          source: "google",
+        },
+        { name: "Lora", type: "webfont", fallback: "serif", source: "google" },
+        {
+          name: "Playfair Display",
+          type: "webfont",
+          fallback: "serif",
+          source: "google",
+        },
+        {
+          name: "Source Serif Pro",
+          type: "webfont",
+          fallback: "serif",
+          source: "google",
+        },
+        { name: "Avenir", type: "system", fallback: "sans-serif" },
+        {
+          name: "Roboto",
+          type: "webfont",
+          fallback: "sans-serif",
+          source: "google",
+        },
+        {
+          name: "Inter",
+          type: "webfont",
+          fallback: "sans-serif",
+          source: "google",
+        },
+      ];
+
+      const fontInfo = fontList.find((f) => f.name === newFont);
+
+      // If it's a web font, ensure it's loaded first
+      if (fontInfo && fontInfo.type === "webfont") {
+        log(`📥 Loading web font before application: ${newFont}`, "INFO");
+
+        const loadWebFont = (fontName, source) => {
+          return new Promise((resolve) => {
+            if (source === "google") {
+              const existingLink = document.querySelector(
+                `link[href*="${fontName.replace(/\s+/g, "+")}"]`
+              );
+              if (existingLink) {
+                resolve(true);
+                return;
+              }
+
+              const link = document.createElement("link");
+              link.rel = "stylesheet";
+              link.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(
+                /\s+/g,
+                "+"
+              )}:ital,wght@0,400;0,700;1,400&display=swap`;
+
+              link.onload = () => resolve(true);
+              link.onerror = () => resolve(false);
+
+              document.head.appendChild(link);
+              setTimeout(() => resolve(false), 3000);
+            } else {
+              resolve(true);
+            }
+          });
+        };
+
+        const webFontLoaded = await loadWebFont(fontInfo.name, fontInfo.source);
+        if (!webFontLoaded) {
+          log(
+            `⚠️ Web font loading failed, continuing anyway: ${newFont}`,
+            "WARNING"
+          );
+        }
+      }
+
+      const applyUserFont = platform.getUtility("applyUserFont");
+
+      if (!applyUserFont) {
+        log("❌ applyUserFont utility not found in platform", "ERROR");
+        return { success: false, error: "Font utility not available" };
+      }
+
+      // Apply the font using Extension 3's service
+      const result = await applyUserFont(username);
+
+      if (result && result.success) {
+        log(
+          `✅ Font successfully applied: ${result.font || newFont}`,
+          "SUCCESS"
+        );
+        return { success: true, font: result.font || newFont };
+      } else {
+        log(
+          `❌ Font application failed: ${result?.error || "Unknown error"}`,
+          "ERROR"
+        );
+        return {
+          success: false,
+          error: result?.error || "Font application failed",
+        };
+      }
+    } catch (error) {
+      log(`❌ Error in font application: ${error.message}`, "ERROR");
+      return { success: false, error: error.message };
+    }
+  };
+
+  const showUserFeedback = (message, type = "success") => {
+    // Create temporary feedback overlay
+    const feedback = document.createElement("div");
+    feedback.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 16px 24px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 16px;
+      z-index: 10000;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      transition: all 0.3s ease;
+      ${
+        type === "success"
+          ? "background: linear-gradient(135deg, #10b981, #059669); color: white;"
+          : "background: linear-gradient(135deg, #ef4444, #dc2626); color: white;"
+      }
+    `;
+
+    feedback.textContent = message;
+    document.body.appendChild(feedback);
+
+    // Animate in
+    setTimeout(() => {
+      feedback.style.transform = "translateX(0)";
+      feedback.style.opacity = "1";
+    }, 100);
+
+    // Remove after 3 seconds
+    setTimeout(() => {
+      feedback.style.transform = "translateX(100%)";
+      feedback.style.opacity = "0";
+      setTimeout(() => {
+        if (document.body.contains(feedback)) {
+          document.body.removeChild(feedback);
+        }
+      }, 300);
+    }, 3000);
+  };
+
+  // ===================================================================
+  // 💾 ENHANCED SAVE PREFERENCES HANDLER - With Font Integration
   // ===================================================================
 
   const handleSavePreferences = async () => {
     try {
+      // Disable save button and show loading state
+      const saveButton = preferencesModal.querySelector("button");
+      const originalText = saveButton.textContent;
+      saveButton.disabled = true;
+      saveButton.textContent = "💾 Saving...";
+      saveButton.style.opacity = "0.7";
+      saveButton.style.cursor = "not-allowed";
+
       const formElements = preferencesModal.querySelectorAll("select, input");
       const updatedPreferences = {};
 
@@ -1047,12 +1423,43 @@ const preferencesEditorExtension = (() => {
         "INFO"
       );
 
-      const success = await savePreferences(updatedPreferences);
+      // 1. Save preferences to user's preference page
+      const saveSuccess = await savePreferences(updatedPreferences);
 
-      if (success) {
-        log("✅ All preferences saved successfully!", "SUCCESS");
+      if (!saveSuccess) {
+        log("❌ Some preferences failed to save", "ERROR");
+        showUserFeedback("❌ Failed to save some preferences", "error");
+        return;
+      }
 
-        // Close modal
+      log("✅ All preferences saved successfully!", "SUCCESS");
+
+      // 2. Check if font preference changed and apply immediately
+      const fontChanged = checkFontPreferenceChange(updatedPreferences);
+
+      if (fontChanged) {
+        log("🔤 Font preference changed, applying immediately...", "INFO");
+
+        const user = getCurrentUserSafe();
+        const fontResult = await applyFontChange(fontChanged, user.displayName);
+
+        if (fontResult.success) {
+          showUserFeedback(`✅ Font changed to ${fontResult.font}!`, "success");
+          log(`✅ Font successfully applied: ${fontResult.font}`, "SUCCESS");
+        } else {
+          showUserFeedback(
+            `❌ Font change failed: ${fontResult.error}`,
+            "error"
+          );
+          log(`❌ Font application failed: ${fontResult.error}`, "ERROR");
+        }
+      }
+
+      // 3. Show overall success message
+      showUserFeedback("✅ Preferences saved successfully!", "success");
+
+      // 4. Close modal after brief delay
+      setTimeout(() => {
         if (preferencesModal) {
           preferencesModal.remove();
           preferencesModal = null;
@@ -1063,46 +1470,19 @@ const preferencesEditorExtension = (() => {
           buttonManager.registry.rebuildAllButtons();
           log("🔄 Triggered button condition re-evaluation", "INFO");
         }
-
-        // TODO: Here we'll add the action logic for color/font changes
-        await handlePreferenceActions(updatedPreferences);
-      } else {
-        log("❌ Some preferences failed to save", "ERROR");
-      }
+      }, 1500);
     } catch (error) {
       log(`Error saving preferences: ${error.message}`, "ERROR");
-    }
-  };
-
-  // ===================================================================
-  // 🎯 PREFERENCE ACTIONS (Placeholder for future implementation)
-  // ===================================================================
-
-  const handlePreferenceActions = async (updatedPreferences) => {
-    try {
-      log("🎯 Handling preference actions...", "INFO");
-
-      // Check if journal color was changed
-      if (updatedPreferences["Journal Header Color"]) {
-        log(
-          `📝 Journal color changed to: ${updatedPreferences["Journal Header Color"]}`,
-          "INFO"
-        );
-        // TODO: Apply journal color changes
+      showUserFeedback(`❌ Error: ${error.message}`, "error");
+    } finally {
+      // Re-enable save button
+      const saveButton = preferencesModal?.querySelector("button");
+      if (saveButton) {
+        saveButton.disabled = false;
+        saveButton.textContent = "💾 Save Changes";
+        saveButton.style.opacity = "1";
+        saveButton.style.cursor = "pointer";
       }
-
-      // Check if font was changed
-      if (updatedPreferences["Graph Display Font"]) {
-        log(
-          `🔤 Font changed to: ${updatedPreferences["Graph Display Font"]}`,
-          "INFO"
-        );
-        // TODO: Apply font changes
-      }
-
-      log("✅ Preference actions completed", "SUCCESS");
-    } catch (error) {
-      log(`Error handling preference actions: ${error.message}`, "ERROR");
     }
   };
 
@@ -1112,7 +1492,7 @@ const preferencesEditorExtension = (() => {
 
   const onload = ({ extensionAPI: api }) => {
     try {
-      log("Preferences Editor Extension loading...", "SUCCESS");
+      log("Enhanced Preferences Editor Extension loading...", "SUCCESS");
 
       extensionAPI = api;
 
@@ -1149,7 +1529,7 @@ const preferencesEditorExtension = (() => {
               id: "enablePreferencesEditor",
               name: "Enable Preferences Editor",
               description:
-                "Show preferences editor button on your preferences page",
+                "Show enhanced preferences editor button on your preferences page",
               action: { type: "switch" },
             },
           ],
@@ -1166,6 +1546,95 @@ const preferencesEditorExtension = (() => {
           testButtonCondition: isOnOwnUserPreferencesPage,
           getCurrentUser: getCurrentUserSafe,
           getCurrentPage: getCurrentPageTitle,
+          checkFontIntegration: () => {
+            const platform = window.RoamExtensionSuite;
+            const applyUserFont = platform?.getUtility("applyUserFont");
+            return { platform: !!platform, applyUserFont: !!applyUserFont };
+          },
+          testFontLoading: async (fontName) => {
+            const fontList = [
+              { name: "Noto Sans", type: "system", fallback: "sans-serif" },
+              { name: "Georgia", type: "system", fallback: "serif" },
+              {
+                name: "Merriweather",
+                type: "webfont",
+                fallback: "serif",
+                source: "google",
+              },
+              {
+                name: "Crimson Text",
+                type: "webfont",
+                fallback: "serif",
+                source: "google",
+              },
+              {
+                name: "Lora",
+                type: "webfont",
+                fallback: "serif",
+                source: "google",
+              },
+              {
+                name: "Playfair Display",
+                type: "webfont",
+                fallback: "serif",
+                source: "google",
+              },
+              {
+                name: "Source Serif Pro",
+                type: "webfont",
+                fallback: "serif",
+                source: "google",
+              },
+              { name: "Avenir", type: "system", fallback: "sans-serif" },
+              {
+                name: "Roboto",
+                type: "webfont",
+                fallback: "sans-serif",
+                source: "google",
+              },
+              {
+                name: "Inter",
+                type: "webfont",
+                fallback: "sans-serif",
+                source: "google",
+              },
+            ];
+
+            const fontInfo = fontList.find((f) => f.name === fontName);
+            if (!fontInfo) return { error: "Font not in list" };
+
+            if (fontInfo.type === "system")
+              return { available: true, type: "system" };
+
+            // Test web font loading
+            try {
+              const link = document.createElement("link");
+              link.rel = "stylesheet";
+              link.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(
+                /\s+/g,
+                "+"
+              )}:ital,wght@0,400;0,700;1,400&display=swap`;
+
+              return new Promise((resolve) => {
+                link.onload = () =>
+                  resolve({ available: true, type: "webfont", loaded: true });
+                link.onerror = () =>
+                  resolve({ available: false, type: "webfont", loaded: false });
+                document.head.appendChild(link);
+                setTimeout(
+                  () =>
+                    resolve({
+                      available: false,
+                      type: "webfont",
+                      timeout: true,
+                    }),
+                  3000
+                );
+              });
+            } catch (error) {
+              return { error: error.message };
+            }
+          },
         },
       };
 
@@ -1178,43 +1647,51 @@ const preferencesEditorExtension = (() => {
         );
         if (editorEnabled !== false) {
           try {
-            log("Starting preferences editor button management...", "INFO");
+            log(
+              "Starting enhanced preferences editor button management...",
+              "INFO"
+            );
             const result = await initializeButtonManagement();
             if (result.success) {
               log(
-                "🎉 Preferences editor button management initialized successfully!",
+                "🎉 Enhanced preferences editor button management initialized successfully!",
                 "SUCCESS"
               );
             } else {
               log(
-                `⚠️ Preferences editor button management failed: ${result.reason}`,
+                `⚠️ Enhanced preferences editor button management failed: ${result.reason}`,
                 "WARNING"
               );
             }
           } catch (error) {
             log(
-              `❌ Failed to initialize preferences editor button management: ${error.message}`,
+              `❌ Failed to initialize enhanced preferences editor button management: ${error.message}`,
               "ERROR"
             );
           }
         }
       }, 2000);
 
-      log("Preferences Editor Extension loaded successfully!", "SUCCESS");
       log(
-        "🎛️ NEW: Intelligent preferences editing with conditional logic",
-        "INFO"
+        "Enhanced Preferences Editor Extension loaded successfully!",
+        "SUCCESS"
       );
+      log("🎛️ NEW: Fixed save button + immediate font application", "INFO");
       log(
         "🎯 DETECTION: Only shows button on own user preferences page",
         "INFO"
       );
-      log("🎨 STYLING: Consistent warm yellow with brown border", "INFO");
-      log("📍 POSITION: Top-right stack with automatic coordination", "INFO");
+      log("🎨 STYLING: Professional three-section layout", "INFO");
+      log("📱 LAYOUT: 25% larger modal with fixed footer", "INFO");
       log(
-        "💡 Try: Navigate to your '{username}/user preferences' page",
+        "🔤 FONT: Smart web font loading + 10 beautiful fonts available",
         "INFO"
       );
+      log(
+        "🔍 DETECTION: Font availability checking prevents mismatches",
+        "INFO"
+      );
+      log("💾 UX: Save button always visible at bottom", "INFO");
     } catch (error) {
       log(`CRITICAL ERROR in onload: ${error.message}`, "ERROR");
     }
@@ -1222,7 +1699,7 @@ const preferencesEditorExtension = (() => {
 
   const onunload = () => {
     try {
-      log("Preferences Editor Extension unloading...", "INFO");
+      log("Enhanced Preferences Editor Extension unloading...", "INFO");
 
       // Clean up button management
       if (buttonManager) {
@@ -1250,10 +1727,14 @@ const preferencesEditorExtension = (() => {
       extensionAPI = null;
       buttonManager = null;
       isInitialized = false;
+      initialPreferences = {};
 
-      log("Preferences Editor Extension unloaded successfully", "SUCCESS");
+      log(
+        "Enhanced Preferences Editor Extension unloaded successfully",
+        "SUCCESS"
+      );
     } catch (error) {
-      console.error("Error in Preferences Editor onunload:", error);
+      console.error("Error in Enhanced Preferences Editor onunload:", error);
     }
   };
 
