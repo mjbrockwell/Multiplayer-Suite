@@ -5,7 +5,7 @@
 // ✅ CONDITIONAL: Button only appears on username pages or "chat room" pages
 // 🔧 FIXED: Chat room detection with proper DOM-first title detection
 // 📝 ENHANCED: Opportunistic cache refresh during modal creation
-// 🖱️ NEW: Clickable avatars and usernames for easy navigation
+// 🖱️ FIXED: Clickable avatars and usernames with proper UID-based navigation
 // ===================================================================
 
 // ===================================================================
@@ -860,6 +860,50 @@ const runCleanSystemTests = async () => {
 // ===================================================================
 
 /**
+ * Navigate to user page helper function (FIXED - Uses Page UID!)
+ */
+window.navigateToUserPageClean = (username) => {
+  try {
+    // Get graph name
+    const graphName = window.roamAlphaAPI.graph.name;
+    if (!graphName) {
+      console.error("❌ Could not get graph name for navigation");
+      return;
+    }
+
+    // 🎯 CRITICAL FIX: Get page UID instead of using title!
+    const pageUidQuery = `
+      [:find ?uid 
+       :where 
+       [?page :node/title "${username}"]
+       [?page :block/uid ?uid]]
+    `;
+
+    const pageUidResult = window.roamAlphaAPI.data.fast.q(pageUidQuery);
+    const pageUid = pageUidResult?.[0]?.[0];
+
+    if (!pageUid) {
+      console.error(`❌ No page UID found for username "${username}"`);
+      return;
+    }
+
+    // 🎯 CONSTRUCT CORRECT URL using UID (not title!)
+    const targetUrl = `#/app/${graphName}/page/${pageUid}`;
+
+    // Navigate using the correct UID-based URL
+    window.location.hash = targetUrl.replace("#", "");
+
+    // Close modal
+    setTimeout(() => {
+      const modal = document.getElementById("clean-user-directory-modal");
+      if (modal) modal.remove();
+    }, 100);
+  } catch (error) {
+    console.error("❌ Navigation failed:", error);
+  }
+};
+
+/**
  * Create user directory table
  */
 const createUserDirectoryTable = async (profiles, currentUser) => {
@@ -951,227 +995,6 @@ const createErrorProfile = (username, errorMessage) => ({
   timezoneInfo: { timeString: "—", isValid: false },
 });
 
-/**
- * 🐛 DEBUG: Create debug window for navigation troubleshooting
- */
-const createDebugWindow = () => {
-  // Remove existing debug window
-  const existingDebug = document.getElementById("navigation-debug-window");
-  if (existingDebug) existingDebug.remove();
-
-  const debugWindow = document.createElement("div");
-  debugWindow.id = "navigation-debug-window";
-  debugWindow.style.cssText = `
-    position: fixed;
-    top: 50px;
-    right: 50px;
-    width: 500px;
-    max-height: 70vh;
-    background: white;
-    border: 2px solid #e53e3e;
-    border-radius: 12px;
-    z-index: 20000;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-    font-family: 'SF Mono', Monaco, monospace;
-    font-size: 12px;
-  `;
-
-  debugWindow.innerHTML = `
-    <div style="background: #e53e3e; color: white; padding: 12px; border-radius: 10px 10px 0 0; display: flex; justify-content: space-between; align-items: center;">
-      <div style="font-weight: bold;">🐛 Navigation Debug Log</div>
-      <button onclick="document.getElementById('navigation-debug-window').remove()" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer;">✕</button>
-    </div>
-    <div style="padding: 16px; max-height: 400px; overflow-y: auto;">
-      <div id="debug-content" style="line-height: 1.4; white-space: pre-wrap;"></div>
-      <div style="margin-top: 16px; display: flex; gap: 8px;">
-        <button onclick="copyDebugLog()" style="background: #3182ce; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500;">📋 Copy Log</button>
-        <button onclick="clearDebugLog()" style="background: #718096; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500;">🗑️ Clear</button>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(debugWindow);
-  return debugWindow;
-};
-
-/**
- * 🐛 DEBUG: Log to debug window
- */
-const debugLog = (message, type = "info") => {
-  const debugContent = document.getElementById("debug-content");
-  if (!debugContent) {
-    createDebugWindow();
-    return debugLog(message, type); // Retry after creating window
-  }
-
-  const timestamp = new Date().toLocaleTimeString();
-  const icons = {
-    info: "📍",
-    warn: "⚠️",
-    error: "❌",
-    success: "✅",
-  };
-
-  const logEntry = `${timestamp} ${icons[type] || "📍"} ${message}\n`;
-  debugContent.textContent += logEntry;
-
-  // Auto-scroll to bottom
-  debugContent.scrollTop = debugContent.scrollHeight;
-};
-
-/**
- * 🐛 DEBUG: Copy log to clipboard
- */
-window.copyDebugLog = () => {
-  const debugContent = document.getElementById("debug-content");
-  if (debugContent) {
-    navigator.clipboard.writeText(debugContent.textContent).then(() => {
-      alert("Debug log copied to clipboard!");
-    });
-  }
-};
-
-/**
- * 🐛 DEBUG: Clear debug log
- */
-window.clearDebugLog = () => {
-  const debugContent = document.getElementById("debug-content");
-  if (debugContent) {
-    debugContent.textContent = "";
-  }
-};
-
-/**
- * Navigate to user page helper function (FIXED - Uses Page UID!)
- */
-window.navigateToUserPageClean = (username) => {
-  // Create debug window first
-  createDebugWindow();
-
-  debugLog("=== NAVIGATION DEBUG START ===");
-  debugLog(`Target username: "${username}"`);
-
-  try {
-    // Current page info
-    debugLog(`Current URL: ${window.location.href}`);
-    debugLog(`Current hash: ${window.location.hash}`);
-
-    // Check API availability
-    const hasRoamAPI = !!window.roamAlphaAPI;
-    const hasGraph = !!window.roamAlphaAPI?.graph;
-    debugLog(`Roam API available: ${hasRoamAPI}`);
-    debugLog(`Graph API available: ${hasGraph}`);
-
-    if (!hasRoamAPI || !hasGraph) {
-      debugLog("API not available - navigation may fail", "error");
-      return;
-    }
-
-    // Get graph name
-    let graphName = null;
-    try {
-      graphName = window.roamAlphaAPI.graph.name;
-      debugLog(`Graph name: "${graphName}"`);
-    } catch (error) {
-      debugLog(`Graph API failed: ${error.message}`, "error");
-      return;
-    }
-
-    // 🎯 CRITICAL FIX: Get page UID instead of using title!
-    debugLog("=== LOOKING UP PAGE UID ===");
-
-    const pageUidQuery = `
-      [:find ?uid 
-       :where 
-       [?page :node/title "${username}"]
-       [?page :block/uid ?uid]]
-    `;
-
-    debugLog(`Page UID query: ${pageUidQuery}`);
-
-    let pageUid = null;
-    try {
-      const pageUidResult = window.roamAlphaAPI.data.fast.q(pageUidQuery);
-      pageUid = pageUidResult?.[0]?.[0];
-      debugLog(`Page UID result: ${pageUid}`);
-    } catch (error) {
-      debugLog(`Page UID query failed: ${error.message}`, "error");
-      return;
-    }
-
-    if (!pageUid) {
-      debugLog(
-        `CRITICAL: No page UID found for username "${username}"`,
-        "error"
-      );
-      debugLog("This means the user page doesn't exist in Roam", "error");
-      return;
-    }
-
-    debugLog(
-      `✅ Found page UID: "${pageUid}" for username: "${username}"`,
-      "success"
-    );
-
-    // 🎯 CONSTRUCT CORRECT URL using UID (not title!)
-    const targetUrl = `#/app/${graphName}/page/${pageUid}`;
-    debugLog(`✅ Correct target URL: ${targetUrl}`, "success");
-
-    // Compare with old (broken) method
-    const oldBrokenUrl = `#/app/${graphName}/page/${encodeURIComponent(
-      username
-    )}`;
-    debugLog(`❌ Old broken URL would have been: ${oldBrokenUrl}`, "warn");
-
-    // CAPTURE BEFORE STATE
-    debugLog("=== BEFORE NAVIGATION ===");
-    debugLog(`Before URL: ${window.location.href}`);
-    debugLog(`Before hash: ${window.location.hash}`);
-
-    // ATTEMPT NAVIGATION with correct UID
-    debugLog("=== ATTEMPTING NAVIGATION (with UID) ===");
-    debugLog("Using window.location.hash assignment...");
-    window.location.hash = targetUrl.replace("#", "");
-    debugLog("UID-based hash assignment completed", "success");
-
-    // DELAY TO CHECK RESULTS
-    setTimeout(() => {
-      debugLog("=== AFTER NAVIGATION (1 second later) ===");
-      debugLog(`After URL: ${window.location.href}`);
-      debugLog(`After hash: ${window.location.hash}`);
-
-      // Check if we ended up where we intended
-      const currentHash = window.location.hash;
-      const expectedUid = pageUid;
-
-      if (currentHash.includes(expectedUid)) {
-        debugLog("🎉 SUCCESS: Navigation reached correct page UID!", "success");
-        debugLog(
-          `✅ Found expected UID "${expectedUid}" in current URL`,
-          "success"
-        );
-      } else {
-        debugLog("❌ FAILED: UID not found in current URL", "error");
-        debugLog(`Expected UID: ${expectedUid}`);
-        debugLog(`Actual hash: ${currentHash}`);
-      }
-
-      // Close modal with additional delay
-      setTimeout(() => {
-        const modal = document.getElementById("clean-user-directory-modal");
-        if (modal) {
-          modal.remove();
-          debugLog("Modal closed");
-        }
-        debugLog("=== NAVIGATION DEBUG END ===");
-      }, 500);
-    }, 1000);
-  } catch (error) {
-    debugLog(`CRITICAL ERROR: ${error.message}`, "error");
-    debugLog(`Stack: ${error.stack}`, "error");
-  }
-};
-
 // ===================================================================
 // 🎯 EXTENSION REGISTRATION - Fixed Button Management + Cache Integration
 // ===================================================================
@@ -1179,7 +1002,7 @@ window.navigateToUserPageClean = (username) => {
 export default {
   onload: () => {
     console.log(
-      "🎯 User Directory loading (Fixed Button Management + Chat Room Detection + Cache Integration + Clickable Avatars)..."
+      "🎯 User Directory loading (Fixed Navigation + Clean Code + Working Features)..."
     );
 
     // ✅ STEP 1: Check Extension 1.5 dependencies
@@ -1256,13 +1079,13 @@ export default {
       "clean-user-directory",
       {
         services: cleanDirectoryServices,
-        version: "9.3.0", // 🖱️ Clickable Avatars version
+        version: "10.0.0", // 🚀 Clean production version
       },
       {
         name: "✨ User Directory",
         description:
-          "Professional user directory with FIXED Simple Button Utility 2.0 integration, FIXED chat room conditional logic, NO fallback buttons, OPPORTUNISTIC cache refresh, and CLICKABLE avatars & usernames",
-        version: "9.3.0",
+          "Professional user directory with WORKING UID-based navigation, clickable avatars & usernames, conditional button logic, and clean production code",
+        version: "10.0.0",
         dependencies: requiredDependencies,
       }
     );
@@ -1284,44 +1107,34 @@ export default {
     // ✅ STEP 6: Success report
     const currentUser = platform.getUtility("getCurrentUser")();
     console.log(
-      "🎉 Extension SIX loaded successfully (FIXED Simple Button Utility 2.0 + Chat Room Detection + Cache Integration + Clickable Avatars)!"
+      "🎉 Extension SIX loaded successfully (WORKING NAVIGATION + CLEAN CODE)!"
     );
-    console.log("🗑️ REMOVED: All fallback button logic");
-    console.log("🎯 FIXED: Proper Simple Button Utility 2.0 integration");
     console.log(
-      "🔧 FIXED: Chat room detection with proper DOM-first title detection"
+      "🎯 FIXED: UID-based navigation (no more fallback to chat room!)"
     );
-    console.log("📝 NEW: Opportunistic cache refresh during modal creation");
-    console.log("🖱️ NEW: Clickable avatars and usernames for easy navigation");
-    console.log(
-      "🎯 CONDITIONAL: Button only appears on username or chat room pages"
-    );
-    console.log("🎨 STYLING: Elegant warm yellow with brown border");
-    console.log(
-      "🛡️ SAFETY: Fails gracefully if Simple Button Utility 2.0 not available"
-    );
+    console.log("🖱️ WORKING: Clickable avatars and usernames");
+    console.log("🔧 WORKING: Chat room detection and conditional buttons");
+    console.log("📝 WORKING: Opportunistic cache refresh");
+    console.log("🧹 CLEAN: Production-ready code without debug bloat");
     console.log(`👤 Current user: ${currentUser?.displayName}`);
     console.log('💡 Try: Cmd+P → "User Directory: Show Directory"');
 
     // Auto-test integration after a delay
     setTimeout(async () => {
-      console.log("🔍 Auto-testing Simple Button Utility 2.0 integration...");
+      console.log("🔍 Auto-testing system integration...");
       await runCleanSystemTests();
     }, 3000);
 
     return {
       extensionId: "clean-user-directory",
       services: cleanDirectoryServices,
-      version: "9.3.0",
-      status:
-        "fixed_simple_button_utility_integration_with_cache_and_clickable_avatars",
+      version: "10.0.0",
+      status: "production_ready_with_working_navigation",
     };
   },
 
   onunload: () => {
-    console.log(
-      "🎯 User Directory unloading (Fixed Simple Button Utility 2.0 Integration + Cache + Clickable Avatars)..."
-    );
+    console.log("🎯 User Directory unloading (Clean Production Version)...");
 
     // 🎯 CLEAN: Proper button management cleanup
     if (buttonManager) {
@@ -1345,7 +1158,7 @@ export default {
     delete window.navigateToUserPageClean;
 
     console.log(
-      "✅ User Directory cleanup complete (using Fixed Simple Button Utility 2.0 + Cache Integration + Clickable Avatars)!"
+      "✅ User Directory cleanup complete (Clean Production Version)!"
     );
   },
 };
