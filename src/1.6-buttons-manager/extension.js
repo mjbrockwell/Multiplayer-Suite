@@ -83,19 +83,19 @@
     "top-left": {
       maxButtons: 2,
       positions: [
-        { x: 20, y: 8 }, // ← Sandbox coordinates: relative to content area
-        { x: 20, y: 50 }, // ← Proper spacing for content positioning
+        { x: 14, y: 6 }, // ← Sandbox coordinates: relative to content area
+        { x: 14, y: 48 }, // ← Proper spacing for content positioning
       ],
     },
 
     "top-right": {
       maxButtons: 5,
       positions: [
-        { x: -100, y: 8 }, // ← Sandbox coordinates: -100px from right edge
-        { x: -100, y: 50 },
-        { x: -100, y: 92 },
-        { x: -100, y: 134 },
-        { x: -100, y: 176 },
+        { x: -14, y: 6 }, // ← Sandbox coordinates: -14px from right edge
+        { x: -14, y: 48 },
+        { x: -14, y: 90 },
+        { x: -14, y: 132 },
+        { x: -14, y: 174 },
       ],
     },
   };

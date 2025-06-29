@@ -677,6 +677,7 @@ const journalEntryCreator = (() => {
           try {
             const context = detectPageContext();
             await createUsernameEntry(context.page);
+            buttonManager.registry.rebuildAllButtons();
             log("✅ Journal entry created successfully!", "SUCCESS");
           } catch (error) {
             log(`❌ Failed to create journal entry: ${error.message}`, "ERROR");
@@ -703,6 +704,7 @@ const journalEntryCreator = (() => {
           try {
             const context = detectPageContext();
             await createChatRoomEntry(context.page);
+            buttonManager.registry.rebuildAllButtons();
             log("✅ Daily banner created successfully!", "SUCCESS");
           } catch (error) {
             log(`❌ Failed to create daily banner: ${error.message}`, "ERROR");
