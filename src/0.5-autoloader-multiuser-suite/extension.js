@@ -19,6 +19,14 @@ const MULTIUSER_EXTENSIONS = [
     exportPattern: "standard",
   },
   {
+    id: "buttons-manager",
+    name: "Buttons Manager",
+    url: "https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/refs/heads/main/src/1.6-buttons-manager/extension.js",
+    description: "Advanced button management and UI controls",
+    critical: true,
+    exportPattern: "standard",
+  },
+  {
     id: "user-authentication",
     name: "User Authentication",
     url: "https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/refs/heads/main/src/2-user-authentication/extension.js",
@@ -120,6 +128,14 @@ const MULTIUSER_EXTENSIONS = [
     url: "https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/refs/heads/main/src/13-profile-nudge/extension.js",
     description:
       "Smart profile completion prompts and user engagement features",
+    critical: false,
+    exportPattern: "standard",
+  },
+  {
+    id: "preferences-helper",
+    name: "Preferences Helper",
+    url: "https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/refs/heads/main/src/14-preferences-helper/extension.js",
+    description: "Enhanced preference management utilities and helpers",
     critical: false,
     exportPattern: "standard",
   },

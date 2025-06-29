@@ -204,33 +204,113 @@ const journalEntryCreator = (() => {
       if (!currentUser.displayName) return "blue";
 
       const prefsPageName = `${currentUser.displayName}/user preferences`;
-      const prefsBlocks = window.roamAlphaAPI.data.q(`
+
+      // 🔧 FIXED QUERY: Look for descendants, not just direct children
+      const allDescendants = window.roamAlphaAPI.data.q(`
+      [:find ?string
+       :where 
+       [?page :node/title "${prefsPageName}"]
+       [?page :block/children ?child]
+       [?descendant :block/parents ?child]
+       [?descendant :block/string ?string]]
+    `);
+
+      log(
+        `🔍 Found ${allDescendants.length} descendant blocks to search`,
+        "DEBUG"
+      );
+
+      // 🎯 IMPROVED SEARCH: Look for journal color key blocks (handle multiple formats)
+      let journalColorKeyFound = false;
+      let journalColorKeyUid = null;
+      let foundKeyText = null;
+
+      for (const [blockString] of allDescendants) {
+        // Look for any journal color key format (flexible matching)
+        if (
+          blockString.includes("**Journal") &&
+          blockString.includes("Color:**")
+        ) {
+          journalColorKeyFound = true;
+          foundKeyText = blockString;
+          // Get the UID of this key block
+          journalColorKeyUid = window.roamAlphaAPI.data.q(`
+          [:find ?uid .
+           :where 
+           [?block :block/string "${blockString}"]
+           [?block :block/uid ?uid]]
+        `);
+          log(`✅ Found Journal Color key block: "${blockString}"`, "DEBUG");
+          break;
+        }
+      }
+
+      if (journalColorKeyFound && journalColorKeyUid) {
+        // 🎯 Get the child blocks of the Journal Color key (the actual color values)
+        const colorValues = window.roamAlphaAPI.data.q(`
         [:find ?string
          :where 
-         [?page :node/title "${prefsPageName}"]
-         [?page :block/children ?block]
-         [?block :block/string ?string]]
+         [?parent :block/uid "${journalColorKeyUid}"]
+         [?parent :block/children ?child]
+         [?child :block/string ?string]]
       `);
 
-      // Search for color preference
-      for (const [blockString] of prefsBlocks) {
-        if (
-          blockString.toLowerCase().includes("journal") &&
-          blockString.toLowerCase().includes("color")
-        ) {
+        if (colorValues.length > 0) {
+          const colorValue = colorValues[0][0].trim().toLowerCase();
+          log(`🎨 Found color preference: "${colorValue}"`, "SUCCESS");
+          return colorValue;
+        }
+      }
+
+      // 🔍 FALLBACK: Original pattern search for backward compatibility (case-insensitive)
+      log("🔄 Using fallback search pattern...", "DEBUG");
+      for (const [blockString] of allDescendants) {
+        const lowerString = blockString.toLowerCase();
+        if (lowerString.includes("journal") && lowerString.includes("color")) {
           const colorMatch = blockString.match(
             /\b(red|orange|yellow|green|blue|violet|purple|brown|grey|gray|white)\b/i
           );
           if (colorMatch) {
-            log(`Found color preference: ${colorMatch[1]}`, "SUCCESS");
+            log(
+              `Found color preference (fallback): ${colorMatch[1]}`,
+              "SUCCESS"
+            );
             return colorMatch[1].toLowerCase();
           }
         }
       }
 
+      // 🔍 FINAL FALLBACK: Look for any valid color values in descendants
+      log("🔄 Final fallback: searching for any color values...", "DEBUG");
+      const validColors = [
+        "red",
+        "orange",
+        "yellow",
+        "green",
+        "blue",
+        "violet",
+        "purple",
+        "brown",
+        "grey",
+        "gray",
+        "white",
+      ];
+
+      for (const [blockString] of allDescendants) {
+        const trimmedString = blockString.trim().toLowerCase();
+        if (validColors.includes(trimmedString)) {
+          log(
+            `Found color preference (final fallback): ${trimmedString}`,
+            "SUCCESS"
+          );
+          return trimmedString;
+        }
+      }
+
+      log("🔵 No color preference found, using default: blue", "INFO");
       return "blue"; // Default
     } catch (error) {
-      log(`Error getting journal color: ${error.message}`, "ERROR");
+      log(`❌ Error getting journal color: ${error.message}`, "ERROR");
       return "blue";
     }
   };
