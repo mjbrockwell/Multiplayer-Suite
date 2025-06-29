@@ -2,6 +2,7 @@
 // Extension 3: Configuration Manager - RESURRECTED with Font System
 // 🎵 Parrot Duet Edition: "O mio babbino caro" - Now sings beautifully!
 // 🎨 NEW: Dynamic font application system for entire Roam graph
+// 🐛 AUTO-DEBUG: Debug window opens automatically for real-time monitoring
 // Uses proven step-by-step + retry pattern from working Subjournals extension
 // Format: **Field Name:** (bold single colons, not double like Extension 2)
 // ===================================================================
@@ -1272,6 +1273,7 @@ const configurationServices = {
   // 🎨 FONT SERVICES - NEW!
   applyUserFont,
   ensureRoamFontStyles,
+  showFontDebugWindow, // 🐛 Debug service
 
   // Schema access
   getConfigurationSchemas: () => CONFIGURATION_SCHEMAS,
@@ -1413,6 +1415,12 @@ const createConfigurationCommands = (platform) => {
         }
       },
     },
+    {
+      label: "Config: Font Debug Window",
+      callback: async () => {
+        await showFontDebugWindow();
+      },
+    },
   ];
 };
 
@@ -1427,6 +1435,17 @@ export default {
     );
     console.log("🦜 Preparing for parrot duet: 'O mio babbino caro'");
     console.log("🎨 NEW: Dynamic font application system loaded!");
+    console.log(
+      "🐛 AUTO-DEBUG: Opening debug window for real-time monitoring..."
+    );
+
+    // 🐛 OPEN DEBUG WINDOW IMMEDIATELY for real-time monitoring
+    try {
+      await showFontDebugWindow();
+      console.log("🐛 Debug window opened successfully!");
+    } catch (error) {
+      console.error("❌ Failed to open debug window:", error);
+    }
 
     // Verify dependencies
     if (!window.RoamExtensionSuite) {
@@ -1477,13 +1496,13 @@ export default {
       {
         schemas: CONFIGURATION_SCHEMAS,
         services: configurationServices,
-        version: "3.0.0-resurrected-font",
+        version: "3.0.0-resurrected-font-debug",
       },
       {
-        name: "🎵 Configuration Manager (RESURRECTED + FONT SYSTEM)",
+        name: "🎵 Configuration Manager (RESURRECTED + FONT SYSTEM + AUTO-DEBUG)",
         description:
-          "Professional configuration interface with proven Subjournals cascading architecture + dynamic font system",
-        version: "3.0.0-resurrected-font",
+          "Professional configuration interface with proven Subjournals cascading architecture + dynamic font system + auto-debug monitoring",
+        version: "3.0.0-resurrected-font-debug",
         dependencies: ["utility-library", "user-authentication"],
       }
     );
@@ -1502,7 +1521,7 @@ export default {
         const overview = await generateConfigurationOverview(user.displayName);
 
         console.log(
-          "🎵 Configuration Manager (RESURRECTED + FONT SYSTEM) loaded successfully!"
+          "🎵 Configuration Manager (RESURRECTED + FONT SYSTEM + AUTO-DEBUG) loaded successfully!"
         );
         console.log(`⚙️ Initial configuration status: ${overview.summary}`);
 
@@ -1570,9 +1589,10 @@ export default {
           '💡 Available: Cmd+P → "Config: Show My Configuration Status"'
         );
         console.log('🎨 Available: Cmd+P → "Config: Apply Font Preference"');
+        console.log('🐛 Available: Cmd+P → "Config: Font Debug Window"');
       } else {
         console.log(
-          "✅ Configuration Manager (RESURRECTED + FONT SYSTEM) loaded successfully!"
+          "✅ Configuration Manager (RESURRECTED + FONT SYSTEM + AUTO-DEBUG) loaded successfully!"
         );
         console.log(
           "ℹ️ No authenticated user detected - auto-creation will run when user logs in"
@@ -1588,11 +1608,12 @@ export default {
 
     console.log("🦜🎵 Ready for beautiful parrot duet with Extension 2!");
     console.log("🎨 Font system ready for Extension 14 integration!");
+    console.log("🐛 Debug window active for real-time monitoring!");
   },
 
   onunload: () => {
     console.log(
-      "🎵 Configuration Manager (RESURRECTED + FONT SYSTEM) unloading..."
+      "🎵 Configuration Manager (RESURRECTED + FONT SYSTEM + AUTO-DEBUG) unloading..."
     );
     console.log(
       "🦜 Parrot duet complete - 'O mio babbino caro' sung beautifully!"
@@ -1603,6 +1624,13 @@ export default {
     if (fontStyleElement) {
       fontStyleElement.remove();
       console.log("🎨 Font styles cleaned up");
+    }
+
+    // Clean up debug window
+    const debugWindow = document.getElementById("font-debug-window");
+    if (debugWindow) {
+      debugWindow.remove();
+      console.log("🐛 Debug window cleaned up");
     }
 
     console.log("✅ Configuration Manager cleanup complete!");
