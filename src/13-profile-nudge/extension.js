@@ -336,7 +336,7 @@ const userProfileNudgesExtension = (() => {
       // 🌟 Register Profile Nudge Button
       const nudgeButtonResult = await buttonManager.registerButton({
         id: "profile-nudge-button",
-        text: "✨ Complete Your Profile",
+        text: "✨ Click for profile helper",
         stack: "top-right", // Position at top-right with other action buttons
         priority: false, // Play nice with other extensions
         style: buttonStyle,

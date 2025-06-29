@@ -952,17 +952,221 @@ const createErrorProfile = (username, errorMessage) => ({
 });
 
 /**
- * Navigate to user page helper function
+ * 🐛 DEBUG: Create debug window for navigation troubleshooting
+ */
+const createDebugWindow = () => {
+  // Remove existing debug window
+  const existingDebug = document.getElementById("navigation-debug-window");
+  if (existingDebug) existingDebug.remove();
+
+  const debugWindow = document.createElement("div");
+  debugWindow.id = "navigation-debug-window";
+  debugWindow.style.cssText = `
+    position: fixed;
+    top: 50px;
+    right: 50px;
+    width: 500px;
+    max-height: 70vh;
+    background: white;
+    border: 2px solid #e53e3e;
+    border-radius: 12px;
+    z-index: 20000;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 12px;
+  `;
+
+  debugWindow.innerHTML = `
+    <div style="background: #e53e3e; color: white; padding: 12px; border-radius: 10px 10px 0 0; display: flex; justify-content: space-between; align-items: center;">
+      <div style="font-weight: bold;">🐛 Navigation Debug Log</div>
+      <button onclick="document.getElementById('navigation-debug-window').remove()" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer;">✕</button>
+    </div>
+    <div style="padding: 16px; max-height: 400px; overflow-y: auto;">
+      <div id="debug-content" style="line-height: 1.4; white-space: pre-wrap;"></div>
+      <div style="margin-top: 16px; display: flex; gap: 8px;">
+        <button onclick="copyDebugLog()" style="background: #3182ce; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500;">📋 Copy Log</button>
+        <button onclick="clearDebugLog()" style="background: #718096; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500;">🗑️ Clear</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(debugWindow);
+  return debugWindow;
+};
+
+/**
+ * 🐛 DEBUG: Log to debug window
+ */
+const debugLog = (message, type = "info") => {
+  const debugContent = document.getElementById("debug-content");
+  if (!debugContent) {
+    createDebugWindow();
+    return debugLog(message, type); // Retry after creating window
+  }
+
+  const timestamp = new Date().toLocaleTimeString();
+  const icons = {
+    info: "📍",
+    warn: "⚠️",
+    error: "❌",
+    success: "✅",
+  };
+
+  const logEntry = `${timestamp} ${icons[type] || "📍"} ${message}\n`;
+  debugContent.textContent += logEntry;
+
+  // Auto-scroll to bottom
+  debugContent.scrollTop = debugContent.scrollHeight;
+};
+
+/**
+ * 🐛 DEBUG: Copy log to clipboard
+ */
+window.copyDebugLog = () => {
+  const debugContent = document.getElementById("debug-content");
+  if (debugContent) {
+    navigator.clipboard.writeText(debugContent.textContent).then(() => {
+      alert("Debug log copied to clipboard!");
+    });
+  }
+};
+
+/**
+ * 🐛 DEBUG: Clear debug log
+ */
+window.clearDebugLog = () => {
+  const debugContent = document.getElementById("debug-content");
+  if (debugContent) {
+    debugContent.textContent = "";
+  }
+};
+
+/**
+ * Navigate to user page helper function (WITH CLEAN DEBUG WINDOW)
  */
 window.navigateToUserPageClean = (username) => {
-  const userPageUrl = `#/app/${
-    window.roamAlphaAPI.graph.name
-  }/page/${encodeURIComponent(username)}`;
-  window.location.href = userPageUrl;
+  // Create debug window first
+  createDebugWindow();
 
-  // Close modal
-  const modal = document.getElementById("clean-user-directory-modal");
-  if (modal) modal.remove();
+  debugLog("=== NAVIGATION DEBUG START ===");
+  debugLog(`Target username: "${username}"`);
+
+  try {
+    // Current page info
+    debugLog(`Current URL: ${window.location.href}`);
+    debugLog(`Current hash: ${window.location.hash}`);
+
+    // Check API availability
+    const hasRoamAPI = !!window.roamAlphaAPI;
+    const hasGraph = !!window.roamAlphaAPI?.graph;
+    debugLog(`Roam API available: ${hasRoamAPI}`);
+    debugLog(`Graph API available: ${hasGraph}`);
+
+    if (!hasRoamAPI || !hasGraph) {
+      debugLog("API not available - navigation may fail", "error");
+      return;
+    }
+
+    // Get graph name with multiple methods
+    let graphName = null;
+
+    // Method 1: Direct API call
+    try {
+      graphName = window.roamAlphaAPI.graph.name;
+      debugLog(`Graph name (API): "${graphName}"`);
+    } catch (error) {
+      debugLog(`Graph API failed: ${error.message}`, "error");
+    }
+
+    // Method 2: Extract from URL
+    try {
+      const urlMatch = window.location.href.match(/#\/app\/([^\/]+)/);
+      const urlGraphName = urlMatch ? decodeURIComponent(urlMatch[1]) : null;
+      debugLog(`Graph name (URL): "${urlGraphName}"`);
+
+      if (!graphName && urlGraphName) {
+        graphName = urlGraphName;
+        debugLog("Using URL-extracted graph name", "warn");
+      }
+    } catch (error) {
+      debugLog(`URL extraction failed: ${error.message}`, "error");
+    }
+
+    if (!graphName) {
+      debugLog("CRITICAL: No graph name found!", "error");
+      return;
+    }
+
+    // Construct target URL
+    const encodedUsername = encodeURIComponent(username);
+    debugLog(`Encoded username: "${encodedUsername}"`);
+
+    // Test different URL patterns
+    const urlPatterns = [
+      `#/app/${graphName}/page/${encodedUsername}`,
+      `/#/app/${graphName}/page/${encodedUsername}`,
+      `#/app/${encodeURIComponent(graphName)}/page/${encodedUsername}`,
+      `#/page/${encodedUsername}`,
+    ];
+
+    debugLog("=== URL PATTERNS TO TRY ===");
+    urlPatterns.forEach((url, i) => {
+      debugLog(`Pattern ${i + 1}: ${url}`);
+    });
+
+    const targetUrl = urlPatterns[0]; // Use first pattern
+    debugLog(`Selected target URL: ${targetUrl}`, "success");
+
+    // CAPTURE BEFORE STATE
+    debugLog("=== BEFORE NAVIGATION ===");
+    debugLog(`Before URL: ${window.location.href}`);
+    debugLog(`Before hash: ${window.location.hash}`);
+
+    // ATTEMPT NAVIGATION
+    debugLog("=== ATTEMPTING NAVIGATION ===");
+
+    // Method 1: Direct hash change (often more reliable in SPAs)
+    debugLog("Trying window.location.hash assignment...");
+    window.location.hash = targetUrl.replace("#", "");
+    debugLog("Hash assignment completed", "success");
+
+    // DELAY TO CHECK RESULTS
+    setTimeout(() => {
+      debugLog("=== AFTER NAVIGATION (1 second later) ===");
+      debugLog(`After URL: ${window.location.href}`);
+      debugLog(`After hash: ${window.location.hash}`);
+
+      // Check if we ended up where we intended
+      const currentHash = window.location.hash;
+      const expectedPath = targetUrl.replace("#", "");
+
+      if (currentHash.includes(expectedPath)) {
+        debugLog("✅ SUCCESS: Navigation reached target!", "success");
+      } else if (currentHash.includes(encodedUsername)) {
+        debugLog(
+          "⚠️ PARTIAL: Username found in URL but path different",
+          "warn"
+        );
+      } else {
+        debugLog("❌ FAILED: Navigation did not reach target", "error");
+        debugLog(`Expected path: ${expectedPath}`);
+        debugLog(`Actual hash: ${currentHash}`);
+      }
+
+      // Close modal with additional delay
+      setTimeout(() => {
+        const modal = document.getElementById("clean-user-directory-modal");
+        if (modal) {
+          modal.remove();
+          debugLog("Modal closed");
+        }
+        debugLog("=== NAVIGATION DEBUG END ===");
+      }, 500);
+    }, 1000);
+  } catch (error) {
+    debugLog(`CRITICAL ERROR: ${error.message}`, "error");
+    debugLog(`Stack: ${error.stack}`, "error");
+  }
 };
 
 // ===================================================================
