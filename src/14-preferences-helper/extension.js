@@ -1,8 +1,9 @@
 // ===================================================================
-// Enhanced Preferences Editor Extension - Professional UX + Font Integration
+// Enhanced Preferences Editor Extension - Professional UX + Font Integration + Surgical Color Auto-Fix
 // 🎛️ Fixed save button + immediate font application + 25% larger modal
 // 🎯 Three-section layout: Fixed header + Scrollable content + Fixed footer
 // 🎨 Professional user experience with real-time feedback
+// 🔥 NEW: Surgical Journal Color Auto-Fix Integration
 // ===================================================================
 
 const preferencesEditorExtension = (() => {
@@ -290,6 +291,242 @@ const preferencesEditorExtension = (() => {
     } catch (error) {
       log(`Error saving preferences: ${error.message}`, "ERROR");
       return false;
+    }
+  };
+
+  // ===================================================================
+  // 🎯 SURGICAL COLOR AUTO-FIX FUNCTIONS - Extension 3 Integration
+  // ===================================================================
+
+  /**
+   * 🔍 Find user's home page UID
+   */
+  const getUserPageUid = async (username) => {
+    try {
+      const pageUid = window.roamAlphaAPI.q(`
+        [:find ?uid :where [?e :node/title "${username}"] [?e :block/uid ?uid]]
+      `)?.[0]?.[0];
+
+      if (pageUid) {
+        log(`Found user page: ${username} (${pageUid})`, "DEBUG");
+        return pageUid;
+      } else {
+        log(`User page not found: ${username}`, "WARNING");
+        return null;
+      }
+    } catch (error) {
+      log(`Error finding user page for ${username}: ${error.message}`, "ERROR");
+      return null;
+    }
+  };
+
+  /**
+   * 🔍 Find "Journal::" block on user's page
+   */
+  const findJournalBlock = async (pageUid) => {
+    try {
+      const blocks = window.roamAlphaAPI.q(`
+        [:find (pull ?block [:block/uid :block/string])
+         :where 
+         [?page :block/uid "${pageUid}"]
+         [?block :block/page ?page]
+         [?block :block/string ?string]
+         [(clojure.string/starts-with? ?string "Journal::")]]
+      `);
+
+      if (blocks.length === 0) {
+        log(
+          `No block starting with "Journal::" found on page ${pageUid}`,
+          "INFO"
+        );
+        return null;
+      }
+
+      if (blocks.length > 1) {
+        log(
+          `Multiple blocks starting with "Journal::" found, using first one`,
+          "WARNING"
+        );
+      }
+
+      const journalBlock = blocks[0][0];
+      const uid = journalBlock[":block/uid"] || journalBlock.uid;
+      const text = journalBlock[":block/string"] || journalBlock.string;
+
+      log(`Found Journal:: block: "${text}" (${uid})`, "DEBUG");
+      return uid;
+    } catch (error) {
+      log(`Error finding Journal:: block: ${error.message}`, "ERROR");
+      return null;
+    }
+  };
+
+  /**
+   * 🌳 Get ALL descendant blocks (children, grandchildren, etc.) of a block
+   */
+  const getAllDescendantBlocks = async (parentUid) => {
+    try {
+      const descendants = window.roamAlphaAPI.q(`
+        [:find (pull ?descendant [:block/uid :block/string])
+         :where 
+         [?parent :block/uid "${parentUid}"]
+         [?descendant :block/parents ?parent]
+         [?descendant :block/string ?string]]
+      `);
+
+      const result = descendants.map(([block]) => ({
+        uid: block[":block/uid"] || block.uid,
+        text: block[":block/string"] || block.string,
+      }));
+
+      log(`Found ${result.length} descendant blocks of ${parentUid}`, "DEBUG");
+      return result;
+    } catch (error) {
+      log(`Error getting descendant blocks: ${error.message}`, "ERROR");
+      return [];
+    }
+  };
+
+  /**
+   * 🌈 Get 3-letter color code from full color name
+   */
+  const getColorCode = (colorName) => {
+    const COLOR_MAPPING = {
+      red: "red",
+      orange: "orn",
+      yellow: "ylo",
+      green: "grn",
+      blue: "blu",
+      violet: "ppl",
+      brown: "brn",
+      grey: "gry",
+      white: "wht",
+    };
+    return COLOR_MAPPING[colorName] || "blu"; // Default to blue
+  };
+
+  /**
+   * 🎯 SURGICAL JOURNAL COLOR TAG UPDATER
+   * Simple, robust, precise: finds Journal:: block, replaces ALL color tags with current preference
+   */
+  const surgicalUpdateJournalColorTags = async (username) => {
+    try {
+      log(`Starting surgical color tag update for ${username}`, "INFO");
+
+      // STEP 1: Get user's current color preference
+      const getUserPreferenceBulletproof =
+        getUtility("getUserPreferenceBulletproof") ||
+        getUtility("getUserPreference");
+      if (!getUserPreferenceBulletproof) {
+        log("No user preference utility available", "ERROR");
+        return { success: false, error: "No preference utility found" };
+      }
+
+      const currentColor = await getUserPreferenceBulletproof(
+        username,
+        "Journal Header Color"
+      );
+      if (!currentColor) {
+        log(`No journal color preference found for ${username}`, "WARNING");
+        return { success: false, error: "No color preference found" };
+      }
+
+      const currentColorCode = getColorCode(currentColor);
+      const newColorTag = `#clr-lgt-${currentColorCode}-act`;
+      log(`Target color: ${currentColor} → ${newColorTag}`, "INFO");
+
+      // STEP 2: Get user's page UID
+      const userPageUid = await getUserPageUid(username);
+      if (!userPageUid) {
+        log(`Could not find page for user: ${username}`, "ERROR");
+        return { success: false, error: `User page not found: ${username}` };
+      }
+
+      // STEP 3: Find "Journal::" block on user's page
+      const journalBlockUid = await findJournalBlock(userPageUid);
+      if (!journalBlockUid) {
+        log(`No "Journal::" block found on ${username}'s page`, "INFO");
+        return {
+          success: true,
+          changed: 0,
+          message: "No Journal:: block found",
+        };
+      }
+
+      log(`Found Journal:: block: ${journalBlockUid}`, "SUCCESS");
+
+      // STEP 4: Get ALL descendant blocks of Journal::
+      const descendantBlocks = await getAllDescendantBlocks(journalBlockUid);
+      log(
+        `Found ${descendantBlocks.length} descendant blocks to check`,
+        "INFO"
+      );
+
+      // STEP 5: Surgical replacement on each block
+      let updatedCount = 0;
+      let failedCount = 0;
+      const colorTagPattern = /#clr-lgt-\w+-act/g;
+
+      for (const block of descendantBlocks) {
+        try {
+          // Check if block contains any color tags
+          if (colorTagPattern.test(block.text)) {
+            // Reset regex lastIndex for next use
+            colorTagPattern.lastIndex = 0;
+
+            // Replace ALL color tags with current preference
+            const updatedText = block.text.replace(
+              colorTagPattern,
+              newColorTag
+            );
+
+            log(
+              `Updating block ${block.uid}: "${block.text}" → "${updatedText}"`,
+              "DEBUG"
+            );
+
+            await window.roamAlphaAPI.data.block.update({
+              block: {
+                uid: block.uid,
+                string: updatedText,
+              },
+            });
+
+            updatedCount++;
+            log(`Block ${block.uid} updated successfully`, "DEBUG");
+
+            // Small delay to prevent API overload
+            await new Promise((resolve) => setTimeout(resolve, 50));
+          }
+        } catch (blockError) {
+          log(
+            `Failed to update block ${block.uid}: ${blockError.message}`,
+            "ERROR"
+          );
+          failedCount++;
+        }
+      }
+
+      // STEP 6: Report results
+      const summary = `Surgically updated ${updatedCount} blocks (${failedCount} failed)`;
+      log(summary, updatedCount > 0 ? "SUCCESS" : "INFO");
+
+      return {
+        success: updatedCount > 0 || failedCount === 0,
+        changed: updatedCount,
+        failed: failedCount,
+        total: descendantBlocks.length,
+        message: summary,
+        targetColor: currentColor,
+        targetTag: newColorTag,
+      };
+    } catch (error) {
+      log(`Error during surgical update: ${error.message}`, "ERROR");
+      return {
+        success: false,
+        error: error.message,
+        changed: 0,
+      };
     }
   };
 
@@ -1201,6 +1438,22 @@ const preferencesEditorExtension = (() => {
     return initialFont !== newFont && newFont;
   };
 
+  // ===================================================================
+  // 🎯 JOURNAL COLOR CHANGE DETECTION - New Integration
+  // ===================================================================
+
+  const checkJournalColorPreferenceChange = (updatedPreferences) => {
+    const initialColor = initialPreferences["Journal Header Color"];
+    const newColor = updatedPreferences["Journal Header Color"];
+
+    log(
+      `Journal color change check: Initial="${initialColor}", New="${newColor}"`,
+      "DEBUG"
+    );
+
+    return initialColor !== newColor && newColor;
+  };
+
   const applyFontChange = async (newFont, username) => {
     try {
       log(`🔤 Attempting to apply font change to: ${newFont}`, "INFO");
@@ -1376,7 +1629,7 @@ const preferencesEditorExtension = (() => {
   };
 
   // ===================================================================
-  // 💾 ENHANCED SAVE PREFERENCES HANDLER - With Font Integration
+  // 💾 ENHANCED SAVE PREFERENCES HANDLER - With Font + Surgical Color Integration
   // ===================================================================
 
   const handleSavePreferences = async () => {
@@ -1455,10 +1708,66 @@ const preferencesEditorExtension = (() => {
         }
       }
 
-      // 3. Show overall success message
-      showUserFeedback("✅ Preferences saved successfully!", "success");
+      // 3. 🎯 SURGICAL COLOR AUTO-FIX - New Integration!
+      const journalColorChanged =
+        checkJournalColorPreferenceChange(updatedPreferences);
 
-      // 4. Close modal after brief delay
+      if (journalColorChanged) {
+        log(
+          "🎨 Journal color preference changed, running surgical auto-fix...",
+          "INFO"
+        );
+
+        const user = getCurrentUserSafe();
+        try {
+          const surgicalResult = await surgicalUpdateJournalColorTags(
+            user.displayName
+          );
+
+          if (surgicalResult.success) {
+            if (surgicalResult.changed > 0) {
+              const message = `✅ Updated ${surgicalResult.changed} journal entries to ${surgicalResult.targetColor}!`;
+              showUserFeedback(message, "success");
+              log(
+                `Surgical auto-fix completed: ${surgicalResult.message}`,
+                "SUCCESS"
+              );
+              log(
+                `Target: ${surgicalResult.targetColor} (${surgicalResult.targetTag})`,
+                "INFO"
+              );
+            } else {
+              log(
+                "No color tags found in Journal:: block - nothing to update",
+                "INFO"
+              );
+            }
+          } else {
+            log(
+              `Surgical auto-fix info: ${
+                surgicalResult.message || surgicalResult.error
+              }`,
+              "INFO"
+            );
+          }
+        } catch (surgicalError) {
+          log(
+            `Surgical color update warning: ${surgicalError.message}`,
+            "WARNING"
+          );
+          log(
+            "Color preference saved successfully, but auto-fix failed",
+            "WARNING"
+          );
+        }
+      }
+
+      // 4. Show overall success message (if not already shown by specific changes)
+      if (!fontChanged && !journalColorChanged) {
+        showUserFeedback("✅ Preferences saved successfully!", "success");
+      }
+
+      // 5. Close modal after brief delay
       setTimeout(() => {
         if (preferencesModal) {
           preferencesModal.remove();
@@ -1536,12 +1845,20 @@ const preferencesEditorExtension = (() => {
         });
       }
 
-      // Export public API
+      // Export public API with surgical functions
       window.preferencesEditor = {
         showPreferencesEditModal,
         getCurrentPreferences,
         isOnOwnUserPreferencesPage,
         initializeButtonManagement,
+
+        // 🎯 Surgical Color Functions - New Exports!
+        surgicalUpdateJournalColorTags,
+        getUserPageUid,
+        findJournalBlock,
+        getAllDescendantBlocks,
+        getColorCode,
+
         debug: {
           testButtonCondition: isOnOwnUserPreferencesPage,
           getCurrentUser: getCurrentUserSafe,
@@ -1551,6 +1868,49 @@ const preferencesEditorExtension = (() => {
             const applyUserFont = platform?.getUtility("applyUserFont");
             return { platform: !!platform, applyUserFont: !!applyUserFont };
           },
+
+          // 🎯 New surgical debugging functions
+          testSurgicalColorUpdate: async (username) => {
+            const user = getCurrentUserSafe();
+            const testUsername = username || user?.displayName;
+            if (!testUsername)
+              return { error: "No username provided or detected" };
+
+            try {
+              const result = await surgicalUpdateJournalColorTags(testUsername);
+              return result;
+            } catch (error) {
+              return { error: error.message };
+            }
+          },
+
+          checkJournalBlock: async (username) => {
+            const user = getCurrentUserSafe();
+            const testUsername = username || user?.displayName;
+            if (!testUsername)
+              return { error: "No username provided or detected" };
+
+            try {
+              const pageUid = await getUserPageUid(testUsername);
+              if (!pageUid) return { error: "User page not found" };
+
+              const journalUid = await findJournalBlock(pageUid);
+              if (!journalUid) return { error: "No Journal:: block found" };
+
+              const descendants = await getAllDescendantBlocks(journalUid);
+              return {
+                userPage: pageUid,
+                journalBlock: journalUid,
+                descendants: descendants.length,
+                hasColorTags: descendants.some((b) =>
+                  /#clr-lgt-\w+-act/.test(b.text)
+                ),
+              };
+            } catch (error) {
+              return { error: error.message };
+            }
+          },
+
           testFontLoading: async (fontName) => {
             const fontList = [
               { name: "Noto Sans", type: "system", fallback: "sans-serif" },
@@ -1692,6 +2052,11 @@ const preferencesEditorExtension = (() => {
         "INFO"
       );
       log("💾 UX: Save button always visible at bottom", "INFO");
+      log("🎯 NEW: Surgical Journal Color Auto-Fix Integration!", "SUCCESS");
+      log(
+        "🔥 AUTO-FIX: Color changes automatically update all journal entries",
+        "INFO"
+      );
     } catch (error) {
       log(`CRITICAL ERROR in onload: ${error.message}`, "ERROR");
     }
