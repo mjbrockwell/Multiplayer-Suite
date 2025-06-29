@@ -1,11 +1,366 @@
 // ===================================================================
-// Extension 3: Configuration Manager - SMART FONT SYSTEM UPGRADE
-// 🎵 Parrot Duet Edition: "O mio babbino caro" - Now with bulletproof fonts!
+// Extension 3: Configuration Manager - SMART FONT + JOURNAL COLOR SYSTEM UPGRADE
+// 🎵 Parrot Duet Edition: "O mio babbino caro" - Now with bulletproof fonts + color management!
 // 🎨 NEW: Complete smart font system with web font loading capabilities
+// 🌈 NEW: Journal color tag management system with bulk update capabilities
 // 🚀 INTEGRATED: Extension 14's proven font loading architecture
 // Uses proven step-by-step + retry pattern from working Subjournals extension
 // Format: **Field Name:** (bold single colons, not double like Extension 2)
 // ===================================================================
+
+// ===================================================================
+// 🌈 JOURNAL COLOR SYSTEM - Complete Color Management
+// ===================================================================
+
+/**
+ * 🌈 COLOR_MAPPING - Journal Color to 3-Letter Code System
+ * Maps full color names to their 3-letter tag codes used in journal entries
+ */
+const COLOR_MAPPING = {
+  red: "red",
+  orange: "orn",
+  yellow: "ylo",
+  green: "grn",
+  blue: "blu",
+  violet: "ppl",
+  brown: "brn",
+  grey: "gry",
+  white: "wht",
+};
+
+/**
+ * 🌈 Get 3-letter color code from full color name
+ */
+const getColorCode = (colorName) => {
+  return COLOR_MAPPING[colorName] || "blu"; // Default to blue
+};
+
+/**
+ * 🌈 Get full color name from 3-letter code
+ */
+const getColorNameFromCode = (colorCode) => {
+  const entry = Object.entries(COLOR_MAPPING).find(
+    ([name, code]) => code === colorCode
+  );
+  return entry ? entry[0] : "blue"; // Default to blue
+};
+
+/**
+ * 🌈 Core Journal Color Tag Update System
+ * Updates ALL color tags on user's home page from old color to new color
+ */
+const updateUserJournalColorTags = async (username, oldColor, newColor) => {
+  try {
+    console.log(
+      `🌈 [COLOR UPDATE] Updating journal color tags for ${username}: ${oldColor} → ${newColor}`
+    );
+
+    // STEP 1: Get 3-letter codes for both colors
+    const oldColorCode = getColorCode(oldColor);
+    const newColorCode = getColorCode(newColor);
+
+    if (oldColorCode === newColorCode) {
+      console.log(
+        `ℹ️ Color codes are the same (${oldColorCode}), no update needed`
+      );
+      return { success: true, changed: 0, message: "No change needed" };
+    }
+
+    console.log(
+      `🔍 Searching for color pattern: clr-lgt-${oldColorCode}-act → clr-lgt-${newColorCode}-act`
+    );
+
+    // STEP 2: Get user's home page UID
+    const userPageUid = await getUserPageUid(username);
+    if (!userPageUid) {
+      console.error(`❌ Could not find page for user: ${username}`);
+      return { success: false, error: `User page not found: ${username}` };
+    }
+
+    // STEP 3: Find all blocks on user page containing old color tag
+    const oldColorTag = `#clr-lgt-${oldColorCode}-act`;
+    const newColorTag = `#clr-lgt-${newColorCode}-act`;
+
+    console.log(`🔍 Searching for blocks containing: ${oldColorTag}`);
+
+    const blocksToUpdate = await findBlocksWithColorTag(
+      userPageUid,
+      oldColorTag
+    );
+
+    if (blocksToUpdate.length === 0) {
+      console.log(`ℹ️ No blocks found with color tag: ${oldColorTag}`);
+      return { success: true, changed: 0, message: "No blocks to update" };
+    }
+
+    console.log(`📝 Found ${blocksToUpdate.length} blocks to update`);
+
+    // STEP 4: Update each block
+    let updatedCount = 0;
+    let failedCount = 0;
+
+    for (const block of blocksToUpdate) {
+      try {
+        // Replace old color tag with new color tag
+        const updatedText = block.text.replace(
+          new RegExp(`#clr-lgt-${oldColorCode}-act`, "g"),
+          newColorTag
+        );
+
+        console.log(`🔄 Updating block ${block.uid}`);
+        console.log(`   Old: ${block.text}`);
+        console.log(`   New: ${updatedText}`);
+
+        await window.roamAlphaAPI.data.block.update({
+          block: {
+            uid: block.uid,
+            string: updatedText,
+          },
+        });
+
+        updatedCount++;
+        console.log(`✅ Block ${block.uid} updated successfully`);
+
+        // Small delay to prevent API overload
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      } catch (blockError) {
+        console.error(`❌ Failed to update block ${block.uid}:`, blockError);
+        failedCount++;
+      }
+    }
+
+    // STEP 5: Report results
+    const summary = `Updated ${updatedCount} blocks (${failedCount} failed)`;
+    console.log(`🎉 [COLOR UPDATE] ${summary}`);
+
+    return {
+      success: updatedCount > 0,
+      changed: updatedCount,
+      failed: failedCount,
+      total: blocksToUpdate.length,
+      message: summary,
+      oldColor,
+      newColor,
+      oldColorCode,
+      newColorCode,
+    };
+  } catch (error) {
+    console.error(
+      `❌ [COLOR UPDATE] Error updating journal color tags:`,
+      error
+    );
+    return {
+      success: false,
+      error: error.message,
+      changed: 0,
+    };
+  }
+};
+
+/**
+ * 🔍 Find user's home page UID
+ */
+const getUserPageUid = async (username) => {
+  try {
+    const pageUid = window.roamAlphaAPI.q(`
+      [:find ?uid :where [?e :node/title "${username}"] [?e :block/uid ?uid]]
+    `)?.[0]?.[0];
+
+    if (pageUid) {
+      console.log(`✅ Found user page: ${username} (${pageUid})`);
+      return pageUid;
+    } else {
+      console.log(`❌ User page not found: ${username}`);
+      return null;
+    }
+  } catch (error) {
+    console.error(`❌ Error finding user page for ${username}:`, error);
+    return null;
+  }
+};
+
+/**
+ * 🔍 Find all blocks containing specific color tag on a page
+ */
+const findBlocksWithColorTag = async (pageUid, colorTag) => {
+  try {
+    const blocks = window.roamAlphaAPI.q(`
+      [:find (pull ?child [:block/uid :block/string])
+       :where 
+       [?page :block/uid "${pageUid}"]
+       [?child :block/page ?page]
+       [?child :block/string ?string]
+       [(clojure.string/includes? ?string "${colorTag}")]]
+    `);
+
+    const result = blocks.map(([block]) => ({
+      uid: block[":block/uid"] || block.uid,
+      text: block[":block/string"] || block.string,
+    }));
+
+    console.log(`🔍 Found ${result.length} blocks with color tag: ${colorTag}`);
+    return result;
+  } catch (error) {
+    console.error(`❌ Error finding blocks with color tag ${colorTag}:`, error);
+    return [];
+  }
+};
+
+/**
+ * 🌈 Check for Color Preference Discrepancy (Load-time Checkpoint)
+ * Similar to font system - checks if saved preference matches actual page state
+ */
+const checkJournalColorDiscrepancy = async (username) => {
+  try {
+    console.log(`🔍 [COLOR CHECK] Checking color discrepancy for ${username}`);
+
+    // Get saved preference
+    const savedColor = await getUserPreferenceBulletproof(
+      username,
+      "Journal Header Color"
+    );
+    if (!savedColor) {
+      console.log(`ℹ️ No saved journal color preference found`);
+      return { hasDiscrepancy: false, reason: "No saved preference" };
+    }
+
+    console.log(`📋 Saved journal color preference: ${savedColor}`);
+
+    // Get user page UID
+    const userPageUid = await getUserPageUid(username);
+    if (!userPageUid) {
+      console.log(`ℹ️ User page not found, no discrepancy possible`);
+      return { hasDiscrepancy: false, reason: "No user page" };
+    }
+
+    // Check what color tags actually exist on the page
+    const savedColorCode = getColorCode(savedColor);
+    const expectedTag = `#clr-lgt-${savedColorCode}-act`;
+
+    // Look for the expected color tags
+    const expectedBlocks = await findBlocksWithColorTag(
+      userPageUid,
+      expectedTag
+    );
+
+    // Look for any other color tags
+    const allColorCodes = Object.values(COLOR_MAPPING);
+    let foundOtherColors = [];
+
+    for (const code of allColorCodes) {
+      if (code !== savedColorCode) {
+        const otherTag = `#clr-lgt-${code}-act`;
+        const otherBlocks = await findBlocksWithColorTag(userPageUid, otherTag);
+        if (otherBlocks.length > 0) {
+          foundOtherColors.push({
+            code,
+            tag: otherTag,
+            count: otherBlocks.length,
+            colorName: getColorNameFromCode(code),
+          });
+        }
+      }
+    }
+
+    if (foundOtherColors.length > 0) {
+      console.log(`⚠️ Color discrepancy found!`);
+      console.log(
+        `   Expected: ${savedColor} (${expectedTag}) - ${expectedBlocks.length} blocks`
+      );
+      console.log(`   Found other colors:`, foundOtherColors);
+
+      return {
+        hasDiscrepancy: true,
+        savedColor,
+        savedColorCode,
+        expectedTag,
+        expectedCount: expectedBlocks.length,
+        foundOtherColors,
+        reason: `Found ${foundOtherColors.length} different color tags`,
+      };
+    } else {
+      console.log(
+        `✅ No color discrepancy - all tags match preference: ${savedColor}`
+      );
+      return {
+        hasDiscrepancy: false,
+        savedColor,
+        savedColorCode,
+        expectedTag,
+        expectedCount: expectedBlocks.length,
+        reason: "All tags match preference",
+      };
+    }
+  } catch (error) {
+    console.error(`❌ Error checking color discrepancy:`, error);
+    return {
+      hasDiscrepancy: false,
+      error: error.message,
+      reason: "Error during check",
+    };
+  }
+};
+
+/**
+ * 🌈 Auto-fix Color Discrepancy
+ * Fixes mismatched color tags by updating all to match saved preference
+ */
+const autoFixJournalColorDiscrepancy = async (username, discrepancy) => {
+  try {
+    console.log(`🔧 [COLOR FIX] Auto-fixing color discrepancy for ${username}`);
+
+    if (!discrepancy.hasDiscrepancy) {
+      console.log(`ℹ️ No discrepancy to fix`);
+      return { success: true, message: "No discrepancy found" };
+    }
+
+    // Update all other colors to match the saved preference
+    let totalUpdated = 0;
+    let totalFailed = 0;
+
+    for (const otherColor of discrepancy.foundOtherColors) {
+      console.log(
+        `🔄 Fixing ${otherColor.count} blocks with ${otherColor.colorName} tags...`
+      );
+
+      const result = await updateUserJournalColorTags(
+        username,
+        otherColor.colorName,
+        discrepancy.savedColor
+      );
+
+      if (result.success) {
+        totalUpdated += result.changed;
+        console.log(`✅ Fixed ${result.changed} ${otherColor.colorName} tags`);
+      } else {
+        totalFailed += otherColor.count;
+        console.error(
+          `❌ Failed to fix ${otherColor.colorName} tags: ${result.error}`
+        );
+      }
+
+      // Small delay between color updates
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+
+    const summary = `Auto-fixed ${totalUpdated} color tags (${totalFailed} failed)`;
+    console.log(`🎉 [COLOR FIX] ${summary}`);
+
+    return {
+      success: totalUpdated > 0,
+      updated: totalUpdated,
+      failed: totalFailed,
+      message: summary,
+    };
+  } catch (error) {
+    console.error(`❌ [COLOR FIX] Error auto-fixing color discrepancy:`, error);
+    return {
+      success: false,
+      error: error.message,
+      message: "Auto-fix failed",
+    };
+  }
+};
 
 // ===================================================================
 // 🎨 SMART FONT SYSTEM - Complete Font Registry & Loading
@@ -1270,8 +1625,9 @@ const exportUserConfiguration = async (username) => {
       timestamp: new Date().toISOString(),
       preferences,
       schemas: CONFIGURATION_SCHEMAS,
-      fontRegistry: FONT_REGISTRY, // Include font registry
-      version: "3.0.0-smart-font",
+      fontRegistry: FONT_REGISTRY,
+      colorMapping: COLOR_MAPPING, // Include color mapping
+      version: "3.0.0-smart-font-color",
     };
 
     console.log(
@@ -1339,7 +1695,7 @@ const displayConfigurationStatus = async (username) => {
 };
 
 // ===================================================================
-// 🎛️ CONFIGURATION SERVICES - Service Registration with Smart Fonts
+// 🎛️ CONFIGURATION SERVICES - Service Registration with Smart Fonts + Colors
 // ===================================================================
 
 const configurationServices = {
@@ -1376,13 +1732,23 @@ const configurationServices = {
   listLoadedFonts,
   checkFontRegistry,
 
+  // 🌈 JOURNAL COLOR SERVICES - COMPLETE SYSTEM!
+  updateUserJournalColorTags,
+  checkJournalColorDiscrepancy,
+  autoFixJournalColorDiscrepancy,
+  getColorCode,
+  getColorNameFromCode,
+  getUserPageUid,
+  findBlocksWithColorTag,
+
   // Schema access
   getConfigurationSchemas: () => CONFIGURATION_SCHEMAS,
   getFontRegistry: () => FONT_REGISTRY,
+  getColorMapping: () => COLOR_MAPPING,
 };
 
 // ===================================================================
-// 🎮 COMMAND PALETTE - Professional Configuration Commands + Font Commands
+// 🎮 COMMAND PALETTE - Professional Configuration Commands + Font + Color Commands
 // ===================================================================
 
 const createConfigurationCommands = (platform) => {
@@ -1564,18 +1930,125 @@ const createConfigurationCommands = (platform) => {
         console.groupEnd();
       },
     },
+    // 🌈 JOURNAL COLOR COMMANDS
+    {
+      label: "Color: Check Journal Color Discrepancy",
+      callback: async () => {
+        const user = getAuthenticatedUser();
+        if (user) {
+          console.log(
+            `🌈 [COLOR CHECK] Checking color discrepancy for: ${user.displayName}`
+          );
+          const discrepancy = await checkJournalColorDiscrepancy(
+            user.displayName
+          );
+
+          if (discrepancy.hasDiscrepancy) {
+            console.log(`⚠️ Color discrepancy found!`);
+            console.log(`   Reason: ${discrepancy.reason}`);
+            console.log(
+              `   Expected: ${discrepancy.savedColor} (${discrepancy.expectedTag})`
+            );
+            if (discrepancy.foundOtherColors) {
+              console.log(
+                `   Found other colors:`,
+                discrepancy.foundOtherColors
+              );
+            }
+          } else {
+            console.log(`✅ No color discrepancy: ${discrepancy.reason}`);
+          }
+        } else {
+          console.error("❌ No authenticated user found");
+        }
+      },
+    },
+    {
+      label: "Color: Auto-Fix Journal Color Discrepancy",
+      callback: async () => {
+        const user = getAuthenticatedUser();
+        if (user) {
+          console.log(
+            `🔧 [COLOR FIX] Auto-fixing color discrepancy for: ${user.displayName}`
+          );
+
+          const discrepancy = await checkJournalColorDiscrepancy(
+            user.displayName
+          );
+
+          if (discrepancy.hasDiscrepancy) {
+            const result = await autoFixJournalColorDiscrepancy(
+              user.displayName,
+              discrepancy
+            );
+            if (result.success) {
+              console.log(`✅ Auto-fix completed: ${result.message}`);
+            } else {
+              console.error(`❌ Auto-fix failed: ${result.error}`);
+            }
+          } else {
+            console.log(`ℹ️ No discrepancy to fix: ${discrepancy.reason}`);
+          }
+        } else {
+          console.error("❌ No authenticated user found");
+        }
+      },
+    },
+    {
+      label: "Color: Test Journal Color Update",
+      callback: async () => {
+        const user = getAuthenticatedUser();
+        if (user) {
+          console.log(
+            `🧪 [COLOR TEST] Testing color update for: ${user.displayName}`
+          );
+          console.log(
+            `   Testing: blue → red (this is a test, will not save to preferences)`
+          );
+
+          const result = await updateUserJournalColorTags(
+            user.displayName,
+            "blue",
+            "red"
+          );
+
+          if (result.success) {
+            console.log(`✅ Test successful: ${result.message}`);
+            console.log(`   Updated ${result.changed} blocks`);
+          } else {
+            console.error(`❌ Test failed: ${result.error}`);
+          }
+        } else {
+          console.error("❌ No authenticated user found");
+        }
+      },
+    },
+    {
+      label: "Color: Show Color Mapping",
+      callback: () => {
+        console.group("🌈 Journal Color Mapping");
+        console.log("Full color names → 3-letter codes:");
+        Object.entries(COLOR_MAPPING).forEach(([color, code]) => {
+          console.log(`   ${color} → ${code} (tag: #clr-lgt-${code}-act)`);
+        });
+        console.groupEnd();
+      },
+    },
   ];
 };
 
 // ===================================================================
-// 🚀 EXTENSION REGISTRATION - Complete Professional Registration with Smart Fonts
+// 🚀 EXTENSION REGISTRATION - Complete Professional Registration with Smart Fonts + Colors
 // ===================================================================
 
 export default {
   onload: async ({ extensionAPI }) => {
-    console.log("🎵 Configuration Manager (SMART FONT SYSTEM) starting...");
+    console.log(
+      "🎵 Configuration Manager (SMART FONT + COLOR SYSTEM) starting..."
+    );
     console.log("🦜 Preparing for parrot duet: 'O mio babbino caro'");
     console.log("🎨 NEW: Complete smart font system with web font loading!");
+    console.log("🌈 NEW: Journal color tag management system!");
 
     // Verify dependencies
     if (!window.RoamExtensionSuite) {
@@ -1602,7 +2075,7 @@ export default {
     }
 
     console.log(
-      "✅ Dependencies verified - proceeding with smart font resurrection"
+      "✅ Dependencies verified - proceeding with smart font + color resurrection"
     );
 
     // Register configuration services
@@ -1629,18 +2102,19 @@ export default {
         schemas: CONFIGURATION_SCHEMAS,
         services: configurationServices,
         fontRegistry: FONT_REGISTRY,
-        version: "3.0.0-smart-font",
+        colorMapping: COLOR_MAPPING,
+        version: "3.0.0-smart-font-color",
       },
       {
-        name: "🎵 Configuration Manager (SMART FONT SYSTEM)",
+        name: "🎵 Configuration Manager (SMART FONT + COLOR SYSTEM)",
         description:
-          "Professional configuration interface with proven Subjournals cascading architecture + complete smart font system with web font loading",
-        version: "3.0.0-smart-font",
+          "Professional configuration interface with proven Subjournals cascading architecture + complete smart font system + journal color management",
+        version: "3.0.0-smart-font-color",
         dependencies: ["utility-library", "user-authentication"],
       }
     );
 
-    // Export font utilities for Extension 14 integration
+    // Export font + color utilities for Extension 14 integration
     window.fontService = {
       testFont: testFontLoading,
       listLoadedFonts,
@@ -1650,7 +2124,16 @@ export default {
       FONT_REGISTRY,
     };
 
-    // Startup validation with auto-creation + SMART FONT APPLICATION
+    window.colorService = {
+      updateJournalColorTags: updateUserJournalColorTags,
+      checkColorDiscrepancy: checkJournalColorDiscrepancy,
+      autoFixColorDiscrepancy: autoFixJournalColorDiscrepancy,
+      getColorCode,
+      getColorNameFromCode,
+      COLOR_MAPPING,
+    };
+
+    // Startup validation with auto-creation + SMART FONT + COLOR APPLICATION
     try {
       const getAuthenticatedUser = platform.getUtility("getAuthenticatedUser");
       const user = getAuthenticatedUser();
@@ -1664,7 +2147,7 @@ export default {
         const overview = await generateConfigurationOverview(user.displayName);
 
         console.log(
-          "🎵 Configuration Manager (SMART FONT SYSTEM) loaded successfully!"
+          "🎵 Configuration Manager (SMART FONT + COLOR SYSTEM) loaded successfully!"
         );
         console.log(`⚙️ Initial configuration status: ${overview.summary}`);
 
@@ -1747,6 +2230,42 @@ export default {
           }
         }
 
+        // 🌈 JOURNAL COLOR DISCREPANCY CHECK - Load-time Checkpoint
+        console.log(
+          "🌈 [COLOR CHECK] Checking journal color discrepancy on startup..."
+        );
+
+        try {
+          const colorDiscrepancy = await checkJournalColorDiscrepancy(
+            user.displayName
+          );
+
+          if (colorDiscrepancy.hasDiscrepancy) {
+            console.log(`⚠️ [COLOR DISCREPANCY] ${colorDiscrepancy.reason}`);
+            console.log(`   Expected: ${colorDiscrepancy.savedColor}`);
+            console.log(
+              `   Found other colors:`,
+              colorDiscrepancy.foundOtherColors
+            );
+            console.log(
+              '💡 Run "Color: Auto-Fix Journal Color Discrepancy" to fix'
+            );
+          } else {
+            console.log(`✅ [COLOR CHECK] ${colorDiscrepancy.reason}`);
+            if (colorDiscrepancy.savedColor) {
+              console.log(
+                `   Current journal color: ${colorDiscrepancy.savedColor}`
+              );
+            }
+          }
+        } catch (colorError) {
+          console.warn(
+            "⚠️ Color discrepancy check warning:",
+            colorError.message
+          );
+          console.log("   Color system is available but check failed");
+        }
+
         console.log(
           '💡 Available: Cmd+P → "Config: Show My Configuration Status"'
         );
@@ -1754,9 +2273,15 @@ export default {
           '🎨 Available: Cmd+P → "Font: Apply Current Font Preference"'
         );
         console.log('🧪 Available: Cmd+P → "Font: Test Web Font Loading"');
+        console.log(
+          '🌈 Available: Cmd+P → "Color: Check Journal Color Discrepancy"'
+        );
+        console.log(
+          '🔧 Available: Cmd+P → "Color: Auto-Fix Journal Color Discrepancy"'
+        );
       } else {
         console.log(
-          "✅ Configuration Manager (SMART FONT SYSTEM) loaded successfully!"
+          "✅ Configuration Manager (SMART FONT + COLOR SYSTEM) loaded successfully!"
         );
         console.log(
           "ℹ️ No authenticated user detected - auto-creation will run when user logs in"
@@ -1773,10 +2298,13 @@ export default {
     console.log("🦜🎵 Ready for beautiful parrot duet with Extension 2!");
     console.log("🎨🔗 Font system ready for Extension 14 integration!");
     console.log("🌐 Web font loading system active and ready!");
+    console.log("🌈🔗 Color system ready for Extension 14 integration!");
   },
 
   onunload: () => {
-    console.log("🎵 Configuration Manager (SMART FONT SYSTEM) unloading...");
+    console.log(
+      "🎵 Configuration Manager (SMART FONT + COLOR SYSTEM) unloading..."
+    );
     console.log(
       "🦜 Parrot duet complete - 'O mio babbino caro' sung beautifully!"
     );
@@ -1788,10 +2316,15 @@ export default {
       console.log("🎨 Smart font styles cleaned up");
     }
 
-    // Clean up font service
+    // Clean up services
     if (window.fontService) {
       delete window.fontService;
       console.log("🧪 Font service cleaned up");
+    }
+
+    if (window.colorService) {
+      delete window.colorService;
+      console.log("🌈 Color service cleaned up");
     }
 
     console.log("✅ Configuration Manager cleanup complete!");

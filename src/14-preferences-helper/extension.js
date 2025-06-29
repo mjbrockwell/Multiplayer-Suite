@@ -373,7 +373,7 @@ const preferencesEditorExtension = (() => {
       // Register Preferences Editor Button
       const preferencesButtonResult = await buttonManager.registerButton({
         id: "preferences-editor-button",
-        text: "🎛️ Edit preferences",
+        text: "🎨  Edit preferences",
         stack: "top-right", // Position at top-right with other action buttons
         priority: false, // Play nice with other extensions
         style: buttonStyle,
@@ -499,7 +499,7 @@ const preferencesEditorExtension = (() => {
       const headerContent = document.createElement("div");
       headerContent.innerHTML = `
         <h2 style="margin: 0; font-size: 24px; font-weight: 600; display: flex; align-items: center; gap: 12px;">
-          🎛️ Edit Your Preferences
+          🎨  Edit Your Preferences
         </h2>
         <div style="margin-top: 6px; font-size: 16px; opacity: 0.9;">
           Customize your Roam experience
