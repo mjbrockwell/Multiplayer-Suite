@@ -379,6 +379,20 @@ const getBlockUidFromDOM = (element) => {
   try {
     debug("Attempting to extract block UID from:", element);
 
+    // Method 0: Check the element itself for data-link-uid (page references)
+    const directLinkUid = element.getAttribute("data-link-uid");
+    if (directLinkUid) {
+      debug(`Found block UID via direct data-link-uid: ${directLinkUid}`);
+      return directLinkUid;
+    }
+
+    // Method 0.5: Check the element itself for data-uid
+    const directUid = element.getAttribute("data-uid");
+    if (directUid) {
+      debug(`Found block UID via direct data-uid: ${directUid}`);
+      return directUid;
+    }
+
     // First, try to find the closest block container with various selectors
     let blockElement =
       element.closest(".rm-block__input") ||
