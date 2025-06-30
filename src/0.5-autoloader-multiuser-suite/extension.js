@@ -139,6 +139,14 @@ const MULTIUSER_EXTENSIONS = [
     critical: false,
     exportPattern: "standard",
   },
+  {
+    id: "fix-at-sign-syntax",
+    name: "Fix At Sign Syntax",
+    url: "https://raw.githubusercontent.com/mjbrockwell/Multiplayer-Suite/refs/heads/main/src/15-fix-at-sign-syntax/extension.js",
+    description: "Fixes @ sign syntax and formatting issues",
+    critical: false,
+    exportPattern: "standard",
+  },
 ];
 
 // Global state
