@@ -1,6 +1,7 @@
 // 🌳 Extension 8: Timestamp Pills for Multiplayer
 // 🌳 Transforms manual #ts0 tags into contextual timestamp pills
 // 🌳 Optimized for multi-user graphs with timezone awareness
+// 🌳 Enhanced with robust retry system for failure recovery
 
 const Extension8TimestampPills = (() => {
   // 🌲 Internal State
@@ -8,6 +9,8 @@ const Extension8TimestampPills = (() => {
   let styleElement = null;
   let isInitialized = false;
   let platform = null;
+  let retryQueue = new Map(); // Map of element -> retry attempts
+  let retryTimer = null;
 
   // 🌸 Configuration
   let config = {
@@ -33,6 +36,12 @@ const Extension8TimestampPills = (() => {
         className: "ts-older",
         color: "#fed7aa", // Light orange
       },
+    },
+    retry: {
+      maxAttempts: 4, // Try up to 4 times total
+      baseDelay: 1000, // Start with 1 second
+      maxDelay: 30000, // Cap at 30 seconds
+      exponentialBase: 3, // 1s, 3s, 9s, 27s progression
     },
   };
 
@@ -79,7 +88,7 @@ const Extension8TimestampPills = (() => {
       const diffMs = today.getTime() - messageDay.getTime();
       const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-      // Format time for tooltip (respecting 24hr preference)
+      // Format time for display (respecting 24hr preference)
       const timeStr = messageDate.toLocaleTimeString("en-US", {
         hour: "2-digit",
         minute: "2-digit",
@@ -98,45 +107,38 @@ const Extension8TimestampPills = (() => {
 
       // Determine category and display text
       if (diffDays === 0) {
-        // Today
+        // Today - just show the time (today is implied)
         return {
           category: "today",
-          display: config.categories.today.display,
+          display: timeStr, // Just the time, no "today" text
           className: config.categories.today.className,
           navigationDate: messageDate,
           tooltip: fullDateStr,
         };
       } else if (diffDays === 1) {
-        // Yesterday
+        // Yesterday - show "yesterday" + time
         return {
           category: "yesterday",
-          display: config.categories.yesterday.display,
+          display: `${config.categories.yesterday.display}|${timeStr}`, // Use | as line break separator
           className: config.categories.yesterday.className,
           navigationDate: messageDate,
           tooltip: fullDateStr,
         };
       } else if (diffDays <= 7) {
-        // This week - show "DDD|MMM N" format (stacked: Tue / Jun 13)
+        // This week - show "DDD|time" format (stacked: Tue / 2:30pm)
         const dayName = messageDate.toLocaleDateString("en-US", {
           weekday: "short",
         });
-        const monthName = messageDate.toLocaleDateString("en-US", {
-          month: "short",
-        });
-        const dayNum = messageDate.getDate();
 
         return {
           category: "week",
-          display: `${dayName}|${monthName} ${dayNum}`, // Use | as line break separator
+          display: `${dayName}|${timeStr}`, // Use | as line break separator
           className: config.categories.week.className,
           navigationDate: messageDate,
           tooltip: fullDateStr,
         };
       } else {
-        // Older - show "DDD|MMM N" format (stacked: Wed / Mar 15)
-        const dayName = messageDate.toLocaleDateString("en-US", {
-          weekday: "short",
-        });
+        // Older - show "MMM N|time" format (stacked: Mar 15 / 2:30pm)
         const monthName = messageDate.toLocaleDateString("en-US", {
           month: "short",
         });
@@ -144,7 +146,7 @@ const Extension8TimestampPills = (() => {
 
         return {
           category: "older",
-          display: `${dayName}|${monthName} ${dayNum}`, // Use | as line break separator
+          display: `${monthName} ${dayNum}|${timeStr}`, // Use | as line break separator
           className: config.categories.older.className,
           navigationDate: messageDate,
           tooltip: fullDateStr,
@@ -160,6 +162,198 @@ const Extension8TimestampPills = (() => {
         tooltip: "Unable to determine date and time",
       };
     }
+  };
+
+  // 🌺 RETRY SYSTEM
+
+  // 🌺 Check if Roam API is ready
+  const isRoamApiReady = () => {
+    try {
+      return !!(
+        window.roamAlphaAPI &&
+        window.roamAlphaAPI.pull &&
+        typeof window.roamAlphaAPI.pull === "function"
+      );
+    } catch (error) {
+      return false;
+    }
+  };
+
+  // 🌺 Add element to retry queue
+  const addToRetryQueue = (element, failureType, error) => {
+    const key =
+      element.getAttribute("data-ts0-element-id") || Math.random().toString(36);
+
+    if (!element.hasAttribute("data-ts0-element-id")) {
+      element.setAttribute("data-ts0-element-id", key);
+    }
+
+    const existingRetry = retryQueue.get(key);
+    const attempts = existingRetry ? existingRetry.attempts + 1 : 1;
+
+    if (attempts > config.retry.maxAttempts) {
+      debug(
+        `Giving up on element after ${config.retry.maxAttempts} attempts`,
+        element
+      );
+      setFailureState(
+        element,
+        "max-retries",
+        `Failed after ${config.retry.maxAttempts} attempts`
+      );
+      retryQueue.delete(key);
+      return;
+    }
+
+    const nextDelay = Math.min(
+      config.retry.baseDelay *
+        Math.pow(config.retry.exponentialBase, attempts - 1),
+      config.retry.maxDelay
+    );
+
+    retryQueue.set(key, {
+      element,
+      attempts,
+      failureType,
+      error,
+      nextRetry: Date.now() + nextDelay,
+    });
+
+    debug(
+      `Added to retry queue (attempt ${attempts}/${config.retry.maxAttempts}, next in ${nextDelay}ms): ${failureType}`,
+      error
+    );
+
+    // Set loading state
+    setLoadingState(element, attempts);
+
+    // Schedule retry processing
+    scheduleRetryProcessing();
+  };
+
+  // 🌺 Set loading state for retrying elements
+  const setLoadingState = (element, attempts) => {
+    element.setAttribute("data-ts0-processed", "retrying");
+    element.setAttribute("data-display", `Loading...\n(${attempts})`);
+    element.setAttribute("data-time-class", "ts-loading");
+    element.setAttribute("title", `Retrying... (attempt ${attempts})`);
+  };
+
+  // 🌺 Set failure state for elements that can't be processed
+  const setFailureState = (element, failureType, message) => {
+    element.setAttribute("data-ts0-processed", "error");
+    element.setAttribute("data-failure-type", failureType);
+
+    switch (failureType) {
+      case "no-uid":
+        element.setAttribute("data-display", "No UID");
+        element.setAttribute("title", "Could not determine block identifier");
+        break;
+      case "no-time":
+        element.setAttribute("data-display", "No Time");
+        element.setAttribute("title", "Could not determine creation time");
+        break;
+      case "api-not-ready":
+        element.setAttribute("data-display", "API Wait");
+        element.setAttribute("title", "Roam API not ready, will retry");
+        break;
+      case "max-retries":
+        element.setAttribute("data-display", "Failed");
+        element.setAttribute("title", message);
+        break;
+      default:
+        element.setAttribute("data-display", "Error");
+        element.setAttribute("title", message || "Unknown error occurred");
+    }
+
+    element.setAttribute("data-time-class", "ts-error");
+  };
+
+  // 🌺 Schedule retry processing
+  const scheduleRetryProcessing = () => {
+    if (retryTimer) return; // Already scheduled
+
+    retryTimer = setTimeout(() => {
+      processRetryQueue();
+      retryTimer = null;
+    }, 500); // Check every 500ms for due retries
+  };
+
+  // 🌺 Process retry queue
+  const processRetryQueue = () => {
+    const now = Date.now();
+    const toRetry = [];
+
+    for (const [key, retryData] of retryQueue.entries()) {
+      if (retryData.nextRetry <= now) {
+        toRetry.push({ key, ...retryData });
+      }
+    }
+
+    if (toRetry.length === 0) {
+      // Check if there are future retries to schedule
+      const futureRetries = Array.from(retryQueue.values()).filter(
+        (r) => r.nextRetry > now
+      );
+      if (futureRetries.length > 0) {
+        const nextRetry = Math.min(...futureRetries.map((r) => r.nextRetry));
+        const delay = Math.max(500, nextRetry - now);
+        retryTimer = setTimeout(() => {
+          processRetryQueue();
+          retryTimer = null;
+        }, delay);
+      }
+      return;
+    }
+
+    debug(`Processing ${toRetry.length} retry attempts...`);
+
+    toRetry.forEach(({ key, element, attempts, failureType }) => {
+      try {
+        // Check if element still exists in DOM
+        if (!document.contains(element)) {
+          debug(`Element no longer in DOM, removing from retry queue`);
+          retryQueue.delete(key);
+          return;
+        }
+
+        debug(`Retrying ${failureType} (attempt ${attempts}): `, element);
+
+        // Remove from queue temporarily (will be re-added if it fails again)
+        retryQueue.delete(key);
+
+        // Attempt to process again
+        processTimestampTag(element, true); // isRetry = true
+      } catch (error) {
+        debug(`Retry failed: ${error.message}`);
+        addToRetryQueue(element, failureType, error.message);
+      }
+    });
+
+    // Schedule next check if there are more retries pending
+    if (retryQueue.size > 0) {
+      scheduleRetryProcessing();
+    }
+  };
+
+  // 🌺 Manual retry function for user control
+  const retryAllFailed = () => {
+    debug("Manual retry triggered for all failed elements");
+
+    // Find all failed elements
+    const failedElements = document.querySelectorAll(
+      `[data-tag="${config.tagName}"][data-ts0-processed="error"]`
+    );
+
+    failedElements.forEach((element) => {
+      const failureType =
+        element.getAttribute("data-failure-type") || "unknown";
+      element.removeAttribute("data-ts0-processed");
+      element.removeAttribute("data-failure-type");
+      addToRetryQueue(element, failureType, "manual retry");
+    });
+
+    debug(`Added ${failedElements.length} failed elements to retry queue`);
   };
 
   // 🌺 BLOCK UID EXTRACTION (Multiplayer Adaptation)
@@ -296,6 +490,12 @@ const Extension8TimestampPills = (() => {
     try {
       debug(`Querying API for block ${blockUid}...`);
 
+      // Check if API is ready first
+      if (!isRoamApiReady()) {
+        debug("Roam API not ready");
+        return null;
+      }
+
       // Try Roam API first
       if (window.roamAlphaAPI?.pull) {
         const blockData = window.roamAlphaAPI.pull(
@@ -331,10 +531,10 @@ const Extension8TimestampPills = (() => {
   // 🌺 DOM PROCESSING
 
   // 🌺 Process a single #ts0 tag
-  const processTimestampTag = (tagElement) => {
+  const processTimestampTag = (tagElement, isRetry = false) => {
     try {
-      // Skip if already processed
-      if (tagElement.hasAttribute("data-ts0-processed")) {
+      // Skip if already processed (unless this is a retry)
+      if (!isRetry && tagElement.hasAttribute("data-ts0-processed")) {
         return;
       }
 
@@ -343,25 +543,47 @@ const Extension8TimestampPills = (() => {
       // Get block UID
       const blockUid = getBlockUidFromDOM(tagElement);
       if (!blockUid) {
-        debug("Could not get block UID, skipping");
-        tagElement.setAttribute("data-ts0-processed", "error");
-        tagElement.setAttribute("data-display", "No UID");
-        tagElement.setAttribute("data-time-class", "ts-error");
-        tagElement.setAttribute(
-          "title",
-          "Could not determine block identifier"
-        );
+        debug("Could not get block UID");
+        if (isRetry) {
+          setFailureState(
+            tagElement,
+            "no-uid",
+            "Could not determine block identifier"
+          );
+        } else {
+          addToRetryQueue(tagElement, "no-uid", "Block UID extraction failed");
+        }
+        return;
+      }
+
+      // Check if Roam API is ready
+      if (!isRoamApiReady()) {
+        debug("Roam API not ready");
+        if (isRetry) {
+          setFailureState(tagElement, "api-not-ready", "Roam API not ready");
+        } else {
+          addToRetryQueue(tagElement, "api-not-ready", "Roam API not ready");
+        }
         return;
       }
 
       // Get creation time
       const createTime = getBlockCreateTime(blockUid);
       if (!createTime) {
-        debug("Could not get creation time, skipping");
-        tagElement.setAttribute("data-ts0-processed", "error");
-        tagElement.setAttribute("data-display", "No Time");
-        tagElement.setAttribute("data-time-class", "ts-error");
-        tagElement.setAttribute("title", "Could not determine creation time");
+        debug("Could not get creation time");
+        if (isRetry) {
+          setFailureState(
+            tagElement,
+            "no-time",
+            "Could not determine creation time"
+          );
+        } else {
+          addToRetryQueue(
+            tagElement,
+            "no-time",
+            "Block creation time not found"
+          );
+        }
         return;
       }
 
@@ -379,15 +601,24 @@ const Extension8TimestampPills = (() => {
       tagElement.setAttribute("data-original-time", createTime);
       tagElement.setAttribute("title", timeData.tooltip);
 
+      // Remove any retry-related attributes
+      tagElement.removeAttribute("data-failure-type");
+      tagElement.removeAttribute("data-ts0-element-id");
+
       debug(
         `Successfully processed timestamp tag: ${timeData.display} (${timeData.category})`
       );
     } catch (error) {
       debug(`Error processing timestamp tag: ${error.message}`);
-      tagElement.setAttribute("data-ts0-processed", "error");
-      tagElement.setAttribute("data-display", "Error");
-      tagElement.setAttribute("data-time-class", "ts-error");
-      tagElement.setAttribute("title", `Error: ${error.message}`);
+      if (isRetry) {
+        setFailureState(
+          tagElement,
+          "processing-error",
+          `Error: ${error.message}`
+        );
+      } else {
+        addToRetryQueue(tagElement, "processing-error", error.message);
+      }
     }
   };
 
@@ -547,6 +778,16 @@ const Extension8TimestampPills = (() => {
         border-color: rgba(154, 52, 18, 0.2) !important;
       }
 
+      /* Loading state - Animated Light Gray */
+      .rm-page-ref[data-tag="${config.tagName}"][data-time-class="ts-loading"]::before,
+      a[data-link-title="${config.tagName}"][data-time-class="ts-loading"]::before,
+      .roam-tag[data-tag="${config.tagName}"][data-time-class="ts-loading"]::before {
+        background: linear-gradient(135deg, #f3f4f6, #e5e7eb) !important;
+        color: #6b7280 !important;
+        border-color: rgba(107, 114, 128, 0.2) !important;
+        animation: ts-loading-pulse 1.5s ease-in-out infinite !important;
+      }
+
       /* Error state - Light Red */
       .rm-page-ref[data-tag="${config.tagName}"][data-time-class="ts-error"]::before,
       a[data-link-title="${config.tagName}"][data-time-class="ts-error"]::before,
@@ -554,6 +795,12 @@ const Extension8TimestampPills = (() => {
         background: linear-gradient(135deg, #fecaca, #fecacaE6) !important;
         color: #991b1b !important;
         border-color: rgba(153, 27, 27, 0.2) !important;
+      }
+
+      /* 🌳 Loading animation */
+      @keyframes ts-loading-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
       }
 
       /* 🌳 Hide the original tag text completely */
@@ -704,6 +951,14 @@ const Extension8TimestampPills = (() => {
       styleElement = null;
     }
 
+    if (retryTimer) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+
+    // Clear retry queue
+    retryQueue.clear();
+
     // Remove data attributes from processed tags
     document
       .querySelectorAll(`[data-tag="${config.tagName}"][data-ts0-processed]`)
@@ -712,6 +967,8 @@ const Extension8TimestampPills = (() => {
         tag.removeAttribute("data-display");
         tag.removeAttribute("data-time-class");
         tag.removeAttribute("data-original-time");
+        tag.removeAttribute("data-failure-type");
+        tag.removeAttribute("data-ts0-element-id");
         tag.removeAttribute("title");
       });
 
@@ -725,6 +982,22 @@ const Extension8TimestampPills = (() => {
     processAllTimestampTags();
   };
 
+  // 🌺 Debug functions
+  const getRetryQueueStatus = () => {
+    const status = {
+      queueSize: retryQueue.size,
+      retries: Array.from(retryQueue.entries()).map(([key, data]) => ({
+        key,
+        attempts: data.attempts,
+        failureType: data.failureType,
+        nextRetry: new Date(data.nextRetry).toLocaleTimeString(),
+        timeUntilRetry: Math.max(0, data.nextRetry - Date.now()),
+      })),
+    };
+    console.table(status.retries);
+    return status;
+  };
+
   // 🍎 ROAM EXTENSION INTERFACE
 
   const onload = ({ extensionAPI }) => {
@@ -733,13 +1006,16 @@ const Extension8TimestampPills = (() => {
     // Register with platform if available
     if (window.RoamExtensionSuite) {
       window.RoamExtensionSuite.register("Extension8_TimestampPills", {
-        version: "1.0.0",
-        description: "Transforms #ts0 tags into contextual timestamp pills",
+        version: "1.1.0",
+        description:
+          "Transforms #ts0 tags into contextual timestamp pills with retry system",
         api: {
           updateConfig,
           refresh,
+          retryAllFailed,
           debug,
           getConfig: () => config,
+          getRetryQueueStatus,
         },
       });
     }
@@ -778,7 +1054,9 @@ const Extension8TimestampPills = (() => {
     window.Extension8_TimestampPills = {
       refresh,
       updateConfig,
+      retryAllFailed,
       getConfig: () => config,
+      getRetryQueueStatus,
       debug: (enabled) => {
         if (enabled) {
           window.ts8Debug = debug;
@@ -789,6 +1067,9 @@ const Extension8TimestampPills = (() => {
     };
 
     debug("Extension loaded successfully");
+    debug(
+      "💡 Available commands: window.Extension8_TimestampPills.retryAllFailed(), .getRetryQueueStatus(), .refresh()"
+    );
   };
 
   const onunload = () => {
