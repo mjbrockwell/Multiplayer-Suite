@@ -1,21 +1,21 @@
-// 🌳 Enhanced Smart Username Tagger - Integrated with Utilities Suite
-// 🌳 Preserves specialized timing logic + adds robust utilities integration
-// 🌳 Updated: Better user detection, member validation, preferences support
-// 🌳 NEW: Chat room date context support + exclusion criteria
+// 🌳 Enhanced Smart Username Tagger - FIXED: Strict Date Banner Detection
+// 🌳 Prevents grandchildren tagging by using strict date banner criteria (#st0 + date pattern)
+// 🌳 Updated: Reverse validation ensures only direct children of REAL date banners get tagged
+// 🌳 NEW: Chat room date context support with precise hierarchy detection
 
 const smartUsernameTagger = (() => {
-  // 🌲 1.0 - Internal State (unchanged - this works well)
+  // 🌲 1.0 - Internal State
   let processedBlocks = new Set();
   let pendingBlocks = new Set();
   let idleTimer = null;
   let isProcessing = false;
 
-  // 🌸 1.1 - Debug Function (unchanged)
+  // 🌸 1.1 - Debug Function
   const debug = (message) => {
     console.log("Smart Tagger:", message);
   };
 
-  // 🔧 1.2 - ENHANCED: Get Block Author with Robust User Detection (EXACT COPY)
+  // 🔧 1.2 - ENHANCED: Get Block Author with Robust User Detection
   const getBlockAuthor = (blockUid) => {
     try {
       // Try the original method first (fastest)
@@ -79,7 +79,7 @@ const smartUsernameTagger = (() => {
     }
   };
 
-  // 🌺 1.3 - ENHANCED: Extract Block UID with Utilities Fallback (EXACT COPY)
+  // 🌺 1.3 - ENHANCED: Extract Block UID with Utilities Fallback
   const getBlockUidFromDOM = (element) => {
     try {
       const blockElement = element.closest(".rm-block");
@@ -118,7 +118,7 @@ const smartUsernameTagger = (() => {
     }
   };
 
-  // 🌺 1.4 - Check if block has username tags (EXACT COPY - works well)
+  // 🌺 1.4 - Check if block has username tags
   const hasUsernameTag = (blockContent, username) => {
     if (!blockContent || !username) return false;
 
@@ -135,7 +135,7 @@ const smartUsernameTagger = (() => {
     return newTagPattern.test(blockContent) || oldTagPattern.test(blockContent);
   };
 
-  // 🌺 1.5 - Check if block is being edited (EXACT COPY - specialized logic)
+  // 🌺 1.5 - Check if block is being edited
   const isBlockBeingEdited = (blockElement) => {
     return (
       blockElement.classList.contains("rm-block--edit") ||
@@ -145,7 +145,7 @@ const smartUsernameTagger = (() => {
     );
   };
 
-  // 🌺 1.6 - Check conversation context (EXACT COPY - domain-specific)
+  // 🌺 1.6 - Check conversation context (unchanged - works well)
   const isInConversation = (blockElement) => {
     let current = blockElement;
     while (current && current !== document.body) {
@@ -162,7 +162,7 @@ const smartUsernameTagger = (() => {
     return false;
   };
 
-  // 🆕 1.7 - NEW: Check if block is under [[roam/comments]]
+  // 🌺 1.7 - Check if block is under [[roam/comments]]
   const isUnderRoamComments = (blockElement) => {
     let current = blockElement;
     while (current && current !== document.body) {
@@ -181,7 +181,7 @@ const smartUsernameTagger = (() => {
     return false;
   };
 
-  // 🆕 1.8 - NEW: Check if block contains #ch0 header
+  // 🌺 1.8 - Check if block contains #ch0 header
   const containsCh0Header = (blockElement) => {
     const textElement = blockElement.querySelector(".rm-block-text");
     if (!textElement) return false;
@@ -197,7 +197,31 @@ const smartUsernameTagger = (() => {
     );
   };
 
-  // 🆕 1.9 - NEW: Check chat room date context
+  // 🎯 1.9 - NEW: Strict Date Banner Detection (CORE FIX)
+  const isRealDateBanner = (blockElement) => {
+    try {
+      const textElement = blockElement.querySelector(".rm-block-text");
+      if (!textElement) return false;
+
+      const content = textElement.textContent || "";
+
+      // Must have #st0 (sticky banner tag)
+      if (!content.includes("#st0")) {
+        return false;
+      }
+
+      // Must have actual date pattern [[Month nth, YYYY]]
+      // Examples: [[June 30th, 2025]], [[December 1st, 2024]], etc.
+      const datePattern = /\[\[([A-Za-z]+\s+\d{1,2}[a-z]{2},\s+\d{4})\]\]/;
+      const hasValidDate = datePattern.test(content);
+
+      return hasValidDate;
+    } catch (error) {
+      return false;
+    }
+  };
+
+  // 🎯 1.10 - FIXED: Check chat room date context (reverse validation)
   const isInChatRoomDateContext = (blockElement) => {
     try {
       // Step 1: Must be on a chat room page
@@ -218,55 +242,50 @@ const smartUsernameTagger = (() => {
         return false;
       }
 
-      // Step 4: Find parent block
-      const parentBlockElement =
-        blockElement.parentElement?.closest(".rm-block");
-      if (!parentBlockElement) {
+      // Step 4: Get this block's UID for reverse validation
+      const thisBlockUID = getBlockUidFromDOM(blockElement);
+      if (!thisBlockUID) {
         return false;
       }
 
-      // Step 5: Parent must contain date pattern
-      const parentTextElement =
-        parentBlockElement.querySelector(".rm-block-text");
-      if (!parentTextElement) {
-        return false;
+      // Step 5: Find ONLY legitimate date banners (#st0 + date pattern)
+      const allBlocks = document.querySelectorAll(".rm-block");
+
+      for (const potentialDateBlock of allBlocks) {
+        // 🎯 Use strict detection instead of loose [[reference]] matching
+        if (!isRealDateBanner(potentialDateBlock)) {
+          continue; // Skip blocks that aren't real date banners
+        }
+
+        // Get OFFICIAL direct children of this REAL date block
+        const officialDirectChildren = potentialDateBlock.querySelectorAll(
+          ":scope > .rm-block-children > .rm-block"
+        );
+
+        // Check if our target block is in the official children list
+        for (const officialChild of officialDirectChildren) {
+          const officialChildUID = getBlockUidFromDOM(officialChild);
+          if (officialChildUID === thisBlockUID) {
+            return true; // Found! This block is an official direct child of a REAL date banner
+          }
+        }
       }
 
-      const parentContent = parentTextElement.textContent || "";
-
-      // Look for [[...]] patterns that could be dates
-      const dateReferencePattern = /\[\[([^\]]+)\]\]/g;
-      const matches = [...parentContent.matchAll(dateReferencePattern)];
-
-      if (matches.length === 0) {
-        return false;
-      }
-
-      // Step 6: Must be direct child of parent
-      const blockChildren = blockElement.parentElement;
-      const parentChildren = parentBlockElement.querySelector(
-        ":scope > .rm-block-children"
-      );
-
-      if (blockChildren !== parentChildren) {
-        return false;
-      }
-
-      return true;
+      return false; // Not found as a direct child of any REAL date banner
     } catch (error) {
       debug(`Error checking chat room date context: ${error.message}`);
       return false;
     }
   };
 
-  // 🆕 1.10 - NEW: Combined context checker
+  // 🎯 1.11 - Combined context checker
   const isInTaggableContext = (blockElement) => {
     return (
       isInConversation(blockElement) || isInChatRoomDateContext(blockElement)
     );
   };
 
-  // 🔧 1.11 - ENHANCED: Add username tags with Utilities Integration (EXACT COPY)
+  // 🔧 1.12 - ENHANCED: Add username tags with Utilities Integration
   const addUsernameTag = async (blockUid, username) => {
     try {
       // 🆕 Try utilities-based block update first
@@ -333,14 +352,14 @@ const smartUsernameTagger = (() => {
     }
   };
 
-  // 🆕 1.12 - NEW: Get User Preferences for Tagging Behavior (ENHANCED with chat room)
+  // 🎯 1.13 - Get User Preferences for Tagging Behavior
   const getUserPreferences = () => {
     const defaultPrefs = {
       enableTagging: true,
       idleDelay: 2000,
       processExistingOnLoad: true,
       validateMembership: false,
-      enableChatRoomTagging: true, // 🆕 NEW
+      enableChatRoomTagging: true,
     };
 
     try {
@@ -372,7 +391,7 @@ const smartUsernameTagger = (() => {
     return defaultPrefs;
   };
 
-  // 🌲 2.0 - Smart Processing Logic (UPDATED: use combined context)
+  // 🌲 2.0 - Smart Processing Logic (UPDATED: use strict date banner detection)
   const processPendingBlocks = async () => {
     if (isProcessing || pendingBlocks.size === 0) return;
 
@@ -391,7 +410,7 @@ const smartUsernameTagger = (() => {
         continue;
       }
 
-      // Find DOM element (original logic preserved)
+      // Find DOM element
       const blockElements = document.querySelectorAll(".rm-block");
       let blockElement = null;
 
@@ -407,7 +426,7 @@ const smartUsernameTagger = (() => {
         continue;
       }
 
-      // 🆕 UPDATED: Check combined taggable context
+      // 🎯 UPDATED: Check strict taggable context
       if (blockElement && !isInTaggableContext(blockElement)) {
         debug(`Skipping ${blockUid} - not in taggable context`);
         pendingBlocks.delete(blockUid);
@@ -433,7 +452,7 @@ const smartUsernameTagger = (() => {
     debug("Pending blocks processing complete");
   };
 
-  // 🌲 3.0 - Event Handlers (UPDATED: use combined context)
+  // 🌲 3.0 - Event Handlers (UPDATED: use strict date banner detection)
   const handleBlockBlur = (event) => {
     const blockElement = event.target.closest(".rm-block");
     if (!blockElement || !isInTaggableContext(blockElement)) return;
@@ -491,7 +510,7 @@ const smartUsernameTagger = (() => {
     processPendingBlocks();
   };
 
-  // 🌲 4.0 - Process Existing Conversations (ENHANCED with chat room support)
+  // 🌲 4.0 - Process Existing Conversations (ENHANCED with strict date banner detection)
   const processExistingConversations = async () => {
     const preferences = getUserPreferences();
     if (!preferences.processExistingOnLoad) {
@@ -501,7 +520,7 @@ const smartUsernameTagger = (() => {
 
     debug("Scanning existing conversations for direct children only...");
 
-    // 🔄 EXISTING: Process #ch0 conversations (EXACT COPY)
+    // 🔄 EXISTING: Process #ch0 conversations (unchanged - works well)
     const ch0Tags = document.querySelectorAll('.rm-page-ref[data-tag="ch0"]');
 
     for (const ch0Tag of ch0Tags) {
@@ -532,60 +551,60 @@ const smartUsernameTagger = (() => {
       }
     }
 
-    // 🆕 NEW: Process chat room date contexts
+    // 🎯 FIXED: Process chat room date contexts with strict detection
     if (preferences.enableChatRoomTagging) {
       const pageTitle = document.title || "";
       if (pageTitle.toLowerCase().includes("chat room")) {
         debug(`📅 Processing chat room page: "${pageTitle}"`);
 
-        // Find all blocks that might contain [[date]] references
+        // 🎯 Find ONLY real date banners with strict detection
         const allBlocks = document.querySelectorAll(".rm-block");
 
         for (const block of allBlocks) {
+          // 🎯 Use strict date banner detection
+          if (!isRealDateBanner(block)) {
+            continue; // Skip blocks that aren't real date banners
+          }
+
           const textElement = block.querySelector(".rm-block-text");
-          if (!textElement) continue;
+          const content = textElement ? textElement.textContent || "" : "";
 
-          const content = textElement.textContent || "";
+          // Find direct children of this REAL date block
+          const directChildren = block.querySelectorAll(
+            ":scope > .rm-block-children > .rm-block"
+          );
 
-          // Check if this block contains [[date]] references
-          if (/\[\[([^\]]+)\]\]/.test(content)) {
-            // Find direct children of this date block
-            const directChildren = block.querySelectorAll(
-              ":scope > .rm-block-children > .rm-block"
-            );
+          debug(
+            `📅 Found ${
+              directChildren.length
+            } direct children under REAL date banner: "${content.substring(
+              0,
+              50
+            )}..."`
+          );
 
-            debug(
-              `Found ${
-                directChildren.length
-              } direct children under date block: "${content.substring(
-                0,
-                50
-              )}..."`
-            );
+          for (const childBlock of directChildren) {
+            if (isBlockBeingEdited(childBlock)) {
+              debug("Skipping block in edit mode during chat room scan");
+              continue;
+            }
 
-            for (const childBlock of directChildren) {
-              if (isBlockBeingEdited(childBlock)) {
-                debug("Skipping block in edit mode during chat room scan");
-                continue;
-              }
+            // Check exclusions
+            if (
+              isUnderRoamComments(childBlock) ||
+              containsCh0Header(childBlock)
+            ) {
+              debug("Skipping excluded block during chat room scan");
+              continue;
+            }
 
-              // Check exclusions
-              if (
-                isUnderRoamComments(childBlock) ||
-                containsCh0Header(childBlock)
-              ) {
-                debug("Skipping excluded block during chat room scan");
-                continue;
-              }
-
-              const blockUid = getBlockUidFromDOM(childBlock);
-              if (blockUid && !processedBlocks.has(blockUid)) {
-                const authorName = getBlockAuthor(blockUid);
-                if (authorName) {
-                  await addUsernameTag(blockUid, authorName);
-                  processedBlocks.add(blockUid);
-                  await new Promise((resolve) => setTimeout(resolve, 100));
-                }
+            const blockUid = getBlockUidFromDOM(childBlock);
+            if (blockUid && !processedBlocks.has(blockUid)) {
+              const authorName = getBlockAuthor(blockUid);
+              if (authorName) {
+                await addUsernameTag(blockUid, authorName);
+                processedBlocks.add(blockUid);
+                await new Promise((resolve) => setTimeout(resolve, 100));
               }
             }
           }
@@ -596,7 +615,7 @@ const smartUsernameTagger = (() => {
     debug("Existing conversations and chat rooms processed");
   };
 
-  // 🌲 5.0 - Setup Event Listeners (EXACT COPY - works well)
+  // 🌲 5.0 - Setup Event Listeners
   const setupEventListeners = () => {
     document.addEventListener("focusout", handleBlockBlur, true);
     document.addEventListener("keydown", handleKeyDown, true);
@@ -617,13 +636,13 @@ const smartUsernameTagger = (() => {
     }
   };
 
-  // 🍎 6.0 - Extension Lifecycle (ENHANCED with chat room setting)
+  // 🍎 6.0 - Extension Lifecycle
   const onload = ({ extensionAPI }) => {
     debug(
-      "🚀 Loading Enhanced Smart Username Tagger with chat room support..."
+      "🚀 Loading Enhanced Smart Username Tagger with strict date banner detection..."
     );
 
-    // 🆕 Enhanced settings panel with chat room support
+    // Settings panel
     extensionAPI.settings.panel.create({
       tabTitle: "Smart Username Tagger",
       settings: [
@@ -635,7 +654,7 @@ const smartUsernameTagger = (() => {
           action: { type: "switch" },
         },
         {
-          id: "enableChatRoomTagging", // 🆕 NEW
+          id: "enableChatRoomTagging",
           name: "Enable chat room tagging",
           description:
             "Tag messages in chat room pages under [[date]] headings",
@@ -675,12 +694,14 @@ const smartUsernameTagger = (() => {
       setTimeout(processExistingConversations, 3000);
     }
 
-    // 🔍 Log utilities integration status
+    // 🔍 Log integration status
     const utilitiesAvailable = !!window._extensionRegistry?.utilities;
     const pageTitle = document.title || "";
     const isChatRoom = pageTitle.toLowerCase().includes("chat room");
 
-    debug(`✅ Enhanced Smart Username Tagger loaded`);
+    debug(
+      `✅ Enhanced Smart Username Tagger loaded with STRICT date banner detection`
+    );
     debug(
       `🔧 Utilities integration: ${utilitiesAvailable ? "ENABLED" : "DISABLED"}`
     );
@@ -694,6 +715,9 @@ const smartUsernameTagger = (() => {
       `🏷️ Chat room tagging: ${
         preferences.enableChatRoomTagging ? "ENABLED" : "DISABLED"
       }`
+    );
+    debug(
+      `🎯 FIXED: Only real date banners (#st0 + [[MMMM nth, YYYY]]) will be recognized`
     );
 
     if (utilitiesAvailable) {
