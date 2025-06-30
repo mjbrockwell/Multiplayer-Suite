@@ -982,6 +982,29 @@ const Extension8TimestampPills = (() => {
     processAllTimestampTags();
   };
 
+  // 🌺 Force refresh function (clears processed flags first)
+  const forceRefresh = () => {
+    debug("Force refresh triggered - clearing all processed flags");
+
+    // Clear all processed flags first
+    document
+      .querySelectorAll(`[data-tag="${config.tagName}"][data-ts0-processed]`)
+      .forEach((tag) => {
+        tag.removeAttribute("data-ts0-processed");
+        tag.removeAttribute("data-display");
+        tag.removeAttribute("data-time-class");
+        tag.removeAttribute("data-original-time");
+        tag.removeAttribute("title");
+        tag.removeAttribute("data-failure-type");
+        tag.removeAttribute("data-ts0-element-id");
+      });
+
+    // Wait a moment then process
+    setTimeout(() => {
+      processAllTimestampTags();
+    }, 100);
+  };
+
   // 🌺 Debug functions
   const getRetryQueueStatus = () => {
     const status = {
@@ -1012,6 +1035,7 @@ const Extension8TimestampPills = (() => {
         api: {
           updateConfig,
           refresh,
+          forceRefresh,
           retryAllFailed,
           debug,
           getConfig: () => config,
@@ -1053,6 +1077,7 @@ const Extension8TimestampPills = (() => {
     // Export functions for manual control
     window.Extension8_TimestampPills = {
       refresh,
+      forceRefresh,
       updateConfig,
       retryAllFailed,
       getConfig: () => config,
@@ -1068,7 +1093,7 @@ const Extension8TimestampPills = (() => {
 
     debug("Extension loaded successfully");
     debug(
-      "💡 Available commands: window.Extension8_TimestampPills.retryAllFailed(), .getRetryQueueStatus(), .refresh()"
+      "💡 Available commands: window.Extension8_TimestampPills.forceRefresh(), .retryAllFailed(), .getRetryQueueStatus(), .refresh()"
     );
   };
 
