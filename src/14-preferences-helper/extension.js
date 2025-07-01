@@ -829,7 +829,7 @@ const preferencesEditorExtension = (() => {
       // Field 2: Immutable Home Page (yes/no)
       const immutableHomeField = createYesNoField(
         "Immutable Home Page",
-        "Protect your home page from edits by others (allows "command key" comments, but no other edits)",
+        `Protect your home page from edits by others (allows "command key" comments, but no other edits)`,
         currentPreferences["Immutable Home Page"]
       );
       fieldsContainer.appendChild(immutableHomeField);
