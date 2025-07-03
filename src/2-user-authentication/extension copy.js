@@ -251,7 +251,7 @@ const initializeUserPreferences = async (username) => {
 
 /**
  * 👤 2.1 Initialize user profile structure using Subjournals pattern
- * Creates the complete "My Info::" and "Book Notes::" structure with bulletproof retry logic
+ * Creates the complete "My Info::" structure with bulletproof retry logic
  * @param {string} username - Username to initialize profile for
  * @returns {boolean} - Success status
  */
@@ -294,7 +294,7 @@ const initializeUserProfile = async (username) => {
         continue; // Retry
       }
 
-      // STEP 3: Create profile fields under "My Info::"
+      // STEP 3: Create profile fields
       const profileFields = [
         { name: "Avatar::", defaultValue: "__not yet entered__" },
         { name: "Location::", defaultValue: "__not yet entered__" },
@@ -303,9 +303,9 @@ const initializeUserProfile = async (username) => {
         { name: "About Me::", defaultValue: "__not yet entered__" },
       ];
 
-      let allMyInfoFieldsCreated = true;
-      let myInfoCreatedCount = 0;
-      let myInfoSkippedCount = 0;
+      let allFieldsCreated = true;
+      let createdCount = 0;
+      let skippedCount = 0;
 
       for (const field of profileFields) {
         const fieldBlock = await findOrCreateBlock(myInfoBlock.uid, field.name);
@@ -320,7 +320,7 @@ const initializeUserProfile = async (username) => {
             workingOn.content = field.name;
             await createBlockSimple(myInfoBlock.uid, field.name);
           }
-          allMyInfoFieldsCreated = false;
+          allFieldsCreated = false;
           break; // Exit field loop, retry main loop
         }
 
@@ -336,63 +336,22 @@ const initializeUserProfile = async (username) => {
             workingOn.content = field.defaultValue;
             await createBlockSimple(fieldBlock.uid, field.defaultValue);
           }
-          allMyInfoFieldsCreated = false;
+          allFieldsCreated = false;
           break; // Exit field loop, retry main loop
         } else {
-          myInfoSkippedCount++;
+          skippedCount++;
         }
       }
 
-      if (!allMyInfoFieldsCreated) {
+      if (!allFieldsCreated) {
         continue; // Retry main loop
       }
 
-      // STEP 4: Ensure "Book Notes::" block exists
-      const bookNotesBlock = await findOrCreateBlock(
-        userPageUid,
-        "Book Notes::"
-      );
-      if (!bookNotesBlock) {
-        if (workingOn.step !== "booknotes" || workingOn.uid !== userPageUid) {
-          workingOn.step = "booknotes";
-          workingOn.uid = userPageUid;
-          workingOn.content = "Book Notes::";
-          await createBlockSimple(userPageUid, "Book Notes::");
-        }
-        continue; // Retry
-      }
-
-      // STEP 5: Ensure "Book Notes::" has default content if empty
-      const bookNotesHasContent = await blockHasChildren(bookNotesBlock.uid);
-      if (!bookNotesHasContent) {
-        if (
-          workingOn.step !== "booknotes-content" ||
-          workingOn.uid !== bookNotesBlock.uid
-        ) {
-          workingOn.step = "booknotes-content";
-          workingOn.uid = bookNotesBlock.uid;
-          workingOn.content = "__Add your book notes here...__";
-          await createBlockSimple(
-            bookNotesBlock.uid,
-            "__Add your book notes here...__"
-          );
-        }
-        continue; // Retry
-      }
-
-      // SUCCESS - all sections exist with content
-      myInfoCreatedCount = profileFields.length - myInfoSkippedCount;
+      // SUCCESS - all fields exist with content
+      createdCount = profileFields.length - skippedCount;
       console.log(`✅ Profile initialization complete for ${username}:`);
-      console.log(
-        `   - "My Info::" section: ${myInfoCreatedCount} fields created, ${myInfoSkippedCount} already existed`
-      );
-      console.log(
-        `   - "Book Notes::" section: ${
-          bookNotesHasContent
-            ? "already had content"
-            : "created with placeholder"
-        }`
-      );
+      console.log(`   - ${createdCount} fields created with defaults`);
+      console.log(`   - ${skippedCount} fields already had content`);
       console.log(
         `   - Total loops: ${loopCount}, Time: ${Date.now() - startTime}ms`
       );
@@ -509,7 +468,7 @@ const blockHasChildren = async (blockUid) => {
 
 /**
  * 👤 2.2 Check if user profile is complete
- * Verifies that all required profile sections exist and are filled
+ * Verifies that all required profile fields exist and are filled
  * @param {string} username - Username to check
  * @returns {Object} - Profile completeness info
  */
@@ -526,30 +485,18 @@ const checkUserProfileCompleteness = async (username) => {
       return {
         exists: false,
         hasMyInfo: false,
-        hasBookNotes: false,
         completeness: 0,
         missingFields: ["User page does not exist"],
       };
     }
 
-    // Check "My Info::" section
     const myInfoData = findNestedDataValuesExact(userPageUid, "My Info");
-    const hasMyInfo = myInfoData && Object.keys(myInfoData).length > 0;
-
-    // Check "Book Notes::" section
-    const bookNotesData = findNestedDataValuesExact(userPageUid, "Book Notes");
-    const hasBookNotes = bookNotesData && Object.keys(bookNotesData).length > 0;
-
-    if (!hasMyInfo && !hasBookNotes) {
+    if (!myInfoData || Object.keys(myInfoData).length === 0) {
       return {
         exists: true,
         hasMyInfo: false,
-        hasBookNotes: false,
         completeness: 0,
-        missingFields: [
-          "My Info:: block missing",
-          "Book Notes:: block missing",
-        ],
+        missingFields: ["My Info:: block missing"],
       };
     }
 
@@ -563,43 +510,27 @@ const checkUserProfileCompleteness = async (username) => {
     const missingFields = [];
     const incompleteFields = [];
 
-    // Check My Info fields
     for (const field of requiredFields) {
-      const value = myInfoData?.[field];
+      const value = myInfoData[field];
       if (!value || value === "__missing field__") {
-        missingFields.push(`My Info: ${field}`);
+        missingFields.push(field);
       } else if (value === "__not yet entered__") {
-        incompleteFields.push(`My Info: ${field}`);
+        incompleteFields.push(field);
       }
     }
 
-    // Check Book Notes section
-    if (!hasBookNotes) {
-      missingFields.push("Book Notes:: block missing");
-    } else {
-      // Check if Book Notes has actual content or just placeholder
-      const bookNotesContent = Object.values(bookNotesData)[0]; // Get first value
-      if (
-        !bookNotesContent ||
-        bookNotesContent === "__Add your book notes here...__"
-      ) {
-        incompleteFields.push("Book Notes: needs content");
-      }
-    }
-
-    // Calculate completeness (My Info fields + Book Notes section)
-    const totalSections = requiredFields.length + 1; // 5 My Info fields + 1 Book Notes
-    const completedSections =
-      totalSections - missingFields.length - incompleteFields.length;
-    const completeness = Math.round((completedSections / totalSections) * 100);
+    const completedFields =
+      requiredFields.length - missingFields.length - incompleteFields.length;
+    const completeness = Math.round(
+      (completedFields / requiredFields.length) * 100
+    );
 
     return {
       exists: true,
-      hasMyInfo,
-      hasBookNotes,
+      hasMyInfo: true,
       completeness,
-      totalSections,
-      completedSections,
+      totalFields: requiredFields.length,
+      completedFields,
       missingFields,
       incompleteFields,
       needsInitialization: missingFields.length > 0,
@@ -612,7 +543,6 @@ const checkUserProfileCompleteness = async (username) => {
     return {
       exists: false,
       hasMyInfo: false,
-      hasBookNotes: false,
       completeness: 0,
       missingFields: [`Error: ${error.message}`],
     };
