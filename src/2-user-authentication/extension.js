@@ -1,6 +1,6 @@
 // ===================================================================
 // Extension 2.0: User Authentication + User Preferences + Profile System
-// Complete clean implementation - depends only on Extension 1.5
+// Production version using proven direct API approach
 // Features: User authentication + user preferences + profile initialization
 // ===================================================================
 
@@ -246,19 +246,18 @@ const initializeUserPreferences = async (username) => {
 };
 
 // ===================================================================
-// 👤 2.0 USER PROFILE SYSTEM - New Profile Initialization
+// 👤 2.0 USER PROFILE SYSTEM - Direct API Approach (Proven Reliable)
 // ===================================================================
 
 /**
- * 👤 2.1 Initialize user profile structure using Subjournals pattern
- * Creates the complete "My Info::" and "Book Notes::" structure with bulletproof retry logic
+ * 👤 2.1 Initialize user profile structure using direct API approach
+ * Creates "My Info::" and "Book Notes::" structure with proven reliability
  * @param {string} username - Username to initialize profile for
  * @returns {boolean} - Success status
  */
 const initializeUserProfile = async (username) => {
   const startTime = Date.now();
-  const TIMEOUT = 5000; // 5 second timeout
-  const workingOn = { step: null, uid: null, content: null };
+  const TIMEOUT = 10000; // 10 second timeout
   let loopCount = 0;
 
   console.log(`🎯 Initializing user profile structure for ${username}...`);
@@ -268,33 +267,53 @@ const initializeUserProfile = async (username) => {
 
     try {
       // STEP 1: Ensure user page exists
-      let userPageUid = await getOrCreatePageUid(username);
+      let userPageUid = window.roamAlphaAPI.q(`
+        [:find ?uid :where [?e :node/title "${username}"] [?e :block/uid ?uid]]
+      `)?.[0]?.[0];
+
       if (!userPageUid) {
-        if (workingOn.step !== "page") {
-          workingOn.step = "page";
-          workingOn.uid = null;
-          workingOn.content = username;
-          console.log(`➕ Creating user page: ${username}`);
-          userPageUid = await window.roamAlphaAPI.data.page.create({
-            page: { title: username },
-          });
-        }
-        continue; // Retry
+        console.log(`➕ Creating user page: ${username}`);
+        userPageUid = window.roamAlphaAPI.util.generateUID();
+        await window.roamAlphaAPI.data.page.create({
+          page: { title: username, uid: userPageUid },
+        });
+        continue; // Retry to verify creation
       }
 
       // STEP 2: Ensure "My Info::" block exists
-      const myInfoBlock = await findOrCreateBlock(userPageUid, "My Info::");
-      if (!myInfoBlock) {
-        if (workingOn.step !== "myinfo" || workingOn.uid !== userPageUid) {
-          workingOn.step = "myinfo";
-          workingOn.uid = userPageUid;
-          workingOn.content = "My Info::";
-          await createBlockSimple(userPageUid, "My Info::");
-        }
-        continue; // Retry
+      const myInfoQuery = window.roamAlphaAPI.q(`
+        [:find (pull ?child [:block/uid :block/string])
+         :where 
+         [?parent :block/uid "${userPageUid}"] 
+         [?child :block/parents ?parent]
+         [?child :block/string ?string] 
+         [(clojure.string/starts-with? ?string "My Info::")]]
+      `);
+
+      let myInfoBlock = null;
+      if (myInfoQuery.length > 0) {
+        const found = myInfoQuery[0][0];
+        myInfoBlock = {
+          uid: found[":block/uid"] || found.uid,
+          string: found[":block/string"] || found.string,
+        };
+      } else {
+        // Create My Info block
+        const childCount =
+          window.roamAlphaAPI.q(`
+          [:find (count ?child) :where 
+           [?parent :block/uid "${userPageUid}"] [?child :block/parents ?parent]]
+        `)?.[0]?.[0] || 0;
+
+        const myInfoUid = window.roamAlphaAPI.util.generateUID();
+        await window.roamAlphaAPI.data.block.create({
+          location: { "parent-uid": userPageUid, order: childCount },
+          block: { uid: myInfoUid, string: "My Info::" },
+        });
+        continue; // Retry to verify creation
       }
 
-      // STEP 3: Create profile fields under "My Info::"
+      // STEP 3: Create profile fields under My Info
       const profileFields = [
         { name: "Avatar::", defaultValue: "__not yet entered__" },
         { name: "Location::", defaultValue: "__not yet entered__" },
@@ -308,38 +327,53 @@ const initializeUserProfile = async (username) => {
       let myInfoSkippedCount = 0;
 
       for (const field of profileFields) {
-        const fieldBlock = await findOrCreateBlock(myInfoBlock.uid, field.name);
+        const fieldQuery = window.roamAlphaAPI.q(`
+          [:find (pull ?child [:block/uid :block/string])
+           :where 
+           [?parent :block/uid "${myInfoBlock.uid}"] 
+           [?child :block/parents ?parent]
+           [?child :block/string ?string] 
+           [(clojure.string/starts-with? ?string "${field.name}")]]
+        `);
 
-        if (!fieldBlock) {
-          if (
-            workingOn.step !== `field-${field.name}` ||
-            workingOn.uid !== myInfoBlock.uid
-          ) {
-            workingOn.step = `field-${field.name}`;
-            workingOn.uid = myInfoBlock.uid;
-            workingOn.content = field.name;
-            await createBlockSimple(myInfoBlock.uid, field.name);
-          }
-          allMyInfoFieldsCreated = false;
-          break; // Exit field loop, retry main loop
-        }
+        if (fieldQuery.length === 0) {
+          // Create field block
+          const fieldChildCount =
+            window.roamAlphaAPI.q(`
+            [:find (count ?child) :where 
+             [?parent :block/uid "${myInfoBlock.uid}"] [?child :block/parents ?parent]]
+          `)?.[0]?.[0] || 0;
 
-        // Check if field has content
-        const hasContent = await blockHasChildren(fieldBlock.uid);
-        if (!hasContent) {
-          if (
-            workingOn.step !== `value-${field.name}` ||
-            workingOn.uid !== fieldBlock.uid
-          ) {
-            workingOn.step = `value-${field.name}`;
-            workingOn.uid = fieldBlock.uid;
-            workingOn.content = field.defaultValue;
-            await createBlockSimple(fieldBlock.uid, field.defaultValue);
-          }
+          const fieldUid = window.roamAlphaAPI.util.generateUID();
+          await window.roamAlphaAPI.data.block.create({
+            location: { "parent-uid": myInfoBlock.uid, order: fieldChildCount },
+            block: { uid: fieldUid, string: field.name },
+          });
           allMyInfoFieldsCreated = false;
           break; // Exit field loop, retry main loop
         } else {
-          myInfoSkippedCount++;
+          const fieldBlock = fieldQuery[0][0];
+          const fieldUid = fieldBlock[":block/uid"] || fieldBlock.uid;
+
+          // Check if field has content
+          const fieldContentCount =
+            window.roamAlphaAPI.q(`
+            [:find (count ?child) :where 
+             [?parent :block/uid "${fieldUid}"] [?child :block/parents ?parent]]
+          `)?.[0]?.[0] || 0;
+
+          if (fieldContentCount === 0) {
+            // Add default content
+            const valueUid = window.roamAlphaAPI.util.generateUID();
+            await window.roamAlphaAPI.data.block.create({
+              location: { "parent-uid": fieldUid, order: 0 },
+              block: { uid: valueUid, string: field.defaultValue },
+            });
+            allMyInfoFieldsCreated = false;
+            break; // Exit field loop, retry main loop
+          } else {
+            myInfoSkippedCount++;
+          }
         }
       }
 
@@ -348,39 +382,59 @@ const initializeUserProfile = async (username) => {
       }
 
       // STEP 4: Ensure "Book Notes::" block exists
-      const bookNotesBlock = await findOrCreateBlock(
-        userPageUid,
-        "Book Notes::"
-      );
-      if (!bookNotesBlock) {
-        if (workingOn.step !== "booknotes" || workingOn.uid !== userPageUid) {
-          workingOn.step = "booknotes";
-          workingOn.uid = userPageUid;
-          workingOn.content = "Book Notes::";
-          await createBlockSimple(userPageUid, "Book Notes::");
-        }
-        continue; // Retry
+      const bookNotesQuery = window.roamAlphaAPI.q(`
+        [:find (pull ?child [:block/uid :block/string])
+         :where 
+         [?parent :block/uid "${userPageUid}"] 
+         [?child :block/parents ?parent]
+         [?child :block/string ?string] 
+         [(clojure.string/starts-with? ?string "Book Notes::")]]
+      `);
+
+      let bookNotesBlock = null;
+      if (bookNotesQuery.length > 0) {
+        const found = bookNotesQuery[0][0];
+        bookNotesBlock = {
+          uid: found[":block/uid"] || found.uid,
+          string: found[":block/string"] || found.string,
+        };
+      } else {
+        // Create Book Notes block
+        const childCount =
+          window.roamAlphaAPI.q(`
+          [:find (count ?child) :where 
+           [?parent :block/uid "${userPageUid}"] [?child :block/parents ?parent]]
+        `)?.[0]?.[0] || 0;
+
+        const bookNotesUid = window.roamAlphaAPI.util.generateUID();
+        await window.roamAlphaAPI.data.block.create({
+          location: { "parent-uid": userPageUid, order: childCount },
+          block: { uid: bookNotesUid, string: "Book Notes::" },
+        });
+        continue; // Retry to verify creation
       }
 
-      // STEP 5: Ensure "Book Notes::" has default content if empty
-      const bookNotesHasContent = await blockHasChildren(bookNotesBlock.uid);
-      if (!bookNotesHasContent) {
-        if (
-          workingOn.step !== "booknotes-content" ||
-          workingOn.uid !== bookNotesBlock.uid
-        ) {
-          workingOn.step = "booknotes-content";
-          workingOn.uid = bookNotesBlock.uid;
-          workingOn.content = "__Add your book notes here...__";
-          await createBlockSimple(
-            bookNotesBlock.uid,
-            "__Add your book notes here...__"
-          );
-        }
-        continue; // Retry
+      // STEP 5: Ensure Book Notes has default content if empty
+      const bookNotesContentCount =
+        window.roamAlphaAPI.q(`
+        [:find (count ?child) :where 
+         [?parent :block/uid "${bookNotesBlock.uid}"] [?child :block/parents ?parent]]
+      `)?.[0]?.[0] || 0;
+
+      if (bookNotesContentCount === 0) {
+        // Add placeholder content
+        const placeholderUid = window.roamAlphaAPI.util.generateUID();
+        await window.roamAlphaAPI.data.block.create({
+          location: { "parent-uid": bookNotesBlock.uid, order: 0 },
+          block: {
+            uid: placeholderUid,
+            string: "__Add your book notes here...__",
+          },
+        });
+        continue; // Retry to verify creation
       }
 
-      // SUCCESS - all sections exist with content
+      // SUCCESS - All sections created!
       myInfoCreatedCount = profileFields.length - myInfoSkippedCount;
       console.log(`✅ Profile initialization complete for ${username}:`);
       console.log(
@@ -388,9 +442,9 @@ const initializeUserProfile = async (username) => {
       );
       console.log(
         `   - "Book Notes::" section: ${
-          bookNotesHasContent
-            ? "already had content"
-            : "created with placeholder"
+          bookNotesContentCount === 1
+            ? "created with placeholder"
+            : "already had content"
         }`
       );
       console.log(
@@ -408,120 +462,19 @@ const initializeUserProfile = async (username) => {
   );
 };
 
-// ===================================================================
-// 🔧 SUPPORTING FUNCTIONS - Subjournals Pattern
-// ===================================================================
-
 /**
- * Get or create page UID using Subjournals pattern
- */
-const getOrCreatePageUid = async (title) => {
-  try {
-    // Check if page already exists
-    let pageUid = window.roamAlphaAPI.q(`
-      [:find ?uid :where [?e :node/title "${title}"] [?e :block/uid ?uid]]
-    `)?.[0]?.[0];
-
-    if (pageUid) return pageUid;
-
-    // Create the page
-    pageUid = window.roamAlphaAPI.util.generateUID();
-    await window.roamAlphaAPI.data.page.create({
-      page: { title, uid: pageUid },
-    });
-    return pageUid;
-  } catch (error) {
-    console.error(`getOrCreatePageUid failed for "${title}":`, error);
-    return null;
-  }
-};
-
-/**
- * Find or create block using Subjournals pattern
- */
-const findOrCreateBlock = async (parentUid, blockText) => {
-  try {
-    // Search for existing block
-    const existing = window.roamAlphaAPI.q(`
-      [:find (pull ?child [:block/uid :block/string])
-       :where 
-       [?parent :block/uid "${parentUid}"] [?child :block/parents ?parent]
-       [?child :block/string ?string] [(clojure.string/starts-with? ?string "${blockText}")]]
-    `);
-
-    if (existing.length > 0) {
-      const found = existing[0][0];
-      return {
-        uid: found[":block/uid"] || found.uid,
-        string: found[":block/string"] || found.string,
-      };
-    }
-
-    // Block doesn't exist, caller should create it
-    return null;
-  } catch (error) {
-    console.error(`findOrCreateBlock failed for "${blockText}":`, error);
-    return null;
-  }
-};
-
-/**
- * Create block using Subjournals pattern
- */
-const createBlockSimple = async (parentUid, content) => {
-  try {
-    const childCount =
-      window.roamAlphaAPI.q(`
-      [:find (count ?child) :where 
-       [?parent :block/uid "${parentUid}"] [?child :block/parents ?parent]]
-    `)?.[0]?.[0] || 0;
-
-    const blockUid = window.roamAlphaAPI.util.generateUID();
-    await window.roamAlphaAPI.data.block.create({
-      location: { "parent-uid": parentUid, order: childCount },
-      block: { uid: blockUid, string: content },
-    });
-
-    return blockUid;
-  } catch (error) {
-    console.error(`createBlockSimple failed for "${content}":`, error);
-    throw error;
-  }
-};
-
-/**
- * Check if block has children using Subjournals pattern
- */
-const blockHasChildren = async (blockUid) => {
-  try {
-    const childCount =
-      window.roamAlphaAPI.q(`
-      [:find (count ?child) :where 
-       [?parent :block/uid "${blockUid}"] [?child :block/parents ?parent]]
-    `)?.[0]?.[0] || 0;
-
-    return childCount > 0;
-  } catch (error) {
-    console.error(`blockHasChildren failed for "${blockUid}":`, error);
-    return false;
-  }
-};
-
-/**
- * 👤 2.2 Check if user profile is complete
+ * 👤 2.2 Check if user profile is complete using direct API
  * Verifies that all required profile sections exist and are filled
  * @param {string} username - Username to check
  * @returns {Object} - Profile completeness info
  */
 const checkUserProfileCompleteness = async (username) => {
   try {
-    const platform = window.RoamExtensionSuite;
-    const findNestedDataValuesExact = platform.getUtility(
-      "findNestedDataValuesExact"
-    );
-    const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
+    // Check if user page exists
+    const userPageUid = window.roamAlphaAPI.q(`
+      [:find ?uid :where [?e :node/title "${username}"] [?e :block/uid ?uid]]
+    `)?.[0]?.[0];
 
-    const userPageUid = getPageUidByTitle(username);
     if (!userPageUid) {
       return {
         exists: false,
@@ -532,13 +485,28 @@ const checkUserProfileCompleteness = async (username) => {
       };
     }
 
-    // Check "My Info::" section
-    const myInfoData = findNestedDataValuesExact(userPageUid, "My Info");
-    const hasMyInfo = myInfoData && Object.keys(myInfoData).length > 0;
+    // Check for My Info block
+    const myInfoQuery = window.roamAlphaAPI.q(`
+      [:find (pull ?child [:block/uid])
+       :where 
+       [?parent :block/uid "${userPageUid}"] 
+       [?child :block/parents ?parent]
+       [?child :block/string ?string] 
+       [(clojure.string/starts-with? ?string "My Info::")]]
+    `);
 
-    // Check "Book Notes::" section
-    const bookNotesData = findNestedDataValuesExact(userPageUid, "Book Notes");
-    const hasBookNotes = bookNotesData && Object.keys(bookNotesData).length > 0;
+    // Check for Book Notes block
+    const bookNotesQuery = window.roamAlphaAPI.q(`
+      [:find (pull ?child [:block/uid])
+       :where 
+       [?parent :block/uid "${userPageUid}"] 
+       [?child :block/parents ?parent]
+       [?child :block/string ?string] 
+       [(clojure.string/starts-with? ?string "Book Notes::")]]
+    `);
+
+    const hasMyInfo = myInfoQuery.length > 0;
+    const hasBookNotes = bookNotesQuery.length > 0;
 
     if (!hasMyInfo && !hasBookNotes) {
       return {
@@ -554,36 +522,78 @@ const checkUserProfileCompleteness = async (username) => {
     }
 
     const requiredFields = [
-      "avatar",
-      "location",
-      "role",
-      "timezone",
-      "aboutMe",
+      "Avatar::",
+      "Location::",
+      "Role::",
+      "Timezone::",
+      "About Me::",
     ];
     const missingFields = [];
     const incompleteFields = [];
 
-    // Check My Info fields
-    for (const field of requiredFields) {
-      const value = myInfoData?.[field];
-      if (!value || value === "__missing field__") {
-        missingFields.push(`My Info: ${field}`);
-      } else if (value === "__not yet entered__") {
-        incompleteFields.push(`My Info: ${field}`);
+    // Check My Info fields if it exists
+    if (hasMyInfo) {
+      const myInfoUid = myInfoQuery[0][0][":block/uid"];
+
+      for (const fieldName of requiredFields) {
+        const fieldQuery = window.roamAlphaAPI.q(`
+          [:find (pull ?child [:block/uid])
+           :where 
+           [?parent :block/uid "${myInfoUid}"] 
+           [?child :block/parents ?parent]
+           [?child :block/string ?string] 
+           [(clojure.string/starts-with? ?string "${fieldName}")]]
+        `);
+
+        if (fieldQuery.length === 0) {
+          missingFields.push(`My Info: ${fieldName.replace("::", "")}`);
+        } else {
+          // Check if field has content
+          const fieldUid = fieldQuery[0][0][":block/uid"];
+          const contentQuery = window.roamAlphaAPI.q(`
+            [:find (pull ?child [:block/string])
+             :where 
+             [?parent :block/uid "${fieldUid}"] 
+             [?child :block/parents ?parent]]
+          `);
+
+          if (contentQuery.length === 0) {
+            incompleteFields.push(
+              `My Info: ${fieldName.replace("::", "")} (no content)`
+            );
+          } else {
+            const content = contentQuery[0][0][":block/string"];
+            if (content === "__not yet entered__") {
+              incompleteFields.push(
+                `My Info: ${fieldName.replace("::", "")} (placeholder)`
+              );
+            }
+          }
+        }
       }
+    } else {
+      missingFields.push("My Info:: block missing");
     }
 
     // Check Book Notes section
     if (!hasBookNotes) {
       missingFields.push("Book Notes:: block missing");
     } else {
-      // Check if Book Notes has actual content or just placeholder
-      const bookNotesContent = Object.values(bookNotesData)[0]; // Get first value
-      if (
-        !bookNotesContent ||
-        bookNotesContent === "__Add your book notes here...__"
-      ) {
-        incompleteFields.push("Book Notes: needs content");
+      const bookNotesUid = bookNotesQuery[0][0][":block/uid"];
+      const bookNotesContentQuery = window.roamAlphaAPI.q(`
+        [:find (pull ?child [:block/string])
+         :where 
+         [?parent :block/uid "${bookNotesUid}"] 
+         [?child :block/parents ?parent]]
+      `);
+
+      if (bookNotesContentQuery.length === 0) {
+        incompleteFields.push("Book Notes: no content");
+      } else {
+        const content = bookNotesContentQuery[0][0][":block/string"];
+        if (content === "__Add your book notes here...__") {
+          incompleteFields.push("Book Notes: placeholder content");
+        }
       }
     }
 
@@ -832,46 +842,7 @@ const testAuthentication = () => {
 };
 
 /**
- * 🧪 4.4 Test preference page creation
- * Tests the preference page creation process
- */
-const testPreferencePageCreation = async () => {
-  console.group("🧪 TESTING: Preference Page Creation");
-
-  const username = getCurrentUsername();
-  if (!username) {
-    console.error("❌ No current user found for testing");
-    console.groupEnd();
-    return;
-  }
-
-  try {
-    console.log(`🎯 Testing preference page creation for: ${username}`);
-
-    const pageUid = await getUserPreferencesPageUid(username);
-
-    if (pageUid) {
-      console.log(`✅ Preference page UID: ${pageUid}`);
-
-      // Verify page exists
-      const platform = window.RoamExtensionSuite;
-      const getPageUidByTitle = platform.getUtility("getPageUidByTitle");
-      const verifyUid = getPageUidByTitle(`${username}/user preferences`);
-
-      console.log(`✅ Page verification: ${verifyUid ? "Found" : "Not found"}`);
-      console.log(`✅ UIDs match: ${pageUid === verifyUid}`);
-    } else {
-      console.error("❌ Failed to create preference page");
-    }
-  } catch (error) {
-    console.error("❌ Preference page creation test failed:", error);
-  }
-
-  console.groupEnd();
-};
-
-/**
- * 🧪 4.5 Run all system tests
+ * 🧪 4.4 Run all system tests
  * Comprehensive test suite for Extension 2
  */
 const runAllTests = async () => {
@@ -883,19 +854,15 @@ const runAllTests = async () => {
   console.log("=== TEST 1: AUTHENTICATION ===");
   testAuthentication();
 
-  // Test 2: Preference page creation
-  console.log("\n=== TEST 2: PREFERENCE PAGE CREATION ===");
-  await testPreferencePageCreation();
-
-  // Test 3: Preferences functionality
-  console.log("\n=== TEST 3: PREFERENCES FUNCTIONALITY ===");
+  // Test 2: Preferences functionality
+  console.log("\n=== TEST 2: PREFERENCES FUNCTIONALITY ===");
   const user = getAuthenticatedUser();
   if (user) {
     await testUserPreferences(user.displayName);
   }
 
-  // Test 4: Profile functionality
-  console.log("\n=== TEST 4: PROFILE FUNCTIONALITY ===");
+  // Test 3: Profile functionality
+  console.log("\n=== TEST 3: PROFILE FUNCTIONALITY ===");
   if (user) {
     await testUserProfile(user.displayName);
   }
@@ -1102,7 +1069,6 @@ export default {
       testUserPreferences,
       testUserProfile,
       testAuthentication,
-      testPreferencePageCreation,
       runAllTests,
     };
 
@@ -1129,7 +1095,7 @@ export default {
       {
         name: "Extension 2.0: User Authentication + Preferences + Profile",
         description:
-          "Complete user authentication, preferences management, and profile initialization system",
+          "Complete user authentication, preferences management, and profile initialization system with reliable direct API approach",
         version: "2.0.0",
         dependencies: ["utility-library"],
       }
@@ -1267,7 +1233,7 @@ export default {
       "✅ Extension 2.0: User Authentication + Preferences + Profile loaded!"
     );
     console.log(
-      "🦊 Features: User preferences + authentication + profile initialization"
+      "🦊 Features: User preferences + authentication + profile initialization with Book Notes"
     );
     console.log("🧹 Dependencies: Extension 1.5 utilities only");
     console.log(
@@ -1282,21 +1248,39 @@ export default {
       '💡 Try: Cmd+P → "Auth: Complete User Setup (Preferences + Profile)"'
     );
 
-    // Auto-setup current user on startup if detected
+    // Improved auto-setup with better timing and error handling
     if (currentUser) {
       console.log("🔍 Auto-running setup for current user...");
       setTimeout(async () => {
-        testAuthentication();
+        try {
+          testAuthentication();
 
-        // Auto-initialize profile if needed
-        const completeness = await checkUserProfileCompleteness(
-          currentUser.displayName
-        );
-        if (completeness.needsInitialization) {
-          console.log("🔧 Auto-initializing profile for current user...");
-          await initializeCurrentUserProfile();
+          // Auto-initialize profile if needed
+          const completeness = await checkUserProfileCompleteness(
+            currentUser.displayName
+          );
+          console.log("📊 Startup profile check:", completeness);
+
+          if (completeness.needsInitialization) {
+            console.log("🔧 Auto-initializing profile for current user...");
+            const success = await initializeCurrentUserProfile();
+            if (success) {
+              console.log("✅ Auto-initialization completed successfully!");
+            } else {
+              console.log(
+                "ℹ️ Auto-initialization skipped - profile already complete"
+              );
+            }
+          } else {
+            console.log(
+              "✅ Profile already complete - no initialization needed"
+            );
+          }
+        } catch (error) {
+          console.warn("⚠️ Auto-setup encountered an issue:", error.message);
+          console.log("💡 You can run setup manually via command palette");
         }
-      }, 1000);
+      }, 2000); // Increased delay for better reliability
     }
   },
 
